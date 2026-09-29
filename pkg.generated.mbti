@@ -1,0 +1,52 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "z2823253773-p/moonreconcile"
+
+// Values
+pub fn invoke(String) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct Config {
+  fields : Array[FieldConfig]
+  key : Array[String]
+  ignore_left : Array[String]
+  ignore_right : Array[String]
+  candidates : Json
+}
+
+pub(all) struct CsvTable {
+  headers : Array[String]
+  rows : Array[Array[String]]
+}
+
+pub(all) struct EngineError {
+  code : String
+  message : String
+  phase : String
+  side : Json
+  record : Json
+  field : Json
+}
+
+pub(all) struct FieldConfig {
+  name : String
+  left : String
+  right : String
+  field_type : String
+  compare : Bool
+  trim_ascii : Bool
+  lower_ascii : Bool
+  left_values : Map[String, String]
+  right_values : Map[String, String]
+  missing : Array[String]
+  both_missing : String
+  abs_tol : String
+  rel_tol : String
+  days_tol : Int
+}
+
+// Type aliases
+
+// Traits
+

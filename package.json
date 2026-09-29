@@ -1,0 +1,13 @@
+{
+  "name": "moonreconcile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:js": "moon build cmd/bridge --target js",
+    "test": "npm run build:js && node --test tests/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

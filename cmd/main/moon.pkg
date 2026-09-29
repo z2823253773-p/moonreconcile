@@ -1,0 +1,5 @@
+// import {
+//   "z2823253773-p/moonreconcile" @lib,
+// }
+
+pkgtype(kind: "executable")

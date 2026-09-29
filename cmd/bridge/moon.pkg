@@ -1,0 +1,9 @@
+import {
+  "z2823253773-p/moonreconcile" @engine,
+}
+
+pkgtype(kind: "foreign_library")
+
+options(
+  link: { "js": { "exports": [ "invoke_bridge" ], "format": "esm" } },
+)
