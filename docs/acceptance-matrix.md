@@ -12,6 +12,7 @@
 | --- | --- | --- | --- |
 | T01 | Task 1：严格 CSV 导入、配置校验与 MoonBit/Node 桥接；不含文件 CLI、对应、复核或报告 | `moon check --target js` exit 0；`moon test --target js` 23/23；`npm test` 6/6；[独立复审](evidence/task1-rereview.md) 针对 `2d05f5e` 确认 I1–I7 和 M1–M3 均已修复，后续文档提交未改变引擎源码 | pass |
 | T02 | Task 2：精确十进制、严格日期、字段转换/缺失策略与比较证据；不含整表对应或 CLI | 提交 `540767c`：`moon check --target js` exit 0；`moon test --target js` 45/45；`npm test` 6/6；[独立审查与复审](evidence/task2-review.md) 确认 Unicode 日期崩溃已修复，独立副本 48/48（含 100 组 Decimal 与 100 组日期金标准） | pass |
+| T03 | Task 3：精确组合键、异常键诊断、结构报告、字段明细、记录计数与 compare 接口；不含候选/决定/CLI | 提交 `1710446`：[独立审查与复审](evidence/task3-review.md) PASS；MoonBit 50/50、Node 8/8，200 组独立配对/守恒/确定性核对通过；JSON 合同、忽略列错误、规范化配置已回归 | pass |
 
 ## 1. 规格章节与产品闭环
 
