@@ -14,6 +14,8 @@
 | T02 | Task 2：精确十进制、严格日期、字段转换/缺失策略与比较证据；不含整表对应或 CLI | 提交 `540767c`：`moon check --target js` exit 0；`moon test --target js` 45/45；`npm test` 6/6；[独立审查与复审](evidence/task2-review.md) 确认 Unicode 日期崩溃已修复，独立副本 48/48（含 100 组 Decimal 与 100 组日期金标准） | pass |
 | T03 | Task 3：精确组合键、异常键诊断、结构报告、字段明细、记录计数与 compare 接口；不含候选/决定/CLI | 提交 `1710446`：[独立审查与复审](evidence/task3-review.md) PASS；MoonBit 50/50、Node 8/8，200 组独立配对/守恒/确定性核对通过；JSON 合同、忽略列错误、规范化配置已回归 | pass |
 
+| T04 | Task 4：候选生成、固定分母评分、Unicode 编辑距离、预算保护、最大权重部分建议；不含人工决定/CLI | 提交 `4fe8f74`：[独立审查](evidence/task4-review.md) PASS，63 MoonBit/8 Node/9 独立场景；控制器 240 图穷举对照 64/64。稀疏性能问题记录并交 Task 7 实测 | pass |
+
 ## 1. 规格章节与产品闭环
 
 | ID | 规格 | 验收对象与通过条件 | 证据位置（计划） | 状态 |
