@@ -2,7 +2,11 @@
 package "z2823253773-p/moonreconcile"
 
 // Values
+pub fn compare_field(String, String, FieldConfig) -> FieldComparison
+
 pub fn invoke(String) -> String
+
+pub fn normalize_value(String, FieldConfig, String) -> NormalizedValue
 
 // Errors
 
@@ -29,6 +33,24 @@ pub(all) struct EngineError {
   field : Json
 }
 
+pub(all) struct FieldComparison {
+  field : String
+  field_type : String
+  left_raw : String
+  right_raw : String
+  left_transformed : String
+  right_transformed : String
+  left_canonical : String?
+  right_canonical : String?
+  left_missing : Bool
+  right_missing : Bool
+  status : String
+  rules : Array[String]
+  difference : String?
+  tolerance : String?
+  explanation : String
+}
+
 pub(all) struct FieldConfig {
   name : String
   left : String
@@ -44,6 +66,15 @@ pub(all) struct FieldConfig {
   abs_tol : String
   rel_tol : String
   days_tol : Int
+}
+
+pub(all) struct NormalizedValue {
+  raw : String
+  transformed : String
+  canonical : String?
+  missing : Bool
+  invalid : Bool
+  rules : Array[String]
 }
 
 // Type aliases
