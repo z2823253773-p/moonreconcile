@@ -1,6 +1,6 @@
 # Task 4 implementation report
 
-- Repository: `/Users/henryz/Desktop/比赛/moonreconcile`
+- Repository: this working copy (local development checkout)
 - Base branch / SHA: `feature/initial-product` / `c2683333674de2e120dfcd097a16a6f191690b7b`
 - Local milestone commit: `4fe8f74d3a416e01c56e2f727fe3dd4454c3c69e` (`Implement budgeted candidate matching`); worktree clean, branch one commit ahead of origin.
 - Scope: candidate pair generation, scoring, pre-score and qualified component handling, maximum-weight partial assignment, report integration. No decision workflow, CLI, or push performed in this report state.

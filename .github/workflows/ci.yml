@@ -1,0 +1,82 @@
+name: CI
+
+# Task 8 requires CI on Ubuntu and macOS with a recorded MoonBit toolchain,
+# Node 22, and the build/core/integration/oracle/workflow gates.
+#
+# Toolchain pinning: the locally verified toolchain is moon 0.1.20260713 /
+# moonc v0.10.4+2cc641edf (see docs/dependency-audit.md). The installer is
+# invoked with an explicit version, and `moon version --all` is echoed on every
+# run so a silent drift is visible in the job log. The exact pin string has NOT
+# been executed against the live installer from this development machine
+# (no network access in that sandbox); the first remote run is what verifies it.
+# If the pin form is rejected, the step fails loudly rather than silently
+# falling back to a different toolchain.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Recorded toolchain from docs/dependency-audit.md section 1.
+  MOONBIT_VERSION: "0.1.20260713"
+  NODE_VERSION: "22"
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history: scripts/check-library-consumer.py uses `git archive`
+          # of the exact HEAD revision.
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install MoonBit toolchain
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh \
+            | bash -s -- --version "$MOONBIT_VERSION"
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Record actual toolchain versions
+        run: |
+          moon version --all
+          node --version
+          python3 --version
+
+      - name: Build and check core
+        run: |
+          moon check --target js
+          moon info
+          moon fmt --check
+
+      - name: Core unit tests (MoonBit)
+        run: moon test --target js
+
+      - name: Build bridge and run host integration tests
+        run: npm test
+
+      - name: Synthetic workflow end-to-end chains
+        run: npm run test:workflows
+
+      - name: Independent assignment oracle
+        run: python3 scripts/check-assignment-oracle.py
+
+      - name: Independent MoonBit library consumer
+        run: python3 scripts/check-library-consumer.py
