@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - New repository only: `moonreconcile/`; never edit the sibling `moontick/` project or create a Git repository at their parent.
-- User has authorized execution by GPT6-Luna, planning/review by GPT6-Astra, and GitHub publication. No further plan approval is required.
+- The project owner has authorized development and GitHub publication. Changes still require the documented tests and review gates.
 - Implement the full `导入 → 列映射与规则配置 → 记录对应 → 字段差异解释 → 人工复核 → 最终报告导出` loop.
 - `首个完整版本中，所有候选分配均需人工接受；只有满足唯一键契约的对应自动成立。`
 - `不自动猜测类型、货币、日期格式、主键或 Unicode 规范化方式。原值始终保留。`
@@ -205,7 +205,7 @@ Run directory files: `manifest.json`, `input/left.csv`, `input/right.csv`, `conf
 - [ ] Write a README acceptance smoke test that executes the documented commands from a clean checkout, accepting explicitly documented exit 1/3 where appropriate.
 - [ ] Write Chinese project proposal: problem/workflows, existing-tool overlap, implemented capabilities, MoonBit/host boundaries, exact rules, real measured tests/performance, synthetic-data caveat, known limits, demand-validation gap, and continuation criteria. Distinguish delivered code/GitHub status from contest acceptance and real workflow adoption.
 - [ ] Add CI on Ubuntu and macOS with pinned or explicitly recorded MoonBit toolchain installation, Node 22, build/core/integration/oracle/workflow tests. Do not fabricate a passing remote run.
-- [ ] Have Astra review current exact commit for spec coverage and high-risk invariants, while Luna fixes actionable findings using failing regression tests. No release claim until all required local gates pass; unresolved scope defects remain named blockers.
+- [ ] Independently review the current exact commit for spec coverage and high-risk invariants; fix actionable findings using failing regression tests. No release claim until all required local gates pass; unresolved scope defects remain named blockers.
 - [ ] Inspect tracked/public payload: no credentials, private source snapshots, personal path-derived data, old project files, dependency caches or giant generated runs. Stage only intended new repository files, use meaningful milestone commits (no arbitrary count requirement).
 - [ ] Publish the authorized repository to `https://github.com/z2823253773-p/moonreconcile`, push the tested commit, verify repository API/README visibility and remote CI exact SHA. If network/auth blocks occur, report actual blocker and retain local deliverables; do not claim upload succeeded.
 - [ ] Verify from a fresh checkout and run the documented example. Deliver repository URL, exact tested SHA, proposal path, actual local/remote evidence, and remaining demand/XLSX/contest uncertainty. Mooncakes publication is a separate optional action, not implied by GitHub delivery.
@@ -214,6 +214,6 @@ Run directory files: `manifest.json`, `input/left.csv`, `input/right.csv`, `conf
 
 Implementation is complete only when Tasks 1–8 pass (publication proof included), all six product stages work, all four record states conserve counts, full suggestions require human review, and each workflow produces final reports. Existing competing tools and absent real workflow evidence are product risks; they do not excuse missing implementation semantics.
 
-Astra owns this plan and final independent review; Luna owns implementation tasks. Start Luna on Task 1 immediately, then Task 2; sequentially integrate contracts before parallel work. A reviewer may reject a task without changing adjacent interfaces. Record task status, exact commands, failure evidence, fixes, SHA and any contract change in `docs/validation.md`. Major contract changes require synchronizing this plan and tests; no renewed user permission is needed for routine implementation choices already within scope.
+Complete Task 1 before Task 2; integrate contracts sequentially. A reviewer may reject a task without changing adjacent interfaces. Record task status, exact commands, failure evidence, fixes, SHA and any contract change in `docs/validation.md`. Major contract changes require synchronizing this plan and tests.
 
 Self-review completed: every spec section has a task; interface names and JSON keys align; the five review risks map to explicit tests; real workflow/XLSX need is honestly unverified; all data processing algorithms stay in MoonBit. Work must not stop after exact diff, matching alone, or export-only output.
