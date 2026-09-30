@@ -298,3 +298,15 @@ test "identical_invalid_values_are_not_equal" {
   let result = compare_field("2024-02-30", "2024-02-30", date_field_for_test())
   assert_eq(result.status, "invalid_value")
 }
+
+///|
+test "unicode_malformed_date_is_invalid_value_not_panic" {
+  let malformed = "😀😀😀😀-x"
+  assert_true(normalize_value(malformed, date_field_for_test(), "left").invalid)
+  let result = compare_field(malformed, "2024-01-01", date_field_for_test())
+  assert_eq(result.status, "invalid_value")
+  assert_eq(result.explanation, "value_does_not_match_declared_type")
+  assert_eq(result.left_raw, malformed)
+  assert_true(result.left_canonical is None)
+  assert_eq(result.left_transformed, malformed)
+}

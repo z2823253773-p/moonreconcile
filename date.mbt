@@ -45,10 +45,10 @@ fn date_parse_digits(chars : Array[Char], start : Int, end : Int) -> Int {
 
 ///|
 fn date_parse(text : String) -> (String, Int)? {
-  if text.length() != 10 {
+  let chars = text.to_array()
+  if chars.length() != 10 {
     return None
   }
-  let chars = text.to_array()
   if chars[4] != '-' || chars[7] != '-' {
     return None
   }
