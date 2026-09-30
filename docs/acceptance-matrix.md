@@ -20,7 +20,7 @@
 
 | T06 | Task 6：四命令、快照指纹、事务保护及11文件导出；不含完整场景/规模/远端CI | 修复提交 `4304f75`：[独立复审](evidence/task6-rereview.md)确认七项缺陷修复；82MoonBit/53Node，含I/O与目录保护回归 | pass |
 
-| T07 | Task 7：三个合成工作流端到端、确定性基准与规模实测；不含需求证据、竞品实测、XLSX、远端CI | `npm run test:workflows`：orders/migration/catalog 各自 compare→resolve→重放通过；`npm run benchmark` 写入 `docs/evidence/task7-benchmark.json`；结果表见 `docs/validation.md`。**证据仅为合成数据与单机测量**，不含真实流程 | pass（范围受限） |
+| T07 | Task 7：三个合成工作流端到端、确定性基准与规模实测；不含需求证据、竞品实测、XLSX、远端CI | `npm run test:workflows`：orders/migration/catalog 各自 compare→resolve→重放通过；`npm run benchmark` 写入 `docs/evidence/task7-benchmark.json`；结果表见 `docs/validation.md`。**证据仅为合成数据与单机测量**，不含真实流程；Task 7 独立审查席位因额度限制未形成报告 | 部分：本地实现和门禁通过，独立审查未完成 |
 
 | U01 | Task 8 文档与交付：架构/配置/复核文档、CI 配置、README 验收路径 | `docs/architecture.md`、`docs/configuration.md`、`docs/review-workflow.md` 已创建并逐项对照源码；`.github/workflows/ci.yml` 已提交。四条 CLI 命令已在本机端到端实跑通过 | 部分：CI **从未在远端执行**，无 Actions 通过证据；公开载荷复核待完成 |
 
