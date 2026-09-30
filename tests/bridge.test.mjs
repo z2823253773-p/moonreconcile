@@ -105,7 +105,7 @@ test("init_config returns a structured error for malformed CSV", () => {
 
 });
 
-test("compare returns exact reconciliation JSON and resolve remains unsupported", () => {
+test("compare returns exact reconciliation JSON and resolve applies human review", () => {
   const config = {
     schema_version: 1,
     fields: [
@@ -214,9 +214,17 @@ test("compare returns exact reconciliation JSON and resolve remains unsupported"
   assert.equal(missingColumn.error.field, "left_id");
   assert.equal(missingColumn.result.exit_code, 2);
 
-  const resolve = call({ op: "resolve" });
-  assert.equal(resolve.ok, false);
-  assert.equal(resolve.error.code, "unsupported_operation");
+  const resolution = call({
+    op: "resolve",
+    left_csv: "id,amount\n001,100.00\n2,7\n",
+    right_csv: "id,amount\n001,100\n3,7\n",
+    config,
+    decisions_csv: "action,left_id,right_id,reason\naccept,L2,R2,manually verified\n",
+  });
+  assert.equal(resolution.ok, true);
+  assert.equal(resolution.result.exit_code, 0);
+  assert.equal(resolution.result.pairs[1].source, "human_review");
+  assert.equal(resolution.result.decisions[0].override, true);
 });
 
 test("compare follows the locked Result wire schema and returns normalized config", () => {

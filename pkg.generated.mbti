@@ -2,6 +2,8 @@
 package "z2823253773-p/moonreconcile"
 
 // Values
+pub fn apply_decisions(ReconciliationResult, Array[Decision], CsvTable, CsvTable, Config) -> Result[ReconciliationResult, EngineError]
+
 pub fn compare_field(String, String, FieldConfig) -> FieldComparison
 
 pub fn compare_tables(CsvTable, CsvTable, Config) -> ReconciliationResult
@@ -11,6 +13,8 @@ pub fn generate_candidates(CsvTable, CsvTable, Array[Int], Array[Int], Config) -
 pub fn invoke(String) -> String
 
 pub fn normalize_value(String, FieldConfig, String) -> NormalizedValue
+
+pub fn parse_decisions(String) -> Result[Array[Decision], EngineError]
 
 pub fn result_to_json(ReconciliationResult) -> Json
 
@@ -36,6 +40,15 @@ pub(all) struct Config {
 pub(all) struct CsvTable {
   headers : Array[String]
   rows : Array[Array[String]]
+}
+
+pub(all) struct Decision {
+  action : String
+  left_record : Int?
+  right_record : Int?
+  reason : String
+  csv_record : Int
+  is_override : Bool
 }
 
 pub(all) struct EngineError {
@@ -115,6 +128,9 @@ pub(all) struct ReconciliationResult {
   computation_issues : Array[Json]
   unprocessed_left_records : Array[Int]
   unprocessed_right_records : Array[Int]
+  unmatched_left_records : Array[Int]
+  unmatched_right_records : Array[Int]
+  decisions : Array[Decision]
   unmapped_left : Array[String]
   unmapped_right : Array[String]
   ignored_left : Array[String]

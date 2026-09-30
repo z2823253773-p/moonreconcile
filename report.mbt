@@ -17,6 +17,8 @@ fn record_entry(
   side : String,
   record : Int,
   paired : Bool,
+  pair_source : String,
+  unmatched : Bool,
   unprocessed : Bool,
 ) -> Json {
   Json::object({
@@ -26,6 +28,8 @@ fn record_entry(
     "status": Json::string(
       if paired {
         "paired"
+      } else if unmatched {
+        "unmatched"
       } else if unprocessed {
         "unprocessed"
       } else {
@@ -34,7 +38,9 @@ fn record_entry(
     ),
     "reason": Json::string(
       if paired {
-        "exact_key"
+        pair_source
+      } else if unmatched {
+        "human_unmatched"
       } else if unprocessed {
         "computation_incomplete"
       } else {
@@ -80,13 +86,14 @@ fn pair_to_json(pair : ExactPair) -> Json {
 fn side_summary(
   total : Int,
   paired : Int,
+  unmatched : Int,
   pending : Int,
   unprocessed : Int,
 ) -> Json {
   Json::object({
     "total": Json::number(total.to_double()),
     "paired": Json::number(paired.to_double()),
-    "unmatched": Json::number(0.0),
+    "unmatched": Json::number(unmatched.to_double()),
     "pending_review": Json::number(pending.to_double()),
     "unprocessed": Json::number(unprocessed.to_double()),
   })
@@ -124,17 +131,29 @@ pub fn result_to_json(result : ReconciliationResult) -> Json {
   let records : Array[Json] = []
   let paired_left = Array::make(result.left_total, false)
   let paired_right = Array::make(result.right_total, false)
+  let paired_left_source = Array::make(result.left_total, "")
+  let paired_right_source = Array::make(result.right_total, "")
   let unprocessed_left = Array::make(result.left_total, false)
   let unprocessed_right = Array::make(result.right_total, false)
+  let unmatched_left = Array::make(result.left_total, false)
+  let unmatched_right = Array::make(result.right_total, false)
   for record in result.unprocessed_left_records {
     unprocessed_left[record - 1] = true
   }
   for record in result.unprocessed_right_records {
     unprocessed_right[record - 1] = true
   }
+  for record in result.unmatched_left_records {
+    unmatched_left[record - 1] = true
+  }
+  for record in result.unmatched_right_records {
+    unmatched_right[record - 1] = true
+  }
   for pair in result.pairs {
     paired_left[pair.left_record - 1] = true
     paired_right[pair.right_record - 1] = true
+    paired_left_source[pair.left_record - 1] = pair.source
+    paired_right_source[pair.right_record - 1] = pair.source
   }
   for index in 0..<result.left_total {
     records.push(
@@ -142,6 +161,8 @@ pub fn result_to_json(result : ReconciliationResult) -> Json {
         "left",
         index + 1,
         paired_left[index],
+        paired_left_source[index],
+        unmatched_left[index],
         unprocessed_left[index],
       ),
     )
@@ -152,6 +173,8 @@ pub fn result_to_json(result : ReconciliationResult) -> Json {
         "right",
         index + 1,
         paired_right[index],
+        paired_right_source[index],
+        unmatched_right[index],
         unprocessed_right[index],
       ),
     )
@@ -206,7 +229,7 @@ pub fn result_to_json(result : ReconciliationResult) -> Json {
     "pairs": Json::array(pairs),
     "fields": Json::array(fields),
     "candidates": Json::array(result.candidates),
-    "decisions": Json::array([]),
+    "decisions": Json::array(result.decisions.map(decision_to_json)),
     "structure": Json::object({
       "unmapped_left": Json::array(result.unmapped_left.map(Json::string)),
       "unmapped_right": Json::array(result.unmapped_right.map(Json::string)),
@@ -219,12 +242,14 @@ pub fn result_to_json(result : ReconciliationResult) -> Json {
         "left": side_summary(
           result.left_total,
           result.pairs.length(),
+          result.unmatched_left_records.length(),
           result.pending_left,
           result.unprocessed_left_records.length(),
         ),
         "right": side_summary(
           result.right_total,
           result.pairs.length(),
+          result.unmatched_right_records.length(),
           result.pending_right,
           result.unprocessed_right_records.length(),
         ),

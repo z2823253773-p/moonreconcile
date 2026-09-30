@@ -175,14 +175,65 @@ fn handle_compare(object : Map[String, Json]) -> Json {
 }
 
 ///|
-fn unsupported_operation(op : String) -> Json {
-  error_to_json(
-    request_error(
-      "unsupported_operation",
-      "operation '\{op}' is not implemented yet",
-      Some("op"),
-    ),
-  )
+fn handle_resolve(object : Map[String, Json]) -> Json {
+  let left_csv = match require_request_string(object, "left_csv") {
+    Ok(value) => value
+    Err(error) => return error_to_json(error)
+  }
+  let right_csv = match require_request_string(object, "right_csv") {
+    Ok(value) => value
+    Err(error) => return error_to_json(error)
+  }
+  let decisions_csv = match require_request_string(object, "decisions_csv") {
+    Ok(value) => value
+    Err(error) => return error_to_json(error)
+  }
+  let left = match parse_csv(left_csv, "left") {
+    Ok(value) => value
+    Err(error) => return error_to_json(error)
+  }
+  let right = match parse_csv(right_csv, "right") {
+    Ok(value) => value
+    Err(error) => return error_to_json(error)
+  }
+  let config_json = match object.get("config") {
+    Some(value) => value
+    None =>
+      return error_to_json(
+        request_error(
+          "invalid_request",
+          "operation 'resolve' requires a config object",
+          Some("config"),
+        ),
+      )
+  }
+  let config = match parse_config(config_json) {
+    Ok(value) => value
+    Err(error) => return error_to_json(error)
+  }
+  let base = compare_tables(left, right, config)
+  match base.fatal_error {
+    Some(error) =>
+      return Json::object({
+        "ok": Json::boolean(false),
+        "error": error_details_to_json(error),
+        "result": result_to_json(base),
+      })
+    None => ()
+  }
+  let decisions = match parse_decisions(decisions_csv) {
+    Ok(value) => value
+    Err(error) => return error_to_json(error)
+  }
+  match apply_decisions(base, decisions, left, right, config) {
+    Ok(result) =>
+      Json::object({
+        "ok": Json::boolean(true),
+        "config": normalize_config(config),
+        "result": result_to_json(result),
+      })
+    Err(error) => error_to_json(error)
+  }
 }
 
 ///|
@@ -216,7 +267,7 @@ fn handle_request(request_json : String) -> Json {
     "init_config" => handle_init_config(object)
     "check_config" => handle_check_config(object)
     "compare" => handle_compare(object)
-    "resolve" => unsupported_operation(op)
+    "resolve" => handle_resolve(object)
     _ =>
       error_to_json(
         request_error(

@@ -28,6 +28,16 @@ pub(all) struct ExactPair {
 }
 
 ///|
+pub(all) struct Decision {
+  action : String
+  left_record : Int?
+  right_record : Int?
+  reason : String
+  csv_record : Int
+  is_override : Bool
+}
+
+///|
 pub(all) struct ReconciliationResult {
   status : String
   exit_code : Int
@@ -43,6 +53,9 @@ pub(all) struct ReconciliationResult {
   computation_issues : Array[Json]
   unprocessed_left_records : Array[Int]
   unprocessed_right_records : Array[Int]
+  unmatched_left_records : Array[Int]
+  unmatched_right_records : Array[Int]
+  decisions : Array[Decision]
   unmapped_left : Array[String]
   unmapped_right : Array[String]
   ignored_left : Array[String]
