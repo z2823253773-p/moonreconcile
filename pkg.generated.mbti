@@ -4,9 +4,13 @@ package "z2823253773-p/moonreconcile"
 // Values
 pub fn compare_field(String, String, FieldConfig) -> FieldComparison
 
+pub fn compare_tables(CsvTable, CsvTable, Config) -> ReconciliationResult
+
 pub fn invoke(String) -> String
 
 pub fn normalize_value(String, FieldConfig, String) -> NormalizedValue
+
+pub fn result_to_json(ReconciliationResult) -> Json
 
 // Errors
 
@@ -19,6 +23,7 @@ pub(all) struct Config {
   candidates : Json
 }
 
+#alias(Table)
 pub(all) struct CsvTable {
   headers : Array[String]
   rows : Array[Array[String]]
@@ -31,6 +36,12 @@ pub(all) struct EngineError {
   side : Json
   record : Json
   field : Json
+}
+
+pub(all) struct ExactPair {
+  left_record : Int
+  right_record : Int
+  fields : Array[FieldComparison]
 }
 
 pub(all) struct FieldComparison {
@@ -75,6 +86,24 @@ pub(all) struct NormalizedValue {
   missing : Bool
   invalid : Bool
   rules : Array[String]
+}
+
+pub(all) struct ReconciliationResult {
+  status : String
+  exit_code : Int
+  left_total : Int
+  right_total : Int
+  pairs : Array[ExactPair]
+  pending_left : Int
+  pending_right : Int
+  pending_left_records : Array[Int]
+  pending_right_records : Array[Int]
+  diagnostics : Array[Json]
+  unmapped_left : Array[String]
+  unmapped_right : Array[String]
+  ignored_left : Array[String]
+  ignored_right : Array[String]
+  fatal_error : EngineError?
 }
 
 // Type aliases

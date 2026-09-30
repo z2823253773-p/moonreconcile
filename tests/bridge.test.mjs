@@ -105,10 +105,93 @@ test("init_config returns a structured error for malformed CSV", () => {
 
 });
 
-test("compare and resolve report explicit unsupported errors", () => {
-  for (const op of ["compare", "resolve"]) {
-    const response = call({ op });
-    assert.equal(response.ok, false);
-    assert.equal(response.error.code, "unsupported_operation");
-  }
+test("compare returns exact reconciliation JSON and resolve remains unsupported", () => {
+  const config = {
+    schema_version: 1,
+    fields: [
+      { name: "id", left: "id", right: "id", type: "text", compare: false },
+      { name: "amount", left: "amount", right: "amount", type: "decimal" },
+    ],
+    key: ["id"],
+  };
+  const response = call({
+    op: "compare",
+    left_csv: "id,amount\n001,100.00\n2,7\n",
+    right_csv: "id,amount\n001,100\n3,7\n",
+    config,
+  });
+  assert.equal(response.ok, true);
+  assert.equal(response.result.run_status, "complete");
+  assert.equal(response.result.exit_code, 1);
+  assert.equal(response.result.pairs.length, 1);
+  assert.equal(response.result.pairs[0].source, "exact_key");
+  assert.equal(response.result.pairs[0].fields[0].status, "equivalent_by_rule");
+  assert.deepEqual(response.result.records.left, {
+    total: 2,
+    paired: 1,
+    unmatched: 0,
+    pending_review: 1,
+    unprocessed: 0,
+    pending_records: [2],
+  });
+
+  const exactOnly = call({
+    op: "compare",
+    left_csv: "id,label\n1,alpha\n",
+    right_csv: "id,label\n1,alpha\n",
+    config: {
+      schema_version: 1,
+      fields: [
+        { name: "id", left: "id", right: "id", type: "text", compare: false },
+        { name: "label", left: "label", right: "label", type: "text" },
+      ],
+      key: ["id"],
+      candidates: {
+        fields: [{ field: "label", metric: "exact", weight: 10000 }],
+        threshold: 10000,
+      },
+    },
+  });
+  assert.equal(exactOnly.ok, true);
+  assert.equal(exactOnly.result.exit_code, 0);
+  assert.equal(exactOnly.result.pairs.length, 1);
+
+  const candidatePending = call({
+    op: "compare",
+    left_csv: "id,label\n1,alpha\n",
+    right_csv: "id,label\n2,alpha\n",
+    config: {
+      schema_version: 1,
+      fields: [
+        { name: "id", left: "id", right: "id", type: "text", compare: false },
+        { name: "label", left: "label", right: "label", type: "text" },
+      ],
+      key: ["id"],
+      candidates: {
+        fields: [{ field: "label", metric: "exact", weight: 10000 }],
+        threshold: 10000,
+      },
+    },
+  });
+  assert.equal(candidatePending.ok, false);
+  assert.equal(candidatePending.error.code, "candidate_stage_not_implemented");
+
+  const missingColumn = call({
+    op: "compare",
+    left_csv: "other\nx\n",
+    right_csv: "right_id\n1\n",
+    config: {
+      schema_version: 1,
+      fields: [{ name: "id", left: "left_id", right: "right_id", type: "text" }],
+      key: ["id"],
+    },
+  });
+  assert.equal(missingColumn.ok, false);
+  assert.equal(missingColumn.error.code, "missing_mandatory_column");
+  assert.equal(missingColumn.result.exit_code, 2);
+  assert.equal(missingColumn.result.diagnostics[0].field, "left_id");
+
+  const resolve = call({ op: "resolve" });
+  assert.equal(resolve.ok, false);
+  assert.equal(resolve.error.code, "unsupported_operation");
 });
