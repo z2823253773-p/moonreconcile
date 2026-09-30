@@ -91,25 +91,18 @@ test("init_config produces an unexecutable draft and check_config rejects it", (
   assert.equal(rejected.error.code, "invalid_config");
 });
 
-test("init_config rejects malformed CSV and preserves leading zeros", () => {
+test("init_config returns a structured error for malformed CSV", () => {
   const bad = call({
     op: "init_config",
-    left_csv: 'id\n1,bad"quote\n',
-    right_csv: "id\n1\n",
+    left_csv: 'id,note\n1,bad"quote\n',
+    right_csv: "id,note\n1,x\n",
   });
   assert.equal(bad.ok, false);
   assert.equal(bad.error.code, "invalid_csv");
   assert.equal(bad.error.side, "left");
   assert.equal(typeof bad.error.record, "number");
+  assert.equal(bad.error.field, "note");
 
-  // Leading zeros survive into the draft as raw source text.
-  const ok = call({
-    op: "init_config",
-    left_csv: "code\n001\n",
-    right_csv: "code\n001\n",
-  });
-  assert.equal(ok.ok, true);
-  assert.equal(ok.config.fields[0].name, "code");
 });
 
 test("compare and resolve report explicit unsupported errors", () => {

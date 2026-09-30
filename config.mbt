@@ -103,21 +103,32 @@ fn parse_string_map(
 
 ///|
 fn valid_nonnegative_decimal(text : String) -> Bool {
-  if text.is_empty() {
+  let unsigned = if text.has_prefix("+") { text[1:].to_owned() } else { text }
+  if unsigned.is_empty() {
     return false
   }
   let saw_digit = Ref(false)
   let saw_point = Ref(false)
-  for ch in text {
+  let digit_count = Ref(0)
+  let fractional_count = Ref(0)
+  for ch in unsigned {
     if ch >= '0' && ch <= '9' {
       saw_digit.val = true
+      digit_count.val += 1
+      if saw_point.val {
+        fractional_count.val += 1
+      }
     } else if ch == '.' && !saw_point.val {
       saw_point.val = true
     } else {
       return false
     }
   }
-  saw_digit.val && text[0] != '.' && text[text.length() - 1] != '.'
+  saw_digit.val &&
+  unsigned[0] != '.' &&
+  unsigned[unsigned.length() - 1] != '.' &&
+  digit_count.val <= 64 &&
+  fractional_count.val <= 18
 }
 
 ///|
@@ -126,6 +137,14 @@ fn parse_int_json(value : Json?, name : String) -> Result[Int, EngineError] {
     Some(Json::Number(number, ..)) => {
       if number != number.floor() {
         return Err(config_error("\{name} must be an integer", field=name))
+      }
+      if number < 0.0 || number > 2147483647.0 {
+        return Err(
+          config_error(
+            "\{name} is outside the supported integer range",
+            field=name,
+          ),
+        )
       }
       let parsed = number.to_int()
       if parsed >= 0 {
@@ -301,37 +320,44 @@ fn parse_config(json : Json) -> Result[Config, EngineError] {
               Err(error) => return Err(error)
             }
         }
-        let both_missing = match
-          json_string(object_member(field, "both_missing")) {
+        let both_missing = match object_member(field, "both_missing") {
           None => "equal"
-          Some("equal") => "equal"
-          Some("issue") => "issue"
-          Some(_) =>
+          Some(Json::String("equal")) => "equal"
+          Some(Json::String("issue")) => "issue"
+          Some(Json::String(_)) =>
             return Err(
               config_error("both_missing must be equal or issue", field=name),
             )
+          Some(_) =>
+            return Err(
+              config_error("both_missing must be a string", field=name),
+            )
         }
-        let abs_tol = match json_string(object_member(field, "abs_tol")) {
+        let abs_tol = match object_member(field, "abs_tol") {
           None => "0"
-          Some(value) if valid_nonnegative_decimal(value) => value
-          _ =>
+          Some(Json::String(value)) if valid_nonnegative_decimal(value) => value
+          Some(Json::String(_)) =>
             return Err(
               config_error(
                 "abs_tol must be a nonnegative decimal string",
                 field=name,
               ),
             )
+          Some(_) =>
+            return Err(config_error("abs_tol must be a string", field=name))
         }
-        let rel_tol = match json_string(object_member(field, "rel_tol")) {
+        let rel_tol = match object_member(field, "rel_tol") {
           None => "0"
-          Some(value) if valid_nonnegative_decimal(value) => value
-          _ =>
+          Some(Json::String(value)) if valid_nonnegative_decimal(value) => value
+          Some(Json::String(_)) =>
             return Err(
               config_error(
                 "rel_tol must be a nonnegative decimal string",
                 field=name,
               ),
             )
+          Some(_) =>
+            return Err(config_error("rel_tol must be a string", field=name))
         }
         let days_tol = match object_member(field, "days_tol") {
           None => 0
@@ -362,11 +388,15 @@ fn parse_config(json : Json) -> Result[Config, EngineError] {
             ),
           )
         }
-        if (!compare && !left_values.is_empty()) ||
-          (!compare && !right_values.is_empty()) {
+        if (
+            field_type == "text" &&
+            (abs_tol != "0" || rel_tol != "0" || days_tol != 0)
+          ) ||
+          (field_type == "date" && (abs_tol != "0" || rel_tol != "0")) ||
+          (field_type == "decimal" && days_tol != 0) {
           return Err(
             config_error(
-              "identity-only fields cannot declare content value maps",
+              "field type cannot use a nondefault irrelevant tolerance",
               field=name,
             ),
           )
@@ -666,6 +696,19 @@ fn normalize_config(config : Config) -> Json {
       }),
     )
   }
+  let normalized_candidates = match config.candidates {
+    Json::Object(candidate) => {
+      let normalized = Map([])
+      for key, value in candidate {
+        normalized[key] = value
+      }
+      if !normalized.contains("blocking") {
+        normalized["blocking"] = Json::array([])
+      }
+      Json::object(normalized)
+    }
+    value => value
+  }
   Json::object({
     "schema_version": Json::number(1.0),
     "draft": Json::boolean(false),
@@ -673,6 +716,6 @@ fn normalize_config(config : Config) -> Json {
     "key": Json::array(config.key.map(Json::string)),
     "ignore_left": Json::array(config.ignore_left.map(Json::string)),
     "ignore_right": Json::array(config.ignore_right.map(Json::string)),
-    "candidates": config.candidates,
+    "candidates": normalized_candidates,
   })
 }

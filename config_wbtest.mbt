@@ -142,3 +142,134 @@ test "normalize_config_is_canonical" {
     Err(_) => assert_true(false)
   }
 }
+
+///|
+test "present_wrong_typed_rule_is_rejected" {
+  for
+    field_property in [
+      "\"abs_tol\":4", "\"rel_tol\":true", "\"both_missing\":null",
+    ] {
+    let config = @json.parse(
+      "{\"schema_version\":1,\"fields\":[{\"name\":\"a\",\"left\":\"X\",\"right\":\"Y\",\"type\":\"decimal\",\{field_property}}]}",
+    )
+    match parse_config(config) {
+      Ok(_) => assert_true(false)
+      Err(error) => assert_eq(error.code, "invalid_config")
+    }
+  }
+}
+
+///|
+test "irrelevant_nondefault_tolerances_are_rejected" {
+  let cases = [
+    ("text", "\"abs_tol\":\"1\""),
+    ("text", "\"days_tol\":3"),
+    ("date", "\"abs_tol\":\"1\""),
+    ("decimal", "\"days_tol\":1"),
+  ]
+  for item in cases {
+    let (field_type, property) = item
+    let config = @json.parse(
+      "{\"schema_version\":1,\"fields\":[{\"name\":\"a\",\"left\":\"X\",\"right\":\"Y\",\"type\":\"\{field_type}\",\{property}}]}",
+    )
+    match parse_config(config) {
+      Ok(_) => assert_true(false)
+      Err(error) => assert_eq(error.code, "invalid_config")
+    }
+  }
+}
+
+///|
+test "days_tolerance_rejects_integer_overflow_without_saturation" {
+  let config = @json.parse(
+    "{\"schema_version\":1,\"fields\":[{\"name\":\"a\",\"left\":\"X\",\"right\":\"Y\",\"type\":\"date\",\"days_tol\":2147483648}]}",
+  )
+  match parse_config(config) {
+    Ok(_) => assert_true(false)
+    Err(error) => assert_eq(error.code, "invalid_config")
+  }
+  let maximum = @json.parse(
+    "{\"schema_version\":1,\"fields\":[{\"name\":\"a\",\"left\":\"X\",\"right\":\"Y\",\"type\":\"date\",\"days_tol\":2147483647}]}",
+  )
+  match parse_config(maximum) {
+    Ok(parsed) => assert_eq(parsed.fields[0].days_tol, 2147483647)
+    Err(_) => assert_true(false)
+  }
+}
+
+///|
+test "identity_only_field_accepts_explicit_value_mapping" {
+  let config = @json.parse(
+    "{\"schema_version\":1,\"key\":[\"id\"],\"fields\":[{\"name\":\"id\",\"left\":\"id\",\"right\":\"id\",\"type\":\"text\",\"compare\":false,\"left_values\":{\"A\":\"B\"}}]}",
+  )
+  match parse_config(config) {
+    Ok(parsed) => assert_eq(parsed.fields[0].left_values.get("A"), Some("B"))
+    Err(_) => assert_true(false)
+  }
+}
+
+///|
+test "decimal_tolerances_enforce_input_digit_and_scale_limits" {
+  let cases = [("abs_tol", "1".repeat(65)), ("rel_tol", "0." + "1".repeat(19))]
+  for item in cases {
+    let (property, value) = item
+    let config = @json.parse(
+      "{\"schema_version\":1,\"fields\":[{\"name\":\"a\",\"left\":\"X\",\"right\":\"Y\",\"type\":\"decimal\",\"\{property}\":\"\{value}\"}]}",
+    )
+    match parse_config(config) {
+      Ok(_) => assert_true(false)
+      Err(error) => assert_eq(error.code, "invalid_config")
+    }
+  }
+  let digits64 = "1".repeat(64)
+  let digits18 = "1".repeat(18)
+  let edge_json = "{\"schema_version\":1,\"fields\":[{\"name\":\"a\",\"left\":\"X\",\"right\":\"Y\",\"type\":\"decimal\",\"abs_tol\":\"" +
+    digits64 +
+    "\",\"rel_tol\":\"0." +
+    digits18 +
+    "\"}]}"
+  let edge = @json.parse(edge_json)
+  match parse_config(edge) {
+    Ok(_) => ()
+    Err(_) => assert_true(false)
+  }
+}
+
+///|
+test "decimal_tolerance_accepts_optional_positive_sign_but_rejects_negative" {
+  let positive = @json.parse(
+    "{\"schema_version\":1,\"fields\":[{\"name\":\"a\",\"left\":\"X\",\"right\":\"Y\",\"type\":\"decimal\",\"abs_tol\":\"+0.01\"}]}",
+  )
+  match parse_config(positive) {
+    Ok(parsed) => assert_eq(parsed.fields[0].abs_tol, "+0.01")
+    Err(_) => assert_true(false)
+  }
+  let negative = @json.parse(
+    "{\"schema_version\":1,\"fields\":[{\"name\":\"a\",\"left\":\"X\",\"right\":\"Y\",\"type\":\"decimal\",\"abs_tol\":\"-0.01\"}]}",
+  )
+  match parse_config(negative) {
+    Ok(_) => assert_true(false)
+    Err(error) => assert_eq(error.code, "invalid_config")
+  }
+}
+
+///|
+test "omitted_and_empty_blocking_normalize_equally" {
+  let omitted = @json.parse(
+    "{\"schema_version\":1,\"fields\":[{\"name\":\"a\",\"left\":\"X\",\"right\":\"Y\",\"type\":\"text\"}],\"candidates\":{\"fields\":[{\"field\":\"a\",\"metric\":\"exact\",\"weight\":1}],\"threshold\":1}}",
+  )
+  let explicit = @json.parse(
+    "{\"schema_version\":1,\"fields\":[{\"name\":\"a\",\"left\":\"X\",\"right\":\"Y\",\"type\":\"text\"}],\"candidates\":{\"fields\":[{\"field\":\"a\",\"metric\":\"exact\",\"weight\":1}],\"threshold\":1,\"blocking\":[]}}",
+  )
+  match (parse_config(omitted), parse_config(explicit)) {
+    (Ok(left), Ok(right)) => {
+      assert_eq(normalize_config(left), normalize_config(right))
+      match parse_config(normalize_config(left)) {
+        Ok(roundtrip) =>
+          assert_eq(normalize_config(roundtrip), normalize_config(right))
+        Err(_) => assert_true(false)
+      }
+    }
+    _ => assert_true(false)
+  }
+}

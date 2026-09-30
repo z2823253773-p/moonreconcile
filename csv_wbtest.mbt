@@ -52,3 +52,62 @@ test "unequal_width_reports_record" {
     }
   }
 }
+
+///|
+test "csv_column_budget_accepts_exact_limit_and_rejects_over_limit" {
+  let exact_headers : Array[String] = []
+  let over_headers : Array[String] = []
+  for i in 0..<257 {
+    if i < 256 {
+      exact_headers.push("c\{i}")
+    }
+    over_headers.push("c\{i}")
+  }
+  assert_true(parse_csv(exact_headers.join(","), "left") is Ok(_))
+  match parse_csv(over_headers.join(","), "left") {
+    Ok(_) => assert_true(false)
+    Err(error) => assert_eq(error.code, "input_limit_exceeded")
+  }
+}
+
+///|
+test "csv_record_budget_accepts_exact_limit_and_rejects_over_limit" {
+  let exact = "id\n" + "1\n".repeat(100000)
+  let over = "id\n" + "1\n".repeat(100001)
+  assert_eq(parse_csv(exact, "left").unwrap().rows.length(), 100000)
+  match parse_csv(over, "left") {
+    Ok(_) => assert_true(false)
+    Err(error) => {
+      assert_eq(error.code, "input_limit_exceeded")
+      assert_eq(error.field, Json::string("id"))
+    }
+  }
+}
+
+///|
+test "csv_cell_budget_counts_utf8_bytes_and_checks_exact_boundary" {
+  let exact = "id\n" + "é".repeat(32768) + "\n"
+  let over = "id\n" + "é".repeat(32769) + "\n"
+  assert_eq(parse_csv(exact, "left").unwrap().rows[0][0].length(), 32768)
+  match parse_csv(over, "left") {
+    Ok(_) => assert_true(false)
+    Err(error) => {
+      assert_eq(error.code, "input_limit_exceeded")
+      assert_eq(error.field, Json::string("id"))
+    }
+  }
+}
+
+///|
+test "csv_syntax_error_identifies_field" {
+  match parse_csv("id,note\n1,bad\"quote\n", "left") {
+    Ok(_) => assert_true(false)
+    Err(error) => assert_eq(error.field, Json::string("note"))
+  }
+}
+
+///|
+test "csv_total_byte_budget_counts_multibyte_utf8_at_boundary" {
+  assert_true(within_utf8_budget("é".repeat(32), 64))
+  assert_true(!within_utf8_budget("é".repeat(33), 64))
+}
