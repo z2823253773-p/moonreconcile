@@ -80,4 +80,4 @@ Competitor review in `docs/dependency-audit.md` is based on primary documentatio
 
 提交 `a0f9310` 增加架构、配置、复核流程和 README，并加入 Ubuntu 24.04 与 macOS 15 的 GitHub Actions 矩阵。随后修订工作流以使用 `actions/checkout@v6`、`actions/setup-node@v6`、`actions/setup-python@v6`、Node 22、Python 3.12 和官方 Unix 安装脚本的 `latest` 路径；历史可下载工具链固定版本未被验证，因此没有伪造固定 pin。工作流会记录安装脚本 SHA、MoonBit 版本、Node/Python 版本、提交 SHA 和 runner 平台。当前仅完成本地等价门禁，尚无远端 Actions run URL 或成功结论。
 
-README 的公开命令、三组示例和独立库消费已在当前工作区复跑通过；这不替代干净 GitHub checkout 和两种远端 runner 的验证。真实流程、XLSX、竞品运行和赛事审核仍为未验证事项。
+README 的公开命令和三组示例已在无构建缓存的 `git archive` 检出中复跑通过；独立库消费在本地新鲜 git clone 中通过 84/84。库消费脚本需要正常 checkout 的 `.git` 历史来确定 SHA，因此纯归档目录不作为该脚本的测试环境。这些本地结果不替代两种远端 runner 的验证。真实流程、XLSX、竞品运行和赛事审核仍为未验证事项。
