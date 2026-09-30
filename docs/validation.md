@@ -58,6 +58,20 @@ All three examples are synthetic. `node scripts/workflows.mjs` invokes the shipp
 
 The catalog truth is hand-authored separately in `examples/catalog/truth.json`. This intentionally adversarial two-candidate case contains one true candidate and one false candidate; the false score-10000 exact-name decoy is the sole suggestion while the true score-8000 competitor remains visible. Review rejects the decoy, accepts the competitor and confirms the other right record unmatched. These are fixture counts only, not an accuracy estimate.
 
-`node scripts/benchmark.mjs` creates deterministic temporary inputs and output runs and measures end-to-end child CLI compare, including CSV parsing and report writing. It excludes build and fixture generation. The retained records list the tested source SHA, OS/CPU, Node/Moon versions, child wall time, candidate counts/density, component size, actual output bytes and exit status. Child RSS is marked unavailable because macOS `/usr/bin/time -l` did not emit its RSS field in this sandbox (`sysctl kern.clockrate: Operation not permitted`). Sparse workloads have three retained before and after observations from the accepted base and optimized source. These are synthetic local measurements, not universal capacity claims.
+`node scripts/benchmark.mjs` creates deterministic temporary inputs and output runs and measures end-to-end child CLI compare, including CSV parsing and report writing. It excludes build and fixture generation. The retained records list the tested source SHA, OS/CPU, Node/Moon versions, child wall time, candidate counts/density, component size, actual output bytes and CLI exit status. Child RSS is unavailable: macOS `/usr/bin/time -l` did not emit an RSS line and reported `sysctl kern.clockrate: Operation not permitted`. The time wrapper itself returned 1 on macOS despite the CLI publishing its result; the harness extracts and records the CLI exit from its output separately.
+
+| Workload | Wall time(s) | Candidates | Density E/(remaining L×R) | Max component L×R | Output bytes | Exit |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Exact, 1,000/side | 0.126 | 0 | n/a | 0×0 | 1,422,879 | 0 |
+| Exact, 10,000/side | 0.343 | 0 | n/a | 0×0 | 14,571,908 | 0 |
+| Sparse, 10,000 singleton/side | 0.298 median (3 runs) | 10,000 | 0.0001 | 1×1 | 11,114,434 | 1 |
+| Sparse, 30,000 singleton/side | 0.726 median (3 runs) | 30,000 | 0.0000333 | 1×1 | 33,934,434 | 1 |
+| Mixed, 9,000 exact + 1,000 candidates/side | 0.361 | 1,000 | 0.001 | 1×1 | 14,813,096 | 1 |
+| Dense, 100×100 | 0.234 | 10,000 | 1 | 100×100 | 6,381,282 | 1 |
+| Dense, 101×101 | 0.193 | 10,201 | 1 | 101×101 | 6,510,905 | 3, `candidate_component_limit_exceeded` |
+| Pair boundary, 1,000×100 | 0.985 | 100,000 | 1 | 1,000×100 | 63,888,301 | 3, `candidate_component_limit_exceeded` |
+| Pair overflow, 1,001×100 | 0.127 | 0 retained from 100,100 possible | 0 | 0×0 (generation aborted) | 244,587 | 3, `candidate_pair_budget_exceeded` |
+
+The separate P3 comparison in the JSON retains three observations per size. At 10,000 singleton edges the base median was 607.856 ms and optimized median 297.867 ms; at 30,000 edges, 5,820.024 ms and 726.061 ms. The fixture output sizes differed by 26 bytes because provenance embeds paths under differently named checkouts; candidate counts and semantic reports matched. This is a local observation, not a general complexity guarantee. The configured 100,000 row limit was not tested as capacity.
 
 Competitor review in `docs/dependency-audit.md` is based on primary documentation, not local tool runs. No actual customer data or adjudicated truth set was available.
