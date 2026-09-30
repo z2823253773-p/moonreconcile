@@ -77,9 +77,9 @@ function writeCanonical(value) {
 
 // Fatal UTF-8 decoding. A single leading BOM is preserved in the returned
 // string (so the engine sees exactly the decoded bytes) and is never stripped
-// from the snapshot. Any further U+FEFF is a decoding error rather than a
-// silently normalized value.
-export function decodeUtf8Fatal(bytes, { side = null, phase = "input" } = {}) {
+// from the snapshot. CSV callers reject later markers; JSON callers allow
+// U+FEFF string data while JSON.parse still validates marker placement.
+export function decodeUtf8Fatal(bytes, { side = null, phase = "input", allowInteriorBom = false } = {}) {
   let text;
   try {
     text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
@@ -87,7 +87,7 @@ export function decodeUtf8Fatal(bytes, { side = null, phase = "input" } = {}) {
     throw new CliError("invalid_encoding", "input is not valid UTF-8", { phase, side });
   }
   const start = text.startsWith(UTF8_BOM) ? 1 : 0;
-  if (text.indexOf(UTF8_BOM, start) !== -1) {
+  if (!allowInteriorBom && text.indexOf(UTF8_BOM, start) !== -1) {
     throw new CliError(
       "invalid_encoding",
       "a UTF-8 byte-order mark is only allowed once, at the start of the file",
@@ -123,6 +123,7 @@ export async function readFileBounded(fsImpl, filePath, maxBytes, { phase = "inp
   } catch (error) {
     throw ioFailure(`cannot read ${filePath}`, error, { phase, side });
   }
+  let operationError = null;
   try {
     const stat = await handle.stat();
     if (!stat.isFile()) {
@@ -151,8 +152,15 @@ export async function readFileBounded(fsImpl, filePath, maxBytes, { phase = "inp
       throw new CliError("io_error", `${filePath} grew while being read`, { phase, side });
     }
     return buffer;
+  } catch (error) {
+    operationError = error;
+    throw error;
   } finally {
-    await handle.close().catch(() => {});
+    try {
+      await handle.close();
+    } catch (error) {
+      if (!operationError) throw ioFailure(`cannot close ${filePath}`, error, { phase, side });
+    }
   }
 }
 
@@ -192,7 +200,7 @@ export function isSamePath(left, right) {
 
 export function containsPath(parent, child) {
   const relative = path.relative(parent, child);
-  return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+  return relative !== "" && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
 async function assertNotProtected(fsImpl, canonicalDest, protectedPaths) {
@@ -256,21 +264,27 @@ export async function assertFileDestination(fsImpl, destPath, { protectedPaths =
   return resolved;
 }
 
-async function writeFileSynced(fsImpl, filePath, data) {
+async function writeFileSynced(fsImpl, filePath, data, onCreate = null) {
   let handle;
   try {
     handle = await fsImpl.open(filePath, "wx", 0o644);
   } catch (error) {
     throw ioFailure(`cannot create ${filePath}`, error, { phase: "output" });
   }
+  onCreate?.();
+  let failure = null;
   try {
     await handle.writeFile(data);
     await handle.sync();
   } catch (error) {
-    throw ioFailure(`cannot write ${filePath}`, error, { phase: "output" });
-  } finally {
-    await handle.close().catch(() => {});
+    failure = ioFailure(`cannot write ${filePath}`, error, { phase: "output" });
   }
+  try {
+    await handle.close();
+  } catch (error) {
+    if (!failure) failure = ioFailure(`cannot close ${filePath}`, error, { phase: "output" });
+  }
+  if (failure) throw failure;
 }
 
 async function syncDirectory(fsImpl, dirPath) {
@@ -373,31 +387,58 @@ export async function publishRunDirectory({ fs: fsImpl, destPath, entries, warn 
 
 export async function publishFileExclusive({ fs: fsImpl, destPath, data }) {
   const parent = path.dirname(destPath);
-  const tempPath = path.join(parent, `.reconcile-file-${process.pid}-${Date.now()}-${Math.floor(Math.random() * 1e9)}`);
+  let staging;
   try {
-    await writeFileSynced(fsImpl, tempPath, data);
+    staging = await fsImpl.mkdtemp(path.join(parent, ".reconcile-file-stage-"));
+  } catch (error) {
+    throw ioFailure(`cannot create a staging directory in ${parent}`, error, { phase: "output" });
+  }
+  const tempPath = path.join(staging, "config.json");
+  let ownsTemp = false;
+  let failure = null;
+  try {
+    await writeFileSynced(fsImpl, tempPath, data, () => { ownsTemp = true; });
     try {
-      // link() is an atomic no-replace publication on the same filesystem.
+      // link() is atomic and exclusive. A filesystem without this primitive
+      // must fail rather than degrade to an overwriting rename.
       await fsImpl.link(tempPath, destPath);
     } catch (error) {
       if (error.code === "EEXIST") {
         throw new CliError("output_conflict", `refusing to overwrite existing path ${destPath}`);
       }
-      if (!["EPERM", "ENOSYS", "ENOTSUP", "EXDEV", "EOPNOTSUPP"].includes(error.code)) {
-        throw ioFailure(`cannot publish ${destPath}`, error, { phase: "output" });
-      }
-      if (await lstatOrNull(fsImpl, destPath)) {
-        throw new CliError("output_conflict", `refusing to overwrite existing path ${destPath}`);
-      }
-      await fsImpl.rename(tempPath, destPath);
-      return destPath;
+      throw ioFailure(`cannot publish ${destPath} atomically without replacement`, error, { phase: "output" });
     }
   } catch (error) {
-    if (error instanceof CliError) throw error;
-    throw ioFailure(`cannot write ${destPath}`, error, { phase: "output" });
-  } finally {
-    await fsImpl.rm(tempPath, { force: true }).catch(() => {});
+    failure = error instanceof CliError ? error : ioFailure(`cannot write ${destPath}`, error, { phase: "output" });
   }
+
+  let cleanupError = null;
+  if (ownsTemp) {
+    try {
+      await fsImpl.unlink(tempPath);
+    } catch (error) {
+      if (error.code !== "ENOENT") cleanupError = error;
+    }
+  }
+  try {
+    await fsImpl.rmdir(staging);
+  } catch (error) {
+    if (error.code !== "ENOENT") cleanupError ??= error;
+  }
+  if (cleanupError) {
+    const residual = `cleanup failed; owned staging directory remains at ${staging}: ${cleanupError.message}`;
+    if (failure) {
+      failure = new CliError(failure.code, `${failure.message}; ${residual}`, {
+        phase: failure.phase,
+        side: failure.side,
+        record: failure.record,
+        field: failure.field,
+      });
+    } else {
+      failure = ioFailure(residual, cleanupError, { phase: "output" });
+    }
+  }
+  if (failure) throw failure;
   return destPath;
 }
 

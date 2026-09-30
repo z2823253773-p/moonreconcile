@@ -116,8 +116,10 @@ export function renderDecisionsCsv(result) {
 
   for (const decision of result.decisions) {
     push([decision.action, decision.left_id ?? "", decision.right_id ?? "", decision.reason ?? ""]);
-    if (decision.left_id) decidedRecords.add(decision.left_id);
-    if (decision.right_id) decidedRecords.add(decision.right_id);
+    if (decision.action !== "reject") {
+      if (decision.left_id) decidedRecords.add(decision.left_id);
+      if (decision.right_id) decidedRecords.add(decision.right_id);
+    }
     if (decision.left_id && decision.right_id) {
       decidedPairs.add(JSON.stringify([decision.left_id, decision.right_id]));
     }
@@ -136,9 +138,14 @@ export function renderDecisionsCsv(result) {
 }
 
 function mdEscape(value) {
-  return String(value)
-    .replaceAll("\\", "\\\\")
-    .replaceAll("|", "\\|")
+  const markdownPunctuation = new Set("*_`[]()!|#");
+  const escaped = [...String(value)]
+    .map((character) => character === "\\" ? "\\\\" : markdownPunctuation.has(character) ? `\\${character}` : character)
+    .join("");
+  return escaped
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
     .replaceAll("\r\n", "<br>")
     .replaceAll("\n", "<br>")
     .replaceAll("\r", "<br>");

@@ -165,7 +165,7 @@ async function readSnapshot(context, filePath, side) {
 
 async function readConfigJson(context, filePath) {
   const bytes = await readFileBounded(context.fs, filePath, context.limits.maxInputBytes, { phase: "input" });
-  const text = decodeUtf8Fatal(bytes, { phase: "input" });
+  const text = decodeUtf8Fatal(bytes, { phase: "input", allowInteriorBom: true });
   return parseJsonText(text, { what: `configuration ${filePath}` });
 }
 
@@ -372,7 +372,7 @@ async function commandResolve(parsed, context) {
       phase: "manifest",
     });
   }
-  const configText = decodeUtf8Fatal(configBytes, { phase: "config" });
+  const configText = decodeUtf8Fatal(configBytes, { phase: "config", allowInteriorBom: true });
   const config = parseJsonText(configText, { phase: "config", what: "config.json" });
   if (canonicalJsonStringify(config) !== configText) {
     throw invalidManifest("config.json is not the canonical normalized configuration for this run");

@@ -509,6 +509,77 @@ test("the raw byte budget is enforced by an injectable internal limit, not a CLI
   assert.equal(byteExact.code, 1, byteExact.stderr);
 });
 
+test("a canonical config containing U+FEFF string data can be replayed", async () => {
+  const dir = await mkTmp();
+  const feff = "\uFEFF";
+  const config = {
+    schema_version: 1,
+    fields: [
+      { name: "value", left: "value", right: "value", type: "text", left_values: { x: feff }, right_values: { x: feff } },
+    ],
+    key: [],
+  };
+  const paths = await writeFixture(dir, { left: "value\nx\n", right: "value\nx\n", config: EQUAL_CONFIG });
+  await fsPromises.writeFile(paths.config, JSON.stringify(config).replaceAll(feff, "\\uFEFF"));
+  const run1 = path.join(dir, "run");
+  const compared = cli(["compare", paths.left, paths.right, "--config", paths.config, "--out", run1]);
+  assert.equal(compared.status, 1, compared.stderr);
+  const canonicalBytes = await fsPromises.readFile(path.join(run1, "config.json"));
+  assert.ok(canonicalBytes.includes(Buffer.from(feff, "utf8")), "canonical JSON contains the source string value");
+
+  const reviewed = path.join(dir, "reviewed");
+  const replay = cli(["resolve", run1, "--decisions", path.join(run1, "decisions.csv"), "--out", reviewed]);
+  assert.equal(replay.status, 1, replay.stderr);
+  const configOut = JSON.parse(await readText(path.join(reviewed, "config.json")));
+  assert.equal(configOut.fields[0].left_values.x, feff);
+});
+
+test("rejecting a candidate keeps both still-pending endpoint rows in the cumulative template", async () => {
+  const dir = await mkTmp();
+  const config = {
+    schema_version: 1,
+    fields: [{ name: "label", left: "label", right: "label", type: "text" }],
+    key: [],
+    candidates: { fields: [{ field: "label", metric: "exact", weight: 10000 }], threshold: 1 },
+  };
+  const paths = await writeFixture(dir, { left: "label\nsame\n", right: "label\nsame\n", config });
+  const run1 = path.join(dir, "run");
+  assert.equal(cli(["compare", paths.left, paths.right, "--config", paths.config, "--out", run1]).status, 1);
+  const decisions = path.join(dir, "decisions.csv");
+  await fsPromises.writeFile(decisions, "action,left_id,right_id,reason\nreject,L1,R1,not same\n");
+  const reviewed = path.join(dir, "reviewed");
+  assert.equal(cli(["resolve", run1, "--decisions", decisions, "--out", reviewed]).status, 1);
+  const report = JSON.parse(await readText(path.join(reviewed, "report.json")));
+  assert.equal(report.summary.unresolved_count, 2);
+  assert.deepEqual(parseCsv(await readText(path.join(reviewed, "decisions.csv"))), [
+    ["action", "left_id", "right_id", "reason"],
+    ["reject", "L1", "R1", "not same"],
+    ["", "L1", "", ""],
+    ["", "", "R1", ""],
+  ]);
+});
+
+test("summary renders source headers without activating HTML or Markdown", async () => {
+  const dir = await mkTmp();
+  const headers = ["id", "<details><summary>hidden</summary>", "[click](https://example.com)", "**bold**", "`code`", "line\nbreak"];
+  const header = headers.map((value) => `"${value.replaceAll('"', '""')}"`).join(",");
+  const row = ["1", "source", "source", "source", "source", "source"].join(",");
+  const paths = await writeFixture(dir, {
+    left: `${header}\n${row}\n`,
+    right: `${header}\n${row}\n`,
+    config: { schema_version: 1, fields: [{ ...TEXT_ID, compare: false }], key: ["id"] },
+  });
+  const out = path.join(dir, "run");
+  assert.equal(cli(["compare", paths.left, paths.right, "--config", paths.config, "--out", out]).status, 1);
+  const summary = await readText(path.join(out, "summary.md"));
+  assert.match(summary, /&lt;details&gt;&lt;summary&gt;hidden&lt;\/summary&gt;/);
+  assert.match(summary, /\\\[click\\\]/);
+  assert.match(summary, /\\\*\\\*bold\\\*\\\*/);
+  assert.match(summary, /\\`code\\`/);
+  assert.doesNotMatch(summary, /<details>|\[click\]\(https:\/\/example\.com\)|(?<!\\)\*\*bold\*\*|(?<!\\)`code`/);
+  assert.match(summary, /<br>/, "controlled source line breaks remain readable");
+});
+
 test("cell budgets stay with the MoonBit core and are reported to the CLI", async () => {
   const dir = await mkTmp();
   const paths = await writeFixture(dir, {
@@ -609,6 +680,14 @@ test("resolve refuses destinations inside or aliasing the source run", async () 
   assert.equal(viaSymlink.status, 2);
   assert.equal(failingError(viaSymlink.stderr).code, "output_conflict");
 
+  const dotPrefixChild = path.join(run1, "..reviewed");
+  const dotPrefix = cli(["resolve", run1, "--decisions", decisions, "--out", dotPrefixChild]);
+  assert.equal(dotPrefix.status, 2, "a legal child name beginning with two dots is still inside the source run");
+  assert.equal(failingError(dotPrefix.stderr).code, "output_conflict");
+  const dotPrefixAlias = cli(["resolve", run1, "--decisions", decisions, "--out", path.join(alias, "..reviewed")]);
+  assert.equal(dotPrefixAlias.status, 2, "symlink aliases must preserve the same containment boundary");
+  assert.equal(failingError(dotPrefixAlias.stderr).code, "output_conflict");
+
   const elsewhere = path.join(dir, "elsewhere");
   await fsPromises.mkdir(elsewhere);
   const directSymlink = path.join(dir, "symlink-out");
@@ -657,8 +736,17 @@ test("a write failure publishes nothing and removes only its own staging", async
     fs: {
       ...base,
       open: async (target, flags, mode) => {
-        if (String(target).endsWith("report.json") && flags === "wx") throw errorWithCode("ENOSPC", "injected write failure");
-        return base.open(target, flags, mode);
+        const handle = await base.open(target, flags, mode);
+        if (!String(target).endsWith("report.json") || flags !== "wx") return handle;
+        return new Proxy(handle, {
+          get(inner, key) {
+            if (key === "writeFile") return async () => {
+              throw errorWithCode("ENOSPC", "injected write failure");
+            };
+            const value = inner[key];
+            return typeof value === "function" ? value.bind(inner) : value;
+          },
+        });
       },
     },
   });
@@ -666,6 +754,235 @@ test("a write failure publishes nothing and removes only its own staging", async
   assert.equal(JSON.parse(result.stderr).error.code, "io_error");
   assert.equal(await exists(out), false, "no partial destination");
   assert.deepEqual(await stagingLeftovers(dir), []);
+});
+
+test("a file close failure aborts run publication and retains an earlier write error", async () => {
+  const dir = await mkTmp();
+  const paths = await writeFixture(dir, { left: "id,amount\n001,100.00\n", right: "id,amount\n001,100\n", config: EQUAL_CONFIG });
+  const base = baseFs();
+  const closeOut = path.join(dir, "close-run");
+  const closeFailure = await quietRun(["compare", paths.left, paths.right, "--config", paths.config, "--out", closeOut], {
+    fs: {
+      ...base,
+      open: async (target, flags, mode) => {
+        const handle = await base.open(target, flags, mode);
+        if (flags !== "wx" || !String(target).endsWith("report.json")) return handle;
+        return new Proxy(handle, {
+          get(inner, key) {
+            if (key === "close") return async () => {
+              await inner.close();
+              throw errorWithCode("EIO", "injected close failure");
+            };
+            const value = inner[key];
+            return typeof value === "function" ? value.bind(inner) : value;
+          },
+        });
+      },
+    },
+  });
+  assert.equal(closeFailure.code, 2);
+  assert.match(JSON.parse(closeFailure.stderr).error.message, /close/i);
+  assert.equal(await exists(closeOut), false);
+  assert.deepEqual(await stagingLeftovers(dir), []);
+
+  const writeAndCloseOut = path.join(dir, "write-close-run");
+  const writeAndClose = await quietRun(["compare", paths.left, paths.right, "--config", paths.config, "--out", writeAndCloseOut], {
+    fs: {
+      ...base,
+      open: async (target, flags, mode) => {
+        const handle = await base.open(target, flags, mode);
+        if (flags !== "wx" || !String(target).endsWith("pairs.csv")) return handle;
+        return new Proxy(handle, {
+          get(inner, key) {
+            if (key === "sync") return async () => {
+              throw errorWithCode("EIO", "original sync failure");
+            };
+            if (key === "close") return async () => {
+              await inner.close();
+              throw errorWithCode("EIO", "secondary close failure");
+            };
+            const value = inner[key];
+            return typeof value === "function" ? value.bind(inner) : value;
+          },
+        });
+      },
+    },
+  });
+  assert.equal(writeAndClose.code, 2);
+  assert.match(JSON.parse(writeAndClose.stderr).error.message, /original sync failure/);
+  assert.doesNotMatch(JSON.parse(writeAndClose.stderr).error.message, /secondary close failure/);
+  assert.equal(await exists(writeAndCloseOut), false);
+  assert.deepEqual(await stagingLeftovers(dir), []);
+});
+
+test("init-config close failure leaves no published file", async () => {
+  const dir = await mkTmp();
+  const paths = await writeFixture(dir, { left: "id\n1\n", right: "id\n1\n", config: EQUAL_CONFIG });
+  const out = path.join(dir, "draft.json");
+  const base = baseFs();
+  const result = await quietRun(["init-config", paths.left, paths.right, "--out", out], {
+    fs: {
+      ...base,
+      open: async (target, flags, mode) => {
+        const handle = await base.open(target, flags, mode);
+        if (flags !== "wx" || (path.basename(String(target)) !== "config.json" && !path.basename(String(target)).startsWith(".reconcile-file-"))) return handle;
+        return new Proxy(handle, {
+          get(inner, key) {
+            if (key === "close") return async () => {
+              await inner.close();
+              throw errorWithCode("EIO", "injected init-config close failure");
+            };
+            const value = inner[key];
+            return typeof value === "function" ? value.bind(inner) : value;
+          },
+        });
+      },
+    },
+  });
+  assert.equal(result.code, 2);
+  assert.match(JSON.parse(result.stderr).error.message, /close/i);
+  assert.equal(await exists(out), false);
+  assert.deepEqual((await listDir(dir)).filter((name) => name.startsWith(".reconcile-file-")), []);
+});
+
+test("init-config never removes an unowned staging collision", async () => {
+  const dir = await mkTmp();
+  const paths = await writeFixture(dir, { left: "id\n1\n", right: "id\n1\n", config: EQUAL_CONFIG });
+  const out = path.join(dir, "draft.json");
+  const base = baseFs();
+  let sentinelPath;
+  const result = await quietRun(["init-config", paths.left, paths.right, "--out", out], {
+    fs: {
+      ...base,
+      open: async (target, flags, mode) => {
+        const basename = path.basename(String(target));
+        if (flags === "wx" && (basename === "config.json" || basename.startsWith(".reconcile-file-"))) {
+          sentinelPath = String(target);
+          await base.writeFile(sentinelPath, "unowned sentinel", { flag: "wx" });
+          throw errorWithCode("EEXIST", "injected staging collision");
+        }
+        return base.open(target, flags, mode);
+      },
+    },
+  });
+  assert.equal(result.code, 2);
+  assert.equal(await readText(sentinelPath), "unowned sentinel");
+  assert.match(JSON.parse(result.stderr).error.message, /residual|staging|collision/i);
+  assert.equal(await exists(out), false);
+});
+
+test("init-config reports a failed owned-stage cleanup with its residual path", async () => {
+  const dir = await mkTmp();
+  const paths = await writeFixture(dir, { left: "id\n1\n", right: "id\n1\n", config: EQUAL_CONFIG });
+  const out = path.join(dir, "draft.json");
+  const base = baseFs();
+  const result = await quietRun(["init-config", paths.left, paths.right, "--out", out], {
+    fs: {
+      ...base,
+      link: async () => {
+        throw errorWithCode("EIO", "primary publication failure");
+      },
+      unlink: async (target) => {
+        if (path.basename(String(target)) === "config.json") throw errorWithCode("EIO", "injected owned cleanup failure");
+        return base.unlink(target);
+      },
+    },
+  });
+  const error = JSON.parse(result.stderr);
+  assert.equal(result.code, 2);
+  assert.match(error.error.message, /primary publication failure/);
+  assert.match(error.error.message, /cleanup failed; owned staging directory remains at .*\.reconcile-file-stage-/);
+  assert.equal(await exists(out), false);
+  const residual = (await listDir(dir)).find((name) => name.startsWith(".reconcile-file-stage-"));
+  assert.ok(residual);
+  await base.rm(path.join(dir, residual), { recursive: true, force: true });
+});
+
+test("init-config reports cleanup failure after exclusive publication", async () => {
+  const dir = await mkTmp();
+  const paths = await writeFixture(dir, { left: "id\n1\n", right: "id\n1\n", config: EQUAL_CONFIG });
+  const out = path.join(dir, "draft.json");
+  const base = baseFs();
+  const result = await quietRun(["init-config", paths.left, paths.right, "--out", out], {
+    fs: {
+      ...base,
+      unlink: async (target) => {
+        if (path.basename(String(target)) === "config.json") throw errorWithCode("EIO", "injected post-publication cleanup failure");
+        return base.unlink(target);
+      },
+    },
+  });
+  const error = JSON.parse(result.stderr);
+  assert.equal(result.code, 2);
+  assert.match(error.error.message, /cleanup failed; owned staging directory remains at .*\.reconcile-file-stage-/);
+  assert.ok(await exists(out), "the atomic destination was published before cleanup failed");
+  assert.equal(JSON.parse(await readText(out)).draft, true);
+  const residual = (await listDir(dir)).find((name) => name.startsWith(".reconcile-file-stage-"));
+  assert.ok(residual);
+  await base.rm(path.join(dir, residual), { recursive: true, force: true });
+});
+
+test("init-config fails safely when atomic no-replace publication is unavailable", async () => {
+  const dir = await mkTmp();
+  const paths = await writeFixture(dir, { left: "id\n1\n", right: "id\n1\n", config: EQUAL_CONFIG });
+  const out = path.join(dir, "draft.json");
+  const base = baseFs();
+  let renameCalls = 0;
+  let raceSentinelCreated = false;
+  let unsupportedLinkSeen = false;
+  const result = await quietRun(["init-config", paths.left, paths.right, "--out", out], {
+    fs: {
+      ...base,
+      link: async () => {
+        unsupportedLinkSeen = true;
+        throw errorWithCode("ENOTSUP", "atomic no-replace unavailable");
+      },
+      lstat: async (target) => {
+        if (unsupportedLinkSeen && String(target) === out) {
+          await base.writeFile(out, "user-created-after-precheck", { flag: "wx" });
+          raceSentinelCreated = true;
+          return null;
+        }
+        return base.lstat(target);
+      },
+      rename: async (...args) => {
+        renameCalls += 1;
+        return base.rename(...args);
+      },
+    },
+  });
+  assert.equal(result.code, 2);
+  assert.equal(JSON.parse(result.stderr).error.code, "io_error");
+  assert.equal(renameCalls, 0, "unsupported hard links must not fall back to overwriting rename");
+  assert.equal(raceSentinelCreated, false, "publication must not enter the check-then-rename race window");
+  assert.equal(await exists(out), false);
+});
+
+test("failed staging cleanup reports its residual path and retains the write error", async () => {
+  const dir = await mkTmp();
+  const paths = await writeFixture(dir, { left: "id,amount\n001,100.00\n", right: "id,amount\n001,100\n", config: EQUAL_CONFIG });
+  const base = baseFs();
+  const result = await quietRun(["compare", paths.left, paths.right, "--config", paths.config, "--out", path.join(dir, "run")], {
+    fs: {
+      ...base,
+      open: async (target, flags, mode) => {
+        if (flags === "wx" && String(target).endsWith("report.json")) throw errorWithCode("ENOSPC", "primary write failure");
+        return base.open(target, flags, mode);
+      },
+      rm: async (target, options) => {
+        if (path.basename(String(target)).startsWith(".reconcile-stage-")) throw errorWithCode("EIO", "injected cleanup failure");
+        return base.rm(target, options);
+      },
+    },
+  });
+  const errors = JSON.parse(result.stderr.split("\n").filter(Boolean).at(-1));
+  assert.equal(result.code, 2);
+  assert.match(errors.error.message, /primary write failure/);
+  assert.match(result.stderr, /cleanup failed; owned staging directory remains at .*\.reconcile-stage-/);
+  assert.equal(await exists(path.join(dir, "run")), false);
+  const residual = (await listDir(dir)).find((name) => name.startsWith(".reconcile-stage-"));
+  assert.ok(residual);
+  await base.rm(path.join(dir, residual), { recursive: true, force: true });
 });
 
 test("a publish failure cleans staging rather than leaving a partial run", async () => {
@@ -1207,7 +1524,7 @@ test("summary reports computation coverage separately from unresolved difference
   assert.equal(cli(["compare", paths.left, paths.right, "--config", paths.config, "--out", out]).status, 3);
   const summary = await readText(path.join(out, "summary.md"));
   assert.match(summary, /computation status: incomplete/);
-  assert.match(summary, /candidate_component_limit_exceeded/);
+  assert.match(summary, /candidate\\_component\\_limit\\_exceeded/);
   assert.match(summary, /unresolved records: 202/);
   assert.ok(!/all reconciled/i.test(summary));
 });
