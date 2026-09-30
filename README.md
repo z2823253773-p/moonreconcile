@@ -7,8 +7,8 @@
 
 ## 当前状态
 
-**开发中。8 个实施任务中仅 Task 1 的代码与基础测试完成，独立审查尚未结束。**
-当前基础测试通过不代表完整产品验收；真实用户采用、性能和赛事审核也仍未得到验证。
+**开发中。8 个实施任务中仅 Task 1 的导入、配置与桥接通过本地测试和独立审查。**
+完整产品验收仍未完成；真实用户采用、性能和赛事审核也尚未得到验证。
 
 | 能力 | 状态 |
 | --- | --- |
@@ -22,7 +22,7 @@
 | 三个演示工作流、基准测试、CI | **未实现** |
 
 实现计划：[docs/plans/2026-09-30-table-reconcile.md](docs/plans/2026-09-30-table-reconcile.md)（Task 1–8）。
-逐项验收状态见 [docs/acceptance-matrix.md](docs/acceptance-matrix.md)。矩阵中的正式验收项仍待逐项核证。
+逐项验收状态见 [docs/acceptance-matrix.md](docs/acceptance-matrix.md)。Task 1 审查证据不替代完整流程的验收。
 
 ### 尚未验证的风险
 
