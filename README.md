@@ -7,7 +7,7 @@
 
 ## 当前状态
 
-**开发中。Task 1–4 的导入、配置、字段规则与精确对应已通过本地测试和独立审查。**
+**开发中。Task 1–5 的导入、配置、字段规则与精确对应已通过本地测试和独立审查。**
 完整产品验收仍未完成；真实用户采用、性能和赛事审核也尚未得到验证。
 
 | 能力 | 状态 |
@@ -18,7 +18,7 @@
 | `check_config` 规范化配置 | 已实现 |
 | 核心字段比较：精确十进制、日期、显式转换与缺失策略 | 已实现；已接入整表比较 |
 | `compare` 精确键对应、结构检查、字段比较 | 已实现；含候选评分、部分分配建议及预算保护 |
-| `resolve` 人工复核回导 | **未实现**（返回 `unsupported_operation`） |
+| `resolve` 人工复核回导 | 已实现核心累计重放；文件 CLI 待实现 |
 | CLI、快照指纹、报告导出 | **未实现** |
 | 三个演示工作流、基准测试、CI | **未实现** |
 
@@ -45,7 +45,7 @@ npm test                            # 构建 + Node 端 bridge 测试
 
 ## 用法
 
-引擎是纯 JSON 进 / JSON 出，不接触文件系统。当前可用 `init_config`、`check_config`、含精确键与候选建议的 `compare`：
+引擎是纯 JSON 进 / JSON 出，不接触文件系统。当前可用 `init_config`、`check_config`、含精确键与候选建议的 `compare` 及累计人工决定的 `resolve`：
 
 ```js
 import { invoke_bridge as invoke } from "./_build/js/debug/build/cmd/bridge/bridge.js";
