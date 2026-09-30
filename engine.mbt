@@ -167,17 +167,6 @@ fn handle_compare(object : Map[String, Json]) -> Json {
       })
     None => ()
   }
-  if result.pending_left > 0 || result.pending_right > 0 {
-    if config.candidates is Json::Object(_) {
-      return error_to_json(
-        request_error(
-          "candidate_stage_not_implemented",
-          "candidate processing is not available in this engine milestone; exact results are not being reported as complete",
-          Some("candidates"),
-        ),
-      )
-    }
-  }
   Json::object({
     "ok": Json::boolean(true),
     "config": normalize_config(config),

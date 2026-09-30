@@ -6,6 +6,8 @@ pub fn compare_field(String, String, FieldConfig) -> FieldComparison
 
 pub fn compare_tables(CsvTable, CsvTable, Config) -> ReconciliationResult
 
+pub fn generate_candidates(CsvTable, CsvTable, Array[Int], Array[Int], Config) -> CandidateStage
+
 pub fn invoke(String) -> String
 
 pub fn normalize_value(String, FieldConfig, String) -> NormalizedValue
@@ -15,6 +17,13 @@ pub fn result_to_json(ReconciliationResult) -> Json
 // Errors
 
 // Types and methods
+pub(all) struct CandidateStage {
+  candidates : Array[Json]
+  issues : Array[Json]
+  unprocessed_left : Array[Int]
+  unprocessed_right : Array[Int]
+}
+
 pub(all) struct Config {
   fields : Array[FieldConfig]
   key : Array[String]
@@ -102,6 +111,10 @@ pub(all) struct ReconciliationResult {
   pending_left_records : Array[Int]
   pending_right_records : Array[Int]
   diagnostics : Array[Json]
+  candidates : Array[Json]
+  computation_issues : Array[Json]
+  unprocessed_left_records : Array[Int]
+  unprocessed_right_records : Array[Int]
   unmapped_left : Array[String]
   unmapped_right : Array[String]
   ignored_left : Array[String]

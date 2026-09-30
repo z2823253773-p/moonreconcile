@@ -191,8 +191,12 @@ test("compare returns exact reconciliation JSON and resolve remains unsupported"
       },
     },
   });
-  assert.equal(candidatePending.ok, false);
-  assert.equal(candidatePending.error.code, "candidate_stage_not_implemented");
+  assert.equal(candidatePending.ok, true);
+  assert.equal(candidatePending.result.candidates.length, 1);
+  assert.equal(candidatePending.result.candidates[0].score, 10000);
+  assert.equal(candidatePending.result.candidates[0].suggested, true);
+  assert.equal(candidatePending.result.pairs.length, 0);
+  assert.equal(candidatePending.result.records[0].status, "pending_review");
 
   const missingColumn = call({
     op: "compare",

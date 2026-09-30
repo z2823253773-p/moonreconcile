@@ -13,13 +13,34 @@ fn result_record_id(side : String, record : Int) -> String {
 }
 
 ///|
-fn record_entry(side : String, record : Int, paired : Bool) -> Json {
+fn record_entry(
+  side : String,
+  record : Int,
+  paired : Bool,
+  unprocessed : Bool,
+) -> Json {
   Json::object({
     "id": Json::string(result_record_id(side, record)),
     "side": Json::string(side),
     "record": Json::number(record.to_double()),
-    "status": Json::string(if paired { "paired" } else { "pending_review" }),
-    "reason": Json::string(if paired { "exact_key" } else { "review_required" }),
+    "status": Json::string(
+      if paired {
+        "paired"
+      } else if unprocessed {
+        "unprocessed"
+      } else {
+        "pending_review"
+      },
+    ),
+    "reason": Json::string(
+      if paired {
+        "exact_key"
+      } else if unprocessed {
+        "computation_incomplete"
+      } else {
+        "review_required"
+      },
+    ),
   })
 }
 
@@ -56,13 +77,18 @@ fn pair_to_json(pair : ExactPair) -> Json {
 }
 
 ///|
-fn side_summary(total : Int, paired : Int, pending : Int) -> Json {
+fn side_summary(
+  total : Int,
+  paired : Int,
+  pending : Int,
+  unprocessed : Int,
+) -> Json {
   Json::object({
     "total": Json::number(total.to_double()),
     "paired": Json::number(paired.to_double()),
     "unmatched": Json::number(0.0),
     "pending_review": Json::number(pending.to_double()),
-    "unprocessed": Json::number(0.0),
+    "unprocessed": Json::number(unprocessed.to_double()),
   })
 }
 
@@ -98,15 +124,37 @@ pub fn result_to_json(result : ReconciliationResult) -> Json {
   let records : Array[Json] = []
   let paired_left = Array::make(result.left_total, false)
   let paired_right = Array::make(result.right_total, false)
+  let unprocessed_left = Array::make(result.left_total, false)
+  let unprocessed_right = Array::make(result.right_total, false)
+  for record in result.unprocessed_left_records {
+    unprocessed_left[record - 1] = true
+  }
+  for record in result.unprocessed_right_records {
+    unprocessed_right[record - 1] = true
+  }
   for pair in result.pairs {
     paired_left[pair.left_record - 1] = true
     paired_right[pair.right_record - 1] = true
   }
   for index in 0..<result.left_total {
-    records.push(record_entry("left", index + 1, paired_left[index]))
+    records.push(
+      record_entry(
+        "left",
+        index + 1,
+        paired_left[index],
+        unprocessed_left[index],
+      ),
+    )
   }
   for index in 0..<result.right_total {
-    records.push(record_entry("right", index + 1, paired_right[index]))
+    records.push(
+      record_entry(
+        "right",
+        index + 1,
+        paired_right[index],
+        unprocessed_right[index],
+      ),
+    )
   }
 
   let pairs = result.pairs.map(pair_to_json)
@@ -143,18 +191,21 @@ pub fn result_to_json(result : ReconciliationResult) -> Json {
       _ => ()
     }
   }
-  let unresolved_count = result.pending_left + result.pending_right
+  let unresolved_count = result.pending_left +
+    result.pending_right +
+    result.unprocessed_left_records.length() +
+    result.unprocessed_right_records.length()
   Json::object({
     "schema_version": Json::number(1.0),
     "engine_version": Json::string("0.1.0"),
     "computation": Json::object({
       "status": Json::string(result.status),
-      "issues": Json::array([]),
+      "issues": Json::array(result.computation_issues),
     }),
     "records": Json::array(records),
     "pairs": Json::array(pairs),
     "fields": Json::array(fields),
-    "candidates": Json::array([]),
+    "candidates": Json::array(result.candidates),
     "decisions": Json::array([]),
     "structure": Json::object({
       "unmapped_left": Json::array(result.unmapped_left.map(Json::string)),
@@ -169,11 +220,13 @@ pub fn result_to_json(result : ReconciliationResult) -> Json {
           result.left_total,
           result.pairs.length(),
           result.pending_left,
+          result.unprocessed_left_records.length(),
         ),
         "right": side_summary(
           result.right_total,
           result.pairs.length(),
           result.pending_right,
+          result.unprocessed_right_records.length(),
         ),
       }),
       "fields": Json::object({
@@ -186,7 +239,7 @@ pub fn result_to_json(result : ReconciliationResult) -> Json {
         structural_issue_count.val.to_double(),
       ),
       "key_issue_count": Json::number(key_issues.length().to_double()),
-      "candidate_count": Json::number(0.0),
+      "candidate_count": Json::number(result.candidates.length().to_double()),
       "unresolved_count": Json::number(unresolved_count.to_double()),
     }),
     "exit_code": Json::number(result.exit_code.to_double()),

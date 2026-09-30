@@ -162,10 +162,11 @@ fn unmapped_columns(
 }
 
 ///|
-pub fn compare_tables(
+fn compare_tables_with_budget(
   left : Table,
   right : Table,
   config : Config,
+  budget : CandidateBudget,
 ) -> ReconciliationResult {
   let diagnostics : Array[Json] = []
   let missing_left = missing_columns(left, config, "left")
@@ -270,6 +271,10 @@ pub fn compare_tables(
       pending_left_records: record_numbers(left.rows.length()),
       pending_right_records: record_numbers(right.rows.length()),
       diagnostics,
+      candidates: [],
+      computation_issues: [],
+      unprocessed_left_records: [],
+      unprocessed_right_records: [],
       unmapped_left: [],
       unmapped_right: [],
       ignored_left: config.ignore_left.copy(),
@@ -499,21 +504,57 @@ pub fn compare_tables(
   } else {
     0
   }
+  let candidate_stage = if config.candidates is Json::Object(_) &&
+    (pending_left > 0 || pending_right > 0) {
+    generate_candidates_with_budget(
+      left, right, pending_left_records, pending_right_records, config, budget,
+    )
+  } else {
+    { candidates: [], issues: [], unprocessed_left: [], unprocessed_right: [] }
+  }
+  let candidate_incomplete = !candidate_stage.unprocessed_left.is_empty() ||
+    !candidate_stage.unprocessed_right.is_empty()
   {
-    status: "complete",
-    exit_code,
+    status: if candidate_incomplete {
+      "incomplete"
+    } else {
+      "complete"
+    },
+    exit_code: if candidate_incomplete {
+      3
+    } else {
+      exit_code
+    },
     left_total: left.rows.length(),
     right_total: right.rows.length(),
     pairs,
-    pending_left,
-    pending_right,
+    pending_left: pending_left - candidate_stage.unprocessed_left.length(),
+    pending_right: pending_right - candidate_stage.unprocessed_right.length(),
     pending_left_records,
     pending_right_records,
     diagnostics,
+    candidates: candidate_stage.candidates,
+    computation_issues: candidate_stage.issues,
+    unprocessed_left_records: candidate_stage.unprocessed_left,
+    unprocessed_right_records: candidate_stage.unprocessed_right,
     unmapped_left,
     unmapped_right,
     ignored_left,
     ignored_right,
     fatal_error: None,
   }
+}
+
+///|
+pub fn compare_tables(
+  left : Table,
+  right : Table,
+  config : Config,
+) -> ReconciliationResult {
+  compare_tables_with_budget(left, right, config, {
+    pairs: 100000,
+    edit_cells: 20000000,
+    max_component_side: 100,
+    max_edit_codepoints: 512,
+  })
 }
