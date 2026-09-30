@@ -264,6 +264,10 @@ fn generate_candidates_with_budget(
   )
   let pre_ids = Array::make(pair_left.length(), "")
   let component = Ref(0)
+  let component_left_mark = Array::make(left.rows.length() + 1, 0)
+  let component_right_mark = Array::make(right.rows.length() + 1, 0)
+  let unprocessed_left_mark = Array::make(left.rows.length() + 1, false)
+  let unprocessed_right_mark = Array::make(right.rows.length() + 1, false)
   let mut dp_used = 0
   for seed in 0..<pair_left.length() {
     if !pair_scored[seed] {
@@ -273,13 +277,11 @@ fn generate_candidates_with_budget(
       let component_right : Array[Int] = []
       component_edges.push(seed)
       pair_scored[seed] = true
-      let component_left_seen = Array::make(left.rows.length() + 1, false)
-      let component_right_seen = Array::make(right.rows.length() + 1, false)
       let expanded = Ref(0)
       while expanded.val < component_edges.length() {
         let ei = component_edges[expanded.val]
-        if !component_left_seen[pair_left[ei]] {
-          component_left_seen[pair_left[ei]] = true
+        if component_left_mark[pair_left[ei]] != component.val {
+          component_left_mark[pair_left[ei]] = component.val
           component_left.push(pair_left[ei])
           match left_adjacency.get("\{pair_left[ei]}") {
             Some(neighbors) =>
@@ -292,8 +294,8 @@ fn generate_candidates_with_budget(
             None => ()
           }
         }
-        if !component_right_seen[pair_right[ei]] {
-          component_right_seen[pair_right[ei]] = true
+        if component_right_mark[pair_right[ei]] != component.val {
+          component_right_mark[pair_right[ei]] = component.val
           component_right.push(pair_right[ei])
           match right_adjacency.get("\{pair_right[ei]}") {
             Some(neighbors) =>
@@ -370,12 +372,14 @@ fn generate_candidates_with_budget(
       }
       if component_over_budget {
         for record in component_left {
-          if !unprocessed_left.contains(record) {
+          if !unprocessed_left_mark[record] {
+            unprocessed_left_mark[record] = true
             unprocessed_left.push(record)
           }
         }
         for record in component_right {
-          if !unprocessed_right.contains(record) {
+          if !unprocessed_right_mark[record] {
+            unprocessed_right_mark[record] = true
             unprocessed_right.push(record)
           }
         }
@@ -542,10 +546,12 @@ fn generate_candidates_with_budget(
   }
   // Qualified graph components are independent solver admission units.
   let qualified = Array::make(pair_left.length(), false)
-  let selected : Array[Int] = []
   let qseen = Array::make(pair_left.length(), false)
   let qid = Array::make(pair_left.length(), "")
   let qnumber = Ref(0)
+  let qualified_left_mark = Array::make(left.rows.length() + 1, 0)
+  let qualified_right_mark = Array::make(right.rows.length() + 1, 0)
+  let selected_edge = Array::make(pair_left.length(), false)
   for i in 0..<pair_left.length() {
     qualified[i] = match score_by_pair[i] {
       Json::Number(value, ..) => value >= threshold.to_double()
@@ -559,13 +565,11 @@ fn generate_candidates_with_budget(
       qseen[seed] = true
       let ls : Array[Int] = []
       let rs : Array[Int] = []
-      let local_left_seen = Array::make(left.rows.length() + 1, false)
-      let local_right_seen = Array::make(right.rows.length() + 1, false)
       let at = Ref(0)
       while at.val < edges.length() {
         let ei = edges[at.val]
-        if !local_left_seen[pair_left[ei]] {
-          local_left_seen[pair_left[ei]] = true
+        if qualified_left_mark[pair_left[ei]] != qnumber.val {
+          qualified_left_mark[pair_left[ei]] = qnumber.val
           ls.push(pair_left[ei])
           match left_adjacency.get("\{pair_left[ei]}") {
             Some(neighbors) =>
@@ -578,8 +582,8 @@ fn generate_candidates_with_budget(
             None => ()
           }
         }
-        if !local_right_seen[pair_right[ei]] {
-          local_right_seen[pair_right[ei]] = true
+        if qualified_right_mark[pair_right[ei]] != qnumber.val {
+          qualified_right_mark[pair_right[ei]] = qnumber.val
           rs.push(pair_right[ei])
           match right_adjacency.get("\{pair_right[ei]}") {
             Some(neighbors) =>
@@ -601,12 +605,14 @@ fn generate_candidates_with_budget(
       if ls.length() > budget.max_component_side ||
         rs.length() > budget.max_component_side {
         for value in ls {
-          if !unprocessed_left.contains(value) {
+          if !unprocessed_left_mark[value] {
+            unprocessed_left_mark[value] = true
             unprocessed_left.push(value)
           }
         }
         for value in rs {
-          if !unprocessed_right.contains(value) {
+          if !unprocessed_right_mark[value] {
+            unprocessed_right_mark[value] = true
             unprocessed_right.push(value)
           }
         }
@@ -637,7 +643,7 @@ fn generate_candidates_with_budget(
             for ei in edges {
               if ls[pair.left] == pair_left[ei] &&
                 rs[pair.right] == pair_right[ei] {
-                selected.push(ei)
+                selected_edge[ei] = true
               }
             }
           }
@@ -654,7 +660,7 @@ fn generate_candidates_with_budget(
         "score": score_by_pair[i],
         "field_scores": field_scores_by_pair[i],
         "diagnostics": diagnostics_by_pair[i],
-        "suggested": Json::boolean(selected.contains(i)),
+        "suggested": Json::boolean(selected_edge[i]),
         "component_id": Json::string(cid),
       }),
     )

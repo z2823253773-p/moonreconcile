@@ -1,0 +1,4 @@
+order_id,status,amount,day
+A,paid,100.00,2026-09-01
+B,pending,10,2026-09-02
+C,paid,5,2026-09-03

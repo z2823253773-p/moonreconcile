@@ -28,7 +28,7 @@ fn decimal_parse(text : String) -> ExactDecimal? {
   if start >= chars.length() {
     return None
   }
-  let digits = StringBuilder::new()
+  let digits = StringBuilder()
   let mut scale = 0
   let mut digit_count = 0
   let mut saw_decimal = false

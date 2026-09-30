@@ -1,0 +1,8 @@
+{
+  "label": "synthetic; hand-authored before running the engine",
+  "true_pairs": [["L1", "R1"]],
+  "true_unmatched": {"left": [], "right": ["R2"]},
+  "qualified_candidates": {"true": 1, "false": 1},
+  "suggestions": {"true": 0, "false": 1, "unmatched_left": 0},
+  "review": {"accepted_true": 1, "accepted_false": 0, "rejected_false": 1, "confirmed_unmatched_right": 1}
+}

@@ -103,3 +103,15 @@ Export shape: cmd/bridge/bridge.js -> invoke_bridge
 | [Python Record Linkage Toolkit 0.15](https://recordlinkage.readthedocs.io/en/stable/ref-compare.html) | 候选记录对及精确、字符串、数值等字段比较特征 | 候选评分也非新问题。是否已有可直接完成本项目整个“比较→人工决定→回导”链路，需进一步核查和实测，不能据此声称不存在 |
 
 相对收益尚未得到真实场景或端到端对照证明。若现有工具加少量脚本即可满足用户需求，应重新评估独立项目的必要性。
+
+## Task 7 competitor documentation check (2026-09-30)
+
+This was a primary-documentation review, not an installation or execution comparison. Retrieval date: 2026-09-30. Versions are stated only where the official page showed them.
+
+| Tool/source | Documented capability relevant here | Evidence tier | Unverified here |
+| --- | --- | --- | --- |
+| [MoonRow 0.1.0 package docs](https://mooncakes.io/docs/JingLan0v0/moonrow@0.1.0) | MoonBit CSV snapshot comparison with configurable single/composite key columns, duplicate diagnostics, exact cell comparison, added/removed/changed records and human-readable reports. Its docs describe no fuzzy candidate matching or review-decision import in the inspected public API. | Official package documentation, version 0.1.0 | No local install/run; feature absence outside inspected docs is unknown. |
+| [DataComPy 1.0.4 Pandas docs](https://capitalone.github.io/datacompy/pandas_usage.html) | Human-readable dataframe comparisons; documented joins by columns or index, absolute/relative tolerance, column/row summaries, unmatched rows and unequal samples. Docs describe a heuristic temporary index for duplicate join keys and warn duplicate matching can be naïve. | Official project documentation, version 1.0.4 | Not installed or run; parity with this CLI workflow and manual-decision persistence unknown. |
+| [Python Record Linkage Toolkit 0.15 docs](https://recordlinkage.readthedocs.io/en/latest/) | A staged record-linkage API documents preprocessing, pair indexing, feature comparison, classification, annotation/manual labeling and evaluation metrics. | Official project documentation, docs version 0.15 | Not installed or run; exact fit, operational friction, output/report behavior, and accuracy on these fixtures unknown. |
+
+This table identifies relevant documented areas; it does not establish that this project fills an ecosystem gap or outperforms any of these tools. The fixture-only JavaScript baseline is separately scoped and must not be conflated with these named products.

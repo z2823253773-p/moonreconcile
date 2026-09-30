@@ -1,0 +1,5 @@
+record_id,status,amount,legacy_note
+A,active,1.00,keep
+D,active,2,dup-a
+D,active,3,dup-b
+,active,4,blank-key

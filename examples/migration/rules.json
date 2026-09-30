@@ -1,0 +1,1 @@
+{"schema_version":1,"fields":[{"name":"id","left":"record_id","right":"new_id","type":"text","compare":false},{"name":"status","left":"status","right":"state","type":"text","right_values":{"old":"active"}},{"name":"amount","left":"amount","right":"total","type":"decimal"}],"key":["id"],"ignore_right":["export_stamp"]}

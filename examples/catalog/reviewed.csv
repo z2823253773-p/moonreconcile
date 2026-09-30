@@ -1,0 +1,4 @@
+action,left_id,right_id,reason
+reject,L1,R2,synthetic truth says this same-name decoy is a different product
+accept,L1,R1,synthetic truth confirms the near-name catalog match
+right_unmatched,,R2,synthetic truth marks the decoy unmatched

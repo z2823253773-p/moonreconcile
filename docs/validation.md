@@ -51,3 +51,13 @@
 ## 独立库消费早期检查
 
 `python3 scripts/check-library-consumer.py` 在 `3ae6245` 的归档代码与独立模块工作区中通过84/84（核心82+外部2）。它不使用Node文件宿主；这不是Mooncakes发布证明。当前官方工具链临时验证记录将随最终CI证据归档，用户全局工具链未改动。
+
+## Task 7
+
+All three examples are synthetic. `node scripts/workflows.mjs` invokes the shipped CLI through compare, resolve and cumulative-decision replay; it checks semantic JSON assertions, conservation on both sides, all 11 run artifacts, CSV headers and Markdown summary sections. Orders and migration exact pairs, states and field statuses are cross-checked with a fixture-scoped independent JavaScript reference. That reference requires complete unique keys, applies declared right-side status mapping, uses BigInt decimal comparison and strict calendar dates, and does not implement fuzzy suggestions or review.
+
+The catalog truth is hand-authored separately in `examples/catalog/truth.json`. This intentionally adversarial two-candidate case contains one true candidate and one false candidate; the false score-10000 exact-name decoy is the sole suggestion while the true score-8000 competitor remains visible. Review rejects the decoy, accepts the competitor and confirms the other right record unmatched. These are fixture counts only, not an accuracy estimate.
+
+`node scripts/benchmark.mjs` creates deterministic temporary inputs and output runs and measures end-to-end child CLI compare, including CSV parsing and report writing. It excludes build and fixture generation. The retained records list the tested source SHA, OS/CPU, Node/Moon versions, child wall time, candidate counts/density, component size, actual output bytes and exit status. Child RSS is marked unavailable because macOS `/usr/bin/time -l` did not emit its RSS field in this sandbox (`sysctl kern.clockrate: Operation not permitted`). Sparse workloads have three retained before and after observations from the accepted base and optimized source. These are synthetic local measurements, not universal capacity claims.
+
+Competitor review in `docs/dependency-audit.md` is based on primary documentation, not local tool runs. No actual customer data or adjudicated truth set was available.

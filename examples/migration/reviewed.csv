@@ -1,0 +1,4 @@
+action,left_id,right_id,reason
+accept,L2,R2,synthetic migration sample verified
+accept,L3,R3,synthetic migration sample verified
+accept,L4,R4,synthetic migration sample verified

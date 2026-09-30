@@ -1,0 +1,1 @@
+{"schema_version":1,"fields":[{"name":"order_id","left":"order_id","right":"external_ref","type":"text","compare":false},{"name":"status","left":"status","right":"state","type":"text","right_values":{"已支付":"paid"}},{"name":"amount","left":"amount","right":"total","type":"decimal","abs_tol":"0.02"},{"name":"day","left":"day","right":"settled_on","type":"date"}],"key":["order_id"]}
