@@ -17,4 +17,4 @@ Validation on the Task 3 tree:
 
 Remaining named gaps are later milestones: candidate generation/scoring and assignment (Task 4), human decision replay (`resolve`, Task 5), standalone CLI/snapshots/full exports (Task 6), workflow/benchmark/product validation (Task 7), and independent acceptance/publication (Task 8). For now, compare returns `candidate_stage_not_implemented` when candidates are configured and exact matching leaves pending records; no candidate-enabled run is represented as complete. No publication or push was performed.
 
-Local implementation commit: `782e4f74aa67a591928faaaeee7f0ac831529f7a`.
+Local implementation commit: `a5052997133c819e7b7315de56ae519c9c182719`. The verification report was committed immediately after it.
