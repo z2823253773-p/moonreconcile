@@ -91,3 +91,15 @@ Export shape: cmd/bridge/bridge.js -> invoke_bridge
 本仓库：[LICENSE](../LICENSE)，MIT。
 
 工具链为 MoonBit 官方发行版，其许可证随官方发行版提供，本仓库未重新分发其源码。
+
+## 6. 相邻工具能力对照（文档核查，未在本仓库运行）
+
+2026-09-30 重新查阅以下公开原始文档。本节只记录文档明确支持的能力与项目定位；没有运行对方代码，也没有测量准确率、速度或真实使用成本。
+
+| 工具与版本 | 文档明确展示的能力 | 与 MoonReconcile 拟议功能的关系 |
+| --- | --- | --- |
+| [MoonRow 0.1.0](https://mooncakes.io/docs/JingLan0v0/moonrow@0.1.0) | MoonBit CSV 库/CLI，必填可重复组合键、重复键报错、增删改和 JSON/Markdown 报告；文档明确不支持数值容差 | 精确键快照比较已覆盖，不应当作本项目独占价值。本项目拟增加显式列映射、类型规则、无可靠键时的候选与人工决定回导；这些拟议能力仍须以实际实现证明 |
+| [DataComPy 1.0.4](https://capitalone.github.io/datacompy/) 与 [自定义比较器文档](https://capitalone.github.io/datacompy/comparator_usage.html) | 多类 DataFrame 的关联对比、结构化报告、可配置容差与自定义比较器 | 内容比较和报告已有成熟基线。本项目不能声称创造了可配置对账；需比较完整复核流程、可追溯性及 MoonBit 实现价值 |
+| [Python Record Linkage Toolkit 0.15](https://recordlinkage.readthedocs.io/en/stable/ref-compare.html) | 候选记录对及精确、字符串、数值等字段比较特征 | 候选评分也非新问题。是否已有可直接完成本项目整个“比较→人工决定→回导”链路，需进一步核查和实测，不能据此声称不存在 |
+
+相对收益尚未得到真实场景或端到端对照证明。若现有工具加少量脚本即可满足用户需求，应重新评估独立项目的必要性。

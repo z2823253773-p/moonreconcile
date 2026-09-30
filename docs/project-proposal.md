@@ -81,7 +81,7 @@ paired + unmatched + pending_review + unprocessed = 输入记录数
 
 ## 5. 现有工具重叠与预期区别
 
-设计阶段已识别 MoonRow 的组合键 CSV 对比、重复键诊断及增删改报告与本项目明显重叠；MoonVerity 的数据契约、NyaCSV 的解析能力属于相邻能力。DataComPy 与 Python Record Linkage Toolkit 是需要进一步对照的成熟工具方向。上述判断来自设计阶段资料，尚不构成本项目完成的逐项竞品实测；最新能力和实际效果仍需核查。
+截至 2026-09-30 的[原始文档对照](dependency-audit.md#6-相邻工具能力对照文档核查未在本仓库运行)显示：MoonRow 已覆盖 MoonBit 组合键 CSV 快照比较和报告；DataComPy 已提供可配置容差、自定义比较器与结构化报告；Python Record Linkage Toolkit 已提供候选对和多种字段比较。拟议差异是把显式映射、业务规则、剩余候选、人工决定回导和追溯报告串成 MoonBit 主导的工作流。这些能力仍须由本项目实际交付并与现有办法对照，不能因设计稿写出组合就宣称需求已验证。
 
 拟验证的区别是：**在同一个 MoonBit 核心和 CLI 中，完成显式列映射、业务规则、剩余候选、人工决定回导和可追溯最终报告。** 精确关联、一个相似度算法、多种输出格式都不能单独充当创新依据。
 
