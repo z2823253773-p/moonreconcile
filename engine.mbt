@@ -178,7 +178,11 @@ fn handle_compare(object : Map[String, Json]) -> Json {
       )
     }
   }
-  success_to_json("result", result_to_json(result))
+  Json::object({
+    "ok": Json::boolean(true),
+    "config": normalize_config(config),
+    "result": result_to_json(result),
+  })
 }
 
 ///|

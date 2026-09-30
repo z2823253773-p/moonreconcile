@@ -21,6 +21,9 @@ pub type Table = CsvTable
 pub(all) struct ExactPair {
   left_record : Int
   right_record : Int
+  source : String
+  reason : String
+  is_override : Bool
   fields : Array[FieldComparison]
 }
 

@@ -121,19 +121,37 @@ test("compare returns exact reconciliation JSON and resolve remains unsupported"
     config,
   });
   assert.equal(response.ok, true);
-  assert.equal(response.result.run_status, "complete");
+  assert.equal(response.result.computation.status, "complete");
   assert.equal(response.result.exit_code, 1);
   assert.equal(response.result.pairs.length, 1);
   assert.equal(response.result.pairs[0].source, "exact_key");
-  assert.equal(response.result.pairs[0].fields[0].status, "equivalent_by_rule");
-  assert.deepEqual(response.result.records.left, {
+  assert.equal(response.result.fields[0].status, "equivalent_by_rule");
+  assert.deepEqual(response.result.summary.per_side.left, {
     total: 2,
     paired: 1,
     unmatched: 0,
     pending_review: 1,
     unprocessed: 0,
-    pending_records: [2],
   });
+  assert.deepEqual(response.result.records[1], {
+    id: "L2",
+    side: "left",
+    record: 2,
+    status: "pending_review",
+    reason: "review_required",
+  });
+  assert.deepEqual(response.result.records[2], {
+    id: "R1",
+    side: "right",
+    record: 1,
+    status: "paired",
+    reason: "exact_key",
+  });
+  assert.deepEqual(response.result.candidates, []);
+  assert.deepEqual(response.result.decisions, []);
+  assert.equal(response.result.summary.candidate_count, 0);
+  assert.equal(response.result.summary.key_issue_count, 2);
+  assert.equal(response.result.summary.unresolved_count, 2);
 
   const exactOnly = call({
     op: "compare",
@@ -188,10 +206,111 @@ test("compare returns exact reconciliation JSON and resolve remains unsupported"
   });
   assert.equal(missingColumn.ok, false);
   assert.equal(missingColumn.error.code, "missing_mandatory_column");
+  assert.equal(missingColumn.error.side, "left");
+  assert.equal(missingColumn.error.field, "left_id");
   assert.equal(missingColumn.result.exit_code, 2);
-  assert.equal(missingColumn.result.diagnostics[0].field, "left_id");
 
   const resolve = call({ op: "resolve" });
   assert.equal(resolve.ok, false);
   assert.equal(resolve.error.code, "unsupported_operation");
+});
+
+test("compare follows the locked Result wire schema and returns normalized config", () => {
+  const response = call({
+    op: "compare",
+    left_csv: "id,amount\n001,100.00\n",
+    right_csv: "id,amount\n001,100\n",
+    config: {
+      schema_version: 1,
+      fields: [
+        { name: "id", left: "id", right: "id", type: "text", compare: false },
+        { name: "amount", left: "amount", right: "amount", type: "decimal" },
+      ],
+      key: ["id"],
+    },
+  });
+  assert.equal(response.ok, true);
+  assert.ok(response.config);
+  assert.equal(response.config.fields[1].trim_ascii, false);
+  assert.equal(response.config.fields[1].abs_tol, "0");
+  const result = response.result;
+  assert.deepEqual(
+    Object.keys(result).sort(),
+    [
+      "schema_version",
+      "engine_version",
+      "computation",
+      "records",
+      "pairs",
+      "fields",
+      "candidates",
+      "decisions",
+      "structure",
+      "key_issues",
+      "summary",
+      "exit_code",
+    ].sort(),
+  );
+  assert.equal(result.schema_version, 1);
+  assert.equal(typeof result.engine_version, "string");
+  assert.equal(result.computation.status, "complete");
+  assert.deepEqual(result.computation.issues, []);
+  assert.deepEqual(result.records, [
+    { id: "L1", side: "left", record: 1, status: "paired", reason: "exact_key" },
+    { id: "R1", side: "right", record: 1, status: "paired", reason: "exact_key" },
+  ]);
+  assert.deepEqual(result.pairs, [
+    { left_id: "L1", right_id: "R1", source: "exact_key", reason: "unique_canonical_key", override: false },
+  ]);
+  assert.equal(result.fields.length, 1);
+  assert.equal(result.fields[0].left_id, "L1");
+  assert.equal(result.fields[0].right_id, "R1");
+  assert.equal(result.fields[0].status, "equivalent_by_rule");
+  assert.deepEqual(result.summary.per_side.left, {
+    total: 1,
+    paired: 1,
+    unmatched: 0,
+    pending_review: 0,
+    unprocessed: 0,
+  });
+  assert.deepEqual(result.summary.fields, {
+    equal: 0,
+    equivalent_by_rule: 1,
+    different: 0,
+    invalid_value: 0,
+  });
+  assert.equal(result.summary.unresolved_count, 0);
+  assert.equal(result.summary.structural_issue_count, 0);
+  assert.equal(result.summary.key_issue_count, 0);
+  assert.deepEqual(result.structure, {
+    unmapped_left: [],
+    unmapped_right: [],
+    ignored_left: [],
+    ignored_right: [],
+  });
+  assert.deepEqual(result.key_issues, []);
+});
+
+test("compare rejects absent explicitly ignored columns on either side", () => {
+  for (const side of ["left", "right"]) {
+    const config = {
+      schema_version: 1,
+      fields: [{ name: "id", left: "id", right: "id", type: "text" }],
+      key: ["id"],
+      ignore_left: side === "left" ? ["left_typo"] : [],
+      ignore_right: side === "right" ? ["right_typo"] : [],
+    };
+    const response = call({
+      op: "compare",
+      left_csv: "id\n1\n",
+      right_csv: "id\n1\n",
+      config,
+    });
+    assert.equal(response.ok, false);
+    assert.equal(response.error.code, "missing_ignored_column");
+    assert.equal(response.error.side, side);
+    assert.equal(response.error.field, `${side}_typo`);
+    assert.equal(response.result.exit_code, 2);
+    assert.equal(response.result.summary.structural_issue_count, 1);
+  }
 });

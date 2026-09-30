@@ -127,6 +127,14 @@ fn record_numbers(count : Int) -> Array[Int] {
 }
 
 ///|
+fn missing_ignored_columns(
+  table : Table,
+  ignored : Array[String],
+) -> Array[String] {
+  ignored.filter(fn(column) { !table.headers.contains(column) })
+}
+
+///|
 fn unmapped_columns(
   table : Table,
   config : Config,
@@ -162,7 +170,15 @@ pub fn compare_tables(
   let diagnostics : Array[Json] = []
   let missing_left = missing_columns(left, config, "left")
   let missing_right = missing_columns(right, config, "right")
-  if !missing_left.is_empty() || !missing_right.is_empty() {
+  let missing_ignored_left = missing_ignored_columns(left, config.ignore_left)
+  let missing_ignored_right = missing_ignored_columns(
+    right,
+    config.ignore_right,
+  )
+  if !missing_left.is_empty() ||
+    !missing_right.is_empty() ||
+    !missing_ignored_left.is_empty() ||
+    !missing_ignored_right.is_empty() {
     for column in missing_left {
       diagnostics.push(
         diagnostic(
@@ -185,12 +201,66 @@ pub fn compare_tables(
         ),
       )
     }
+    for column in missing_ignored_left {
+      diagnostics.push(
+        diagnostic(
+          "missing_ignored_column",
+          "left",
+          None,
+          Some(column),
+          "declared ignored column is absent",
+        ),
+      )
+    }
+    for column in missing_ignored_right {
+      diagnostics.push(
+        diagnostic(
+          "missing_ignored_column",
+          "right",
+          None,
+          Some(column),
+          "declared ignored column is absent",
+        ),
+      )
+    }
+    let (code, side, column, message) = if !missing_left.is_empty() {
+      (
+        "missing_mandatory_column",
+        "left",
+        missing_left[0],
+        "configured source column is absent",
+      )
+    } else if !missing_right.is_empty() {
+      (
+        "missing_mandatory_column",
+        "right",
+        missing_right[0],
+        "configured source column is absent",
+      )
+    } else if !missing_ignored_left.is_empty() {
+      (
+        "missing_ignored_column",
+        "left",
+        missing_ignored_left[0],
+        "declared ignored column is absent",
+      )
+    } else {
+      (
+        "missing_ignored_column",
+        "right",
+        missing_ignored_right[0],
+        "declared ignored column is absent",
+      )
+    }
     let error = engine_error(
-      "missing_mandatory_column", "one or more configured source columns are absent",
+      code,
+      "\{message}: '\{column}' on \{side}",
       "configuration",
+      side~,
+      field=column,
     )
     return {
-      status: "complete",
+      status: "incomplete",
       exit_code: 2,
       left_total: left.rows.length(),
       right_total: right.rows.length(),
@@ -282,6 +352,9 @@ pub fn compare_tables(
               pairs.push({
                 left_record: left_index + 1,
                 right_record: right_index + 1,
+                source: "exact_key",
+                reason: "unique_canonical_key",
+                is_override: false,
                 fields: comparisons,
               })
               left_paired[left_index] = true

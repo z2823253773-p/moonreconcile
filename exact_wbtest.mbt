@@ -36,6 +36,32 @@ test "task3_exact_pair_duplicate_missing_structure_and_conservation" {
   assert_eq(result.left_total, result.pairs.length() + result.pending_left)
   assert_eq(result.right_total, result.pairs.length() + result.pending_right)
   assert_true(result.diagnostics.length() >= 3)
+  let diagnostic_json = Json::array(result.diagnostics).stringify()
+  assert_true(
+    diagnostic_json.contains(
+      "\"code\":\"invalid_or_missing_key\",\"side\":\"left\",\"record\":4",
+    ),
+  )
+  assert_true(
+    diagnostic_json.contains(
+      "\"code\":\"duplicate_key\",\"side\":\"left\",\"record\":2",
+    ),
+  )
+  assert_true(
+    diagnostic_json.contains(
+      "\"code\":\"duplicate_key\",\"side\":\"left\",\"record\":3",
+    ),
+  )
+  assert_true(
+    diagnostic_json.contains(
+      "\"code\":\"duplicate_key\",\"side\":\"right\",\"record\":2",
+    ),
+  )
+  assert_true(
+    diagnostic_json.contains(
+      "\"code\":\"duplicate_key\",\"side\":\"right\",\"record\":3",
+    ),
+  )
   assert_true(result.unmapped_left.contains("old_note") == false)
   assert_true(result.unmapped_left.contains("left_only"))
   assert_true(result.ignored_left.contains("skip"))
@@ -162,6 +188,7 @@ test "task3_missing_mandatory_source_column_is_fatal" {
     config,
   )
   assert_eq(result.exit_code, 2)
+  assert_eq(result.status, "incomplete")
   assert_true(result.fatal_error is Some(_))
   assert_true(result.diagnostics.length() > 0)
 }
