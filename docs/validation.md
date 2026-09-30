@@ -1,6 +1,6 @@
 # 验证记录
 
-本文件只记录实际验证。Tasks 6–8 和完整产品验收尚未完成。
+本文件只记录实际验证。Tasks 7–8 和完整产品验收尚未完成。
 
 ## Task 1
 
@@ -41,3 +41,13 @@
 实现提交 `5281187566dff5eefefeddaa8433520b582056e6`，接续[独立审查](evidence/task5-review.md) PASS（Claude Code 配置路由 DeepSeek-flash；Astra 因额度中断未给出结论）。控制器隔离副本 check/test82/npm8/Python240 均 exit0；另200组累计重排、重复、状态、字段与退出码独立断言通过。生产101×101预算受限案例全量人工处置后仍 incomplete/exit3/unresolved0。源码归档于 `tests/decisions-oracle.test.mjs`。
 
 `summary.key_issue_count` 保留所有键诊断，包括信息性 `no_key_configured` 和 `key_not_found`。这两个代码不单独阻止完全人工复核且无其他问题的运行退出0；重复/缺失/无效键异常、内容差异、无对应和结构问题仍触发退出1。计算历史不完整仍优先退出3。运行目录指纹、文件事务与CLI是Task6，不能由核心复核测试替代。
+
+## Task 6
+
+初版 `ed0eeba` 的82MoonBit/43Node门禁通过，但[独立审查](evidence/task6-review.md)复现七项文件保护、I/O、回导及显示缺陷。因此初版未验收。修复提交 `4304f75c8fafbde63e2a6be8d88cbfa4a116bea9` 补充先红后绿的回归测试，82MoonBit/53Node通过，七项均在[独立定向复审](evidence/task6-rereview.md)确认修复。
+
+当前CLI已实现四个命令及11个输出文件，快照不依赖原路径，规范化配置和输入SHA/大小/引擎版本/run_id均校验，累计决定可二次回导。不能提供原子不覆盖文件发布的文件系统，init-config明确退出2，不使用会覆盖文件的rename回退。CPU/内存规模、三个完整示例及远端CI仍待后续验证。
+
+## 独立库消费早期检查
+
+`python3 scripts/check-library-consumer.py` 在 `3ae6245` 的归档代码与独立模块工作区中通过84/84（核心82+外部2）。它不使用Node文件宿主；这不是Mooncakes发布证明。当前官方工具链临时验证记录将随最终CI证据归档，用户全局工具链未改动。
