@@ -13,7 +13,7 @@ name = "z2823253773-p/moonreconcile"
 
 version = "0.1.0"
 
-readme = "README.mbt.md"
+readme = "README.md"
 
 repository = "https://github.com/z2823253773-p/moonreconcile"
 

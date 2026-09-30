@@ -7,8 +7,7 @@
 
 ## 当前状态
 
-**开发中。Task 1–7 已实现并在本地通过测试、独立审查与端到端运行。**
-完整产品验收、多平台 CI 实际执行和赛事审核仍未完成；真实用户采用与性能也尚未验证。
+**首个可运行版本已完成 Task 1–7 的实现和本地门禁。** Task 8 的文档与 CI 配置已提交，但远端 CI 尚未执行；真实用户采用、XLSX 适配和赛事审核仍未验证。
 
 | 能力 | 状态 |
 | --- | --- |
@@ -28,7 +27,7 @@
 实现计划：[docs/plans/2026-09-30-table-reconcile.md](docs/plans/2026-09-30-table-reconcile.md)（Task 1–8）。
 逐项验收状态见 [docs/acceptance-matrix.md](docs/acceptance-matrix.md)，实际命令与提交见 [docs/validation.md](docs/validation.md)。
 
-**本仓库尚未完成的一件事**：多平台 CI（`.github/workflows/ci.yml`）已写入仓库，但从未在 GitHub Actions 上执行过，因此没有任何远端 CI 通过证据。该工作流的每条命令都已在本机单独实跑通过，但"本机跑通"不等于"CI 跑通"。
+**当前交付边界**：多平台 CI（`.github/workflows/ci.yml`）已写入仓库，但从未在 GitHub Actions 上执行过，因此没有任何远端 CI 通过证据。该工作流的每条命令都已在本机单独实跑通过，但“本机跑通”不等于“CI 跑通”。
 
 ### 尚未验证的风险
 
