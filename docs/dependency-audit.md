@@ -63,7 +63,7 @@ Export shape: cmd/bridge/bridge.js -> invoke_bridge
 
 **结论：该版本提供有用的引号/换行解析，但不能单独满足本项目的严格拒绝与诊断契约。** 本项目没有将它加入正式依赖，自写解析器的取舍由以下可复现探针支撑。这是输入行为结论，不是对其通用 CSV 库质量的评价。
 
-2026-09-30 在 `/private/tmp` 的隔离 MoonBit 项目执行 `moon add moonbit-community/NyaCSV@0.3.3`，成功下载包；`moon.mod` 锁定 0.3.3。临时项目 `moon.pkg` 使用 `import { "moonbit-community/NyaCSV" @csv, }`。将 [探针函数](probes/nyacsv_probe.mbt)、[5 项输入测试](probes/nyacsv_contract_wbtest.mbt) 与 [探针依赖声明](probes/moon.pkg.txt) 放入该项目根包（将 `moon.pkg.txt` 命名为 `moon.pkg`），运行 `moon check --target js` 与 `moon test --target js`：前者 exit 0、无诊断，后者 **5 passed, 0 failed**。探针文件留在本仓库便于重放，但不参与产品构建。
+2026-09-30 在 `/private/tmp` 的隔离 MoonBit 项目执行 `moon add moonbit-community/NyaCSV@0.3.3`，成功下载包；`moon.mod` 锁定 0.3.3。临时项目 `moon.pkg` 使用 `import { "moonbit-community/NyaCSV" @csv, }`。将 [探针函数](probes/nyacsv_probe.mbt)、[8 项输入测试](probes/nyacsv_contract_wbtest.mbt) 与 [探针依赖声明](probes/moon.pkg.txt) 放入该项目根包（将 `moon.pkg.txt` 命名为 `moon.pkg`），运行 `moon check --target js` 与 `moon test --target js`：前者 exit 0、无诊断，后者 **8 passed, 0 failed**。探针文件留在本仓库便于重放，但不参与产品构建。
 
 | 输入 | NyaCSV 0.3.3 实测结果 | 本项目契约 |
 | --- | --- | --- |
@@ -71,9 +71,12 @@ Export shape: cmd/bridge/bridge.js -> invoke_bridge
 | 非引用字段内嵌 `bad"quote` | 返回字段原文 | 拒绝非法引号 |
 | 引号内 CRLF、末尾空字段 | 保留 CRLF 和空字段 | 同样需要保留 |
 | 重复表头 `id,id` | 返回两个同名表头 | 拒绝重复表头 |
+| 空表头 `,id` | 返回一个空列名 | 拒绝空表头 |
+| 引号内换行后的第二条记录 | 正确返回两条数据行，但 API 不返回原始逻辑记录号 | 错误需定位到逻辑记录 |
+| 末尾单个换行 | 没有额外数据记录 | 同样不添加记录 |
 | 空白物理行 | 默认跳过 | 本项目需按显式行宽规则处理 |
 
-包公开 API `CSV::parse_string(String, options?) -> CSV` 没有错误返回值。源码中的 `parse` 结束后也不检查 `in_quotes`。因此若复用它，还需另写严格解析/定位逻辑；维护两套解析路径反而容易不一致。正式代码选择单套 MoonBit 严格状态机。源码定位：[NyaCSV 仓库](https://github.com/moonbit-community/NyaCSV/blob/d59f2e2aef192aeaac8187f5c5cc0926a12e5a84/parser.mbt)；该 GitHub HEAD 仅是调研时的源码参照，**不冒充 Mooncakes 0.3.3 下载包的同一提交**。运行测试才是本节版本行为的主要证据。
+包公开 API `CSV::parse_string(String, options?) -> CSV` 没有错误返回值，也没有逐行源位置/逻辑记录号诊断接口。源码中的 `parse` 结束后也不检查 `in_quotes`。因此若复用它，还需另写严格解析/定位逻辑；维护两套解析路径反而容易不一致。正式代码选择单套 MoonBit 严格状态机。源码定位：[NyaCSV 仓库](https://github.com/moonbit-community/NyaCSV/blob/d59f2e2aef192aeaac8187f5c5cc0926a12e5a84/parser.mbt)；该 GitHub HEAD 仅是调研时的源码参照，**不冒充 Mooncakes 0.3.3 下载包的同一提交**。运行测试才是本节版本行为的主要证据。
 
 ## 4. 运行时依赖
 
