@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,7 +11,12 @@ const root = process.env.BENCH_ROOT ? path.resolve(process.env.BENCH_ROOT) : fil
 const cli = path.join(root,'cli/main.mjs');
 const tmp = await fs.mkdtemp(path.join(os.tmpdir(),'moonreconcile-bench-'));
 const repeatCount=Number(process.env.BENCH_REPEATS??3);
-const sha=process.env.BENCH_SHA??spawnSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).stdout.trim();
+const gitShaResult=spawnSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'});
+const gitSha=gitShaResult.status===0?gitShaResult.stdout.trim():null;
+const sha=process.env.BENCH_SHA??gitSha;
+const hash=(value)=>createHash('sha256').update(value).digest('hex');
+const driverPath=fileURLToPath(import.meta.url);
+const driverSha=hash(await fs.readFile(driverPath));
 const moon=spawnSync('moon',['version','--all'],{encoding:'utf8'}).stdout.trim();
 const exactCsv=(n,side)=>`id,group,name\n${Array.from({length:n},(_,i)=>`id${i},g${i},item${i}\n`).join('')}`;
 const candidateCsv=(n,side,groups)=>`id,group,name\n${Array.from({length:n},(_,i)=>`${side}${i},${groups?`g${Math.floor(i/(n/groups))}`:'shared'},${groups?`name${Math.floor(i/(n/groups))}`:'identical'}\n`).join('')}`;
@@ -35,7 +41,7 @@ async function measure(spec, iteration, engineRoot=root) {
   const comp=new Map();for(const c of report.candidates){let x=comp.get(c.component_id);if(!x){x={left:new Set(),right:new Set()};comp.set(c.component_id,x);}x.left.add(c.left_id);x.right.add(c.right_id);}
   const largest=(side)=>Math.max(0,...[...comp.values()].map(x=>x[side].size));
   const rssEvidence=rssBytes===null?(process.platform==='darwin'?(result.stderr.includes('Operation not permitted')?'unavailable: /usr/bin/time -l reported Operation not permitted while querying sysctl; RSS line was absent':'unavailable: /usr/bin/time -l output contained no maximum resident set size line'):(process.platform==='linux'?'unavailable: /usr/bin/time -v maximum RSS field was not found':'unavailable')):rssTool;
-  return {case:spec.name,iteration,sha,rows_left:spec.leftRows,rows_right:spec.rightRows,exact_pairs:report.pairs.filter(p=>p.source==='exact_key').length,remaining_left:leftPending,remaining_right:rightPending,candidate_count:report.candidates.length,all_pairs_remaining:leftPending*rightPending,blocking_join_pairs:spec.potential,density:(leftPending*rightPending)?report.candidates.length/(leftPending*rightPending):null,candidate_component_count:comp.size,largest_component_left:largest('left'),largest_component_right:largest('right'),wall_ms:Number(elapsed.toFixed(3)),child_peak_rss_bytes:rssBytes,rss_measurement:rssEvidence,output_bytes:await bytes(out),computation_status:report.computation.status,computation_issue_codes:issueCodes,exit_status:childExit,time_wrapper_status:result.status};
+  return {case:spec.name,iteration,sha,semantic_report_sha256:hash(Buffer.from(JSON.stringify(report),'utf8')),input_sha256:{left:hash(Buffer.from(spec.left)),right:hash(Buffer.from(spec.right)),config:hash(Buffer.from(JSON.stringify(spec.config)))},rows_left:spec.leftRows,rows_right:spec.rightRows,exact_pairs:report.pairs.filter(p=>p.source==='exact_key').length,remaining_left:leftPending,remaining_right:rightPending,candidate_count:report.candidates.length,all_pairs_remaining:leftPending*rightPending,blocking_join_pairs:spec.potential,density:(leftPending*rightPending)?report.candidates.length/(leftPending*rightPending):null,candidate_component_count:comp.size,largest_component_left:largest('left'),largest_component_right:largest('right'),wall_ms:Number(elapsed.toFixed(3)),child_peak_rss_bytes:rssBytes,rss_measurement:rssEvidence,output_bytes:await bytes(out),computation_status:report.computation.status,computation_issue_codes:issueCodes,exit_status:childExit,time_wrapper_status:result.status};
 }
 const id={schema_version:1,fields:[{name:'id',left:'id',right:'id',type:'text',compare:false},{name:'group',left:'group',right:'group',type:'text',compare:false},{name:'name',left:'name',right:'name',type:'text'}],key:['id']};
 const cand={schema_version:1,fields:[{name:'id',left:'id',right:'id',type:'text',compare:false},{name:'group',left:'group',right:'group',type:'text',compare:false},{name:'name',left:'name',right:'name',type:'text'}],candidates:{fields:[{field:'name',metric:'exact',weight:1}],threshold:10000,blocking:[['group']]}};
@@ -56,5 +62,18 @@ const results=[];
 for(const item of selectedCases) {const count=item.name.startsWith('sparse-')?repeatCount:1;for(let i=1;i<=count;i++)results.push(await measure(item,i));}
 const host=spawnSync('uname',['-a'],{encoding:'utf8'}).stdout.trim();
 const cpuProbe=spawnSync('sysctl',['-n','machdep.cpu.brand_string'],{encoding:'utf8'});const cpu=cpuProbe.stdout.trim()||spawnSync('sh',['-lc','grep -m1 "model name" /proc/cpuinfo'],{encoding:'utf8'}).stdout.trim()||`${spawnSync('uname',['-m'],{encoding:'utf8'}).stdout.trim()} architecture; CPU model unavailable (${cpuProbe.stderr.trim()||'no model source'})`;
-const record={label:'synthetic benchmark; end-to-end child CLI compare including CSV parse and report writing; fixture generation/build excluded',recorded_at:new Date().toISOString(),tested_sha:sha,host,os:os.platform(),cpu,node:process.version,moon,repeat_count:repeatCount,rss_method:process.platform==='darwin'?'/usr/bin/time -l child maximum resident set size bytes; record an explicit unavailable reason if the line is absent':process.platform==='linux'?'/usr/bin/time -v child maximum resident set size KiB converted to bytes':'unavailable',command:'BENCH_REPEATS=3 node scripts/benchmark.mjs',cases:results};
-const destination=process.env.BENCH_OUTPUT?path.resolve(process.env.BENCH_OUTPUT):path.join(root,'docs/evidence/task7-benchmark.json');await fs.writeFile(destination,`${JSON.stringify(record,null,2)}\n`);console.log(`wrote ${results.length} observations to ${destination}; temporary inputs/runs: ${tmp}`);
+const envKeys=['BENCH_ROOT','BENCH_SHA','BENCH_CASES','BENCH_REPEATS','BENCH_OUTPUT','BENCH_COMPARE_WITH','BENCH_ALLOW_OVERWRITE'];
+const effectiveEnv=Object.fromEntries(envKeys.map(key=>[key,process.env[key]??null]));
+const record={label:'synthetic benchmark; end-to-end child CLI compare including CSV parse and report writing; fixture generation/build excluded',recorded_at:new Date().toISOString(),tested_sha:sha,git_detected_sha:gitSha,host,os:os.platform(),cpu,node:process.version,moon,repeat_count:repeatCount,rss_method:process.platform==='darwin'?'/usr/bin/time -l child maximum resident set size bytes; unavailable reason is retained per observation':process.platform==='linux'?'/usr/bin/time -v child maximum resident set size KiB converted to bytes':'unavailable',driver:{path:driverPath,sha256:driverSha,argv:process.argv,cwd:process.cwd(),engine_root:root,effective_environment:effectiveEnv},cases:results};
+if(process.env.BENCH_COMPARE_WITH){
+ const comparisonPath=path.resolve(process.env.BENCH_COMPARE_WITH);const baseline=JSON.parse(await fs.readFile(comparisonPath,'utf8'));
+ assert.equal(baseline.driver?.sha256,driverSha,'comparison must use the same benchmark driver bytes');
+ assert.equal(baseline.node,process.version,'comparison Node version differs');assert.equal(baseline.moon,moon,'comparison Moon toolchain differs');assert.equal(baseline.host,host,'comparison host differs');
+ const checks=[];
+ for(const current of results){const prior=baseline.cases.find(item=>item.case===current.case&&item.iteration===current.iteration);assert.ok(prior,`baseline lacks ${current.case} iteration ${current.iteration}`);assert.deepEqual(current.input_sha256,prior.input_sha256,`${current.case} input hashes differ`);assert.equal(current.semantic_report_sha256,prior.semantic_report_sha256,`${current.case} semantic report differs`);checks.push({case:current.case,iteration:current.iteration,input_sha256:current.input_sha256,baseline_report_sha256:prior.semantic_report_sha256,current_report_sha256:current.semantic_report_sha256,semantic_equal:true});}
+ record.semantic_comparison={baseline_file:comparisonPath,baseline_tested_sha:baseline.tested_sha,current_tested_sha:sha,baseline_driver_sha256:baseline.driver.sha256,current_driver_sha256:driverSha,checks};
+}
+const stamp=new Date().toISOString().replaceAll(':','-');
+const destination=process.env.BENCH_OUTPUT?path.resolve(process.env.BENCH_OUTPUT):path.join(root,'docs/evidence',`task7-benchmark-${stamp}.json`);
+try{await fs.access(destination);if(process.env.BENCH_ALLOW_OVERWRITE!=='1')throw new Error(`refusing to overwrite existing benchmark evidence: ${destination}; set BENCH_ALLOW_OVERWRITE=1 explicitly`);}catch(error){if(error.code!=='ENOENT')throw error;}
+await fs.writeFile(destination,`${JSON.stringify(record,null,2)}\n`,{flag:'wx'});console.log(`wrote ${results.length} observations to ${destination}; temporary inputs/runs: ${tmp}`);
