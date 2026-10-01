@@ -54,27 +54,25 @@
 
 ## Task 7
 
-All three examples are synthetic. `node scripts/workflows.mjs` invokes the shipped CLI through compare, resolve and cumulative-decision replay; it checks semantic JSON assertions, conservation on both sides, all 11 run artifacts, CSV headers and Markdown summary sections. Orders and migration exact pairs, states and field statuses are cross-checked with a fixture-scoped independent JavaScript reference. That reference requires complete unique keys, applies declared right-side status mapping, uses BigInt decimal comparison and strict calendar dates, and does not implement fuzzy suggestions or review.
+All three examples use synthetic data. `npm run test:workflows` invokes the shipped CLI for compare, resolve, and cumulative-decision replay. It derives expected row IDs from the original CSV bytes, checks complete unique per-side record coverage and summary counts against input rows, asserts exact pair identities from the independent unique-key reference, and verifies fixture-specific states, field values/differences, manual decisions and override flags, duplicate/empty-key diagnostics, and structural anomalies. The reference uses declared status mappings, BigInt decimal comparison, strict calendar dates, and no fuzzy matching.
 
-The catalog truth is hand-authored separately in `examples/catalog/truth.json`. This intentionally adversarial two-candidate case contains one true candidate and one false candidate; the false score-10000 exact-name decoy is the sole suggestion while the true score-8000 competitor remains visible. Review rejects the decoy, accepts the competitor and confirms the other right record unmatched. These are fixture counts only, not an accuracy estimate.
+The workflow gate validates original input snapshots byte-for-byte and checks manifest sizes/digests, normalized configuration semantics, all five CSV headers and values against independent schemas/report fields, cumulative decision and unresolved rows, and explicit computation/accounting/field/structure/review content in Markdown. It also runs five deliberate mutations—missing record, wrong pairs.csv ID, same-length changed snapshot, replaced config.json, and stripped summary.md—and requires each to fail. The catalog truth is hand-authored in `examples/catalog/truth.json`; the sole highest-score suggestion is intentionally false while a true competitor remains visible. Its metrics are synthetic fixture outcomes only.
 
-`node scripts/benchmark.mjs` creates deterministic temporary inputs and output runs and measures end-to-end child CLI compare, including CSV parsing and report writing. It excludes build and fixture generation. The retained records list the tested source SHA, OS/CPU, Node/Moon versions, child wall time, candidate counts/density, component size, actual output bytes and CLI exit status. Child RSS is unavailable: macOS `/usr/bin/time -l` did not emit an RSS line and reported `sysctl kern.clockrate: Operation not permitted`. The time wrapper itself returned 1 on macOS despite the CLI publishing its result; the harness extracts and records the CLI exit from its output separately. Task 7 implementation and local gates are complete, but its independent task-review seat did not return a verdict because of the model usage limit; this remains open in the acceptance matrix.
+The original full-matrix measurements remain in `docs/evidence/task7-benchmark.json`. That historical record does not contain the invocation environment or semantic report hashes, so its old before/after semantic-equality statement is not independently established by that file. The focused follow-up [`task7-p3-comparison.json`](evidence/task7-p3-comparison.json) records reproducible baseline/optimized commands, both source SHAs, the shared benchmark-driver SHA-256, environment, input hashes, and report hashes. For sparse 10k and 30k fixtures, both input hashes and report hashes matched exactly; exit codes and candidate counts also matched. Output bytes differ by 26 because manifest provenance includes checkout paths. One run per size confirms same-driver reproducibility and semantic equality; it is not a replacement performance estimate.
 
-| Workload | Wall time(s) | Candidates | Density E/(remaining L×R) | Max component L×R | Output bytes | Exit |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Exact, 1,000/side | 0.126 | 0 | n/a | 0×0 | 1,422,879 | 0 |
-| Exact, 10,000/side | 0.343 | 0 | n/a | 0×0 | 14,571,908 | 0 |
-| Sparse, 10,000 singleton/side | 0.298 median (3 runs) | 10,000 | 0.0001 | 1×1 | 11,114,434 | 1 |
-| Sparse, 30,000 singleton/side | 0.726 median (3 runs) | 30,000 | 0.0000333 | 1×1 | 33,934,434 | 1 |
-| Mixed, 9,000 exact + 1,000 candidates/side | 0.361 | 1,000 | 0.001 | 1×1 | 14,813,096 | 1 |
-| Dense, 100×100 | 0.234 | 10,000 | 1 | 100×100 | 6,381,282 | 1 |
-| Dense, 101×101 | 0.193 | 10,201 | 1 | 101×101 | 6,510,905 | 3, `candidate_component_limit_exceeded` |
-| Pair boundary, 1,000×100 | 0.985 | 100,000 | 1 | 1,000×100 | 63,888,301 | 3, `candidate_component_limit_exceeded` |
-| Pair overflow, 1,001×100 | 0.127 | 0 retained from 100,100 possible | 0 | 0×0 (generation aborted) | 244,587 | 3, `candidate_pair_budget_exceeded` |
+The comparison can be reproduced from a clean checkout at the Task7 source root:
 
-The separate P3 comparison in the JSON retains three observations per size. At 10,000 singleton edges the base median was 607.856 ms and optimized median 297.867 ms; at 30,000 edges, 5,820.024 ms and 726.061 ms. The fixture output sizes differed by 26 bytes because provenance embeds paths under differently named checkouts; candidate counts and semantic reports matched. This is a local observation, not a general complexity guarantee. The configured 100,000 row limit was not tested as capacity.
+```sh
+mkdir -p /private/tmp/moonreconcile-task7-before
+git archive 5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 | tar -x -C /private/tmp/moonreconcile-task7-before
+(cd /private/tmp/moonreconcile-task7-before && npm run build)
+BENCH_ROOT=/private/tmp/moonreconcile-task7-before BENCH_SHA=5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_OUTPUT=/private/tmp/task7-fixwave-baseline.json node scripts/benchmark.mjs
+BENCH_ROOT="$PWD" BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_COMPARE_WITH=/private/tmp/task7-fixwave-baseline.json BENCH_OUTPUT=/private/tmp/task7-fixwave-optimized.json node scripts/benchmark.mjs
+```
 
-Competitor review in `docs/dependency-audit.md` is based on primary documentation, not local tool runs. No actual customer data or adjudicated truth set was available.
+`BENCH_COMPARE_WITH` requires identical driver bytes, host, Node/Moon versions, generated input hashes, and semantic report hashes. The benchmark now records the effective environment and driver/source identity. Its default output uses a timestamped filename; it refuses to overwrite existing evidence unless explicitly enabled. The historical full matrix is retained unchanged. RSS remains unavailable because `/usr/bin/time -l` emitted no maximum-resident-set line and reported `sysctl kern.clockrate: Operation not permitted`. The configured 100,000-row limit is not a tested capacity claim.
+
+The primary-documentation competitor audit does not establish local competitor execution or comparative benefit. No real customer data or adjudicated real-world truth set was available. Independent review identified the fixture-gate gaps documented above; the fix round is pending re-review.
 
 ## Task 8 configuration
 

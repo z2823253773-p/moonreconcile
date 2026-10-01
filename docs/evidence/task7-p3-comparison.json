@@ -1,0 +1,105 @@
+{
+  "label": "Focused Task 7 P3 before/after confirmation; same benchmark driver and deterministic sparse fixtures; this does not replace the historical full matrix.",
+  "baseline_source_sha": "5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9",
+  "optimized_source_sha": "53ea36894ee8b870944baf0a2ac3c0bb11fba50b",
+  "benchmark_driver_sha256": "7efc29b91ec5e4ea18bd381155eacc1f9560c06000cf33672228f0049fad2c93",
+  "driver_argv": [
+    "/usr/local/bin/node",
+    "/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile/scripts/benchmark.mjs"
+  ],
+  "driver_working_directory": "/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile",
+  "engine_worktrees": {
+    "baseline": "/private/tmp/moonreconcile-task7-before",
+    "optimized": "/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile"
+  },
+  "host": "Darwin HengruideMacBook-Air.local 25.4.0 Darwin Kernel Version 25.4.0: Thu Mar 19 19:33:43 PDT 2026; root:xnu-12377.101.15~1/RELEASE_ARM64_T8142 arm64",
+  "os": "darwin",
+  "cpu": "arm64 architecture; CPU model unavailable (sysctl: sysctl fmt -1 1024 1: Operation not permitted)",
+  "node": "v24.15.0",
+  "moon": "moon 0.1.20260713 (75c7e1f 2026-07-13) ~/.moon/bin/moon\nmoonc v0.10.4+2cc641edf (2026-07-15) ~/.moon/bin/moonc\nmoonrun 0.1.20260713 (75c7e1f 2026-07-13) ~/.moon/bin/moonrun\n\nFeature flags enabled: rr_moon_mod,rr_moon_pkg",
+  "effective_environment": {
+    "baseline": {
+      "BENCH_ROOT": "/private/tmp/moonreconcile-task7-before",
+      "BENCH_SHA": "5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9",
+      "BENCH_CASES": "sparse-10000,sparse-30000",
+      "BENCH_REPEATS": "1",
+      "BENCH_OUTPUT": "/private/tmp/task7-fixwave-baseline.json",
+      "BENCH_COMPARE_WITH": null,
+      "BENCH_ALLOW_OVERWRITE": null
+    },
+    "optimized": {
+      "BENCH_ROOT": "/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile",
+      "BENCH_SHA": null,
+      "BENCH_CASES": "sparse-10000,sparse-30000",
+      "BENCH_REPEATS": "1",
+      "BENCH_OUTPUT": "/private/tmp/task7-fixwave-optimized.json",
+      "BENCH_COMPARE_WITH": "/private/tmp/task7-fixwave-baseline.json",
+      "BENCH_ALLOW_OVERWRITE": null
+    }
+  },
+  "baseline_preparation_commands": [
+    "mkdir -p /private/tmp/moonreconcile-task7-before",
+    "git archive 5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 | tar -x -C /private/tmp/moonreconcile-task7-before",
+    "cd /private/tmp/moonreconcile-task7-before && npm run build"
+  ],
+  "baseline_run_command": "BENCH_ROOT=/private/tmp/moonreconcile-task7-before BENCH_SHA=5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_OUTPUT=/private/tmp/task7-fixwave-baseline.json node /Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile/scripts/benchmark.mjs",
+  "optimized_run_command": "BENCH_ROOT=/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_COMPARE_WITH=/private/tmp/task7-fixwave-baseline.json BENCH_OUTPUT=/private/tmp/task7-fixwave-optimized.json node /Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile/scripts/benchmark.mjs",
+  "comparison": {
+    "baseline_file": "/private/tmp/task7-fixwave-baseline.json",
+    "baseline_tested_sha": "5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9",
+    "current_tested_sha": "53ea36894ee8b870944baf0a2ac3c0bb11fba50b",
+    "baseline_driver_sha256": "7efc29b91ec5e4ea18bd381155eacc1f9560c06000cf33672228f0049fad2c93",
+    "current_driver_sha256": "7efc29b91ec5e4ea18bd381155eacc1f9560c06000cf33672228f0049fad2c93",
+    "checks": [
+      {
+        "case": "sparse-10000",
+        "iteration": 1,
+        "input_sha256": {
+          "left": "1d3bf2c11c3820f61162f0f979572610a3b47bc30b9bc549d1962c7bb864d8b0",
+          "right": "4fa72d8844d5b031dfd12bea1c774a00a78dd5d2cf71934104b38410fa09aefe",
+          "config": "ceb023750f30aabdbcdde311e62a6a89510d9c07a80aae0cb55509ac1d865953"
+        },
+        "baseline_report_sha256": "1296c50288ef0b2f88803ba1a32de6ffbc3f55970bcfd6a9d901a90a914ba380",
+        "current_report_sha256": "1296c50288ef0b2f88803ba1a32de6ffbc3f55970bcfd6a9d901a90a914ba380",
+        "semantic_equal": true
+      },
+      {
+        "case": "sparse-30000",
+        "iteration": 1,
+        "input_sha256": {
+          "left": "9796a5b7b3bf23d58c89b679762e0b55b1eff74a70da365780cca85174cfade6",
+          "right": "d7e4832c4a97a8038c64c9342f343336814c41909947f198a4286b52472c0be4",
+          "config": "ceb023750f30aabdbcdde311e62a6a89510d9c07a80aae0cb55509ac1d865953"
+        },
+        "baseline_report_sha256": "278d3c6aa6ac899d84bc231b6f60a41c7b23dca825941a28625214637a8c7393",
+        "current_report_sha256": "278d3c6aa6ac899d84bc231b6f60a41c7b23dca825941a28625214637a8c7393",
+        "semantic_equal": true
+      }
+    ]
+  },
+  "observations": [
+    {
+      "case": "sparse-10000",
+      "baseline_wall_ms": 556.869,
+      "optimized_wall_ms": 284.003,
+      "baseline_candidates": 10000,
+      "optimized_candidates": 10000,
+      "baseline_output_bytes": 11114460,
+      "optimized_output_bytes": 11114434,
+      "baseline_exit": 1,
+      "optimized_exit": 1
+    },
+    {
+      "case": "sparse-30000",
+      "baseline_wall_ms": 4354.31,
+      "optimized_wall_ms": 666.981,
+      "baseline_candidates": 30000,
+      "optimized_candidates": 30000,
+      "baseline_output_bytes": 33934460,
+      "optimized_output_bytes": 33934434,
+      "baseline_exit": 1,
+      "optimized_exit": 1
+    }
+  ],
+  "limits": "Semantic report hashes and input hashes match for both sizes. Output byte counts differ by 26 bytes because provenance includes checkout-specific paths. One timing observation per size is only a focused reproducibility check, not a fresh performance estimate. Child RSS remains unavailable in this macOS sandbox."
+}
