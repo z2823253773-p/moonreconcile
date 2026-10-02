@@ -18,7 +18,7 @@ macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6781480Z ##[endgro
 macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7661710Z moon 0.1.20260920 (914d7da 2026-09-20) ~/.moon/bin/moon
 macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7662380Z moonc v0.10.14+7d59c7ec9 (2026-09-18) ~/.moon/bin/moonc
 macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7662920Z moonrun 0.1.20260920 (914d7da 2026-09-20) ~/.moon/bin/moonrun
-macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7663190Z 
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7663190Z
 macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7663420Z Feature flags enabled: rr_moon_mod,rr_moon_pkg
 macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7821040Z v22.23.2
 macos-15	Record actual toolchain versions	2026-10-02T19:42:13.8980290Z Python 3.12.10
@@ -53,7 +53,7 @@ ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8207523Z ##[en
 ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8544912Z moon 0.1.20260920 (914d7da 2026-09-20) ~/.moon/bin/moon
 ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8545574Z moonc v0.10.14+7d59c7ec9 (2026-09-18) ~/.moon/bin/moonc
 ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8546111Z moonrun 0.1.20260920 (914d7da 2026-09-20) ~/.moon/bin/moonrun
-ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8546383Z 
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8546383Z
 ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8546656Z Feature flags enabled: rr_moon_mod,rr_moon_pkg
 ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8580635Z v22.23.3
 ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8703816Z Python 3.12.14
