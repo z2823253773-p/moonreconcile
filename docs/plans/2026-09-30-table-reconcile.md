@@ -18,7 +18,7 @@
 - `首个完整版本中，所有候选分配均需人工接受；只有满足唯一键契约的对应自动成立。`
 - `不自动猜测类型、货币、日期格式、主键或 Unicode 规范化方式。原值始终保留。`
 - Decimal input: at most 64 digits and 18 fractional digits, optional sign, integer and optional fractional part; no scientific notation/currency/grouping; exact intermediate arithmetic.
-- Input budgets: 64 MiB/file, 100000 data logical records/file, 256 columns, 64 KiB UTF-8/cell. Candidate budget 100000 unique pairs. Component limit 100 rows/side. Edit fields 512 codepoints and 20000000 DP cells cumulatively.
+- Source input budgets stay 64 MiB/file, 100000 data logical records/file, 256 columns, 64 KiB UTF-8/cell. Decision raw templates have separate 128 MiB/file and 400000 data-record limits, strict four-column header and the same cell cap. The core independently admits at most 100000 nonblank-action rows before deduplication and 64 MiB canonical active CSV including its 31-byte header. Canonical bytes include UTF-8, doubled quotes, enclosing quotes only when needed, commas and LF. Empty-action rows still consume raw budgets. Applied history plus at most 200000 record blanks and 100000 candidate blanks fits 400000 rows and less than 128 MiB; source/snapshot limits remain unchanged. Candidate budget 100000 unique pairs. Component limit 100 rows/side. Edit fields 512 codepoints and 20000000 DP cells cumulatively.
 - `记录状态为 paired、unmatched、pending_review、unprocessed` and field status `equal、equivalent_by_rule、different、invalid_value`.
 - Per-side conservation: paired + unmatched + pending_review + unprocessed = input count; candidates never count as paired.
 - Exit priority `2 > 3 > 1 > 0`: validation/I/O; budget incomplete; complete with issues/unresolved; complete with no issues.

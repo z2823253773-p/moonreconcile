@@ -6,9 +6,12 @@ import path from "node:path";
 // version the MoonBit core reports inside every Result and with moon.mod.
 export const ENGINE_VERSION = "0.1.0";
 
-// 64 MiB of raw bytes, counting BOM, quotes and newlines. Test-only injection
-// points may lower this; the CLI never exposes a production override.
-export const DEFAULT_LIMITS = Object.freeze({ maxInputBytes: 64 * 1024 * 1024 });
+// Role-specific raw bytes, counting BOM, quotes and newlines. Test-only
+// injection may lower these; the CLI exposes no production override.
+export const DEFAULT_LIMITS = Object.freeze({
+  maxInputBytes: 64 * 1024 * 1024,
+  maxDecisionBytes: 128 * 1024 * 1024,
+});
 
 const UTF8_BOM = "﻿";
 

@@ -25,11 +25,21 @@ fn within_utf8_budget(text : String, limit : Int) -> Bool {
 
 ///|
 fn parse_csv(text : String, side : String) -> Result[CsvTable, EngineError] {
-  if !within_utf8_budget(text, 67108864) {
+  parse_csv_with_budget(text, side, 67108864, 100000)
+}
+
+///|
+fn parse_csv_with_budget(
+  text : String,
+  side : String,
+  max_bytes : Int,
+  max_rows : Int,
+) -> Result[CsvTable, EngineError] {
+  if !within_utf8_budget(text, max_bytes) {
     return Err(
       engine_error(
         "input_limit_exceeded",
-        "CSV input exceeds the 64 MiB text limit",
+        "CSV input exceeds the \{max_bytes}-byte text limit",
         "input",
         side~,
       ),
@@ -98,11 +108,11 @@ fn parse_csv(text : String, side : String) -> Result[CsvTable, EngineError] {
   }
 
   fn finish_record() -> Unit {
-    if rows.length() >= 100001 {
+    if rows.length() > max_rows {
       failure.val = Some(
         engine_error(
           "input_limit_exceeded",
-          "CSV exceeds the 100000 data-record limit",
+          "CSV exceeds the \{max_rows} data-record limit",
           "input",
           side~,
           record=logical_record.val,

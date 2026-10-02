@@ -21,7 +21,7 @@
 以下能力全部实现在 `.mbt` 文件中，Node 侧没有等价实现：
 
 - **CSV 语义**：严格状态机解析（引号内换行算一条逻辑记录、`""` 转义、未加引号字段中禁止引号、闭引号后只允许分隔符或换行）、表头非空与不重复校验、行宽必须等于表头宽度、逻辑记录编号。
-- **输入预算**：整表 64 MiB UTF-8 文本上限、单元 64 KiB 上限、256 列上限、100000 数据记录上限。超限返回结构化错误并给出侧别、记录号、列名。
+- **输入预算**：源表 64 MiB / 100000 数据记录 / 256 列 / 每格 64 KiB。私有角色预算解析器允许决策模板 128 MiB / 400000 数据记录，仍严格四列标题与同一单元格上限；核心独立限制非空 action 的 100000 行（去重前）及含标题的规范 CSV 64 MiB。超限返回结构化错误，不应用部分决定。
 - **配置校验与规范化**：未知属性拒绝、`schema_version` 必须为 1、草稿拒绝、字段名/来源列唯一、`type` 必须显式声明、容差与类型匹配、键引用存在性、忽略列不得同时被映射、候选配置的 metric/字段类型匹配与权重/阈值范围。
 - **转换与类型规则**：ASCII 空白裁剪、ASCII 小写、每侧单次有限值映射、显式缺失标记、三种类型（`text`/`decimal`/`date`）的解析与规范化；同时保留原始值、转换后值、规范化值。
 - **精确键对应**：把组合键编码为无歧义 JSON 数组字符串索引，只在**两侧都唯一且键可用**时配对；重复键、缺失键、无对应键全部产生诊断而不做「首行优先」匹配。
@@ -55,7 +55,7 @@
 | [`moonreconcile.mbt`](../moonreconcile.mbt) | 包入口，无逻辑；仅说明公开契约位于 `engine.mbt` |
 | [`model.mbt`](../model.mbt) | 数据结构与错误：`EngineError`、`CsvTable`（别名 `Table`）、`ExactPair`、`Decision`、`ReconciliationResult`、`FieldConfig`、`Config`；`engine_error` 与 JSON 包装（`error_to_json`/`success_to_json`） |
 | [`config.mbt`](../config.mbt) | `parse_config` 严格校验、`normalize_config` 规范化输出、`draft_field` 与 `build_draft_config` 草稿模板；含 `valid_nonnegative_decimal` 与 `parse_int_json` |
-| [`csv.mbt`](../csv.mbt) | 严格 CSV 状态机 `parse_csv`、UTF-8 字节预算 `within_utf8_budget`、表头与行宽校验 |
+| [`csv.mbt`](../csv.mbt) | 严格 CSV 状态机 `parse_csv` / 私有 `parse_csv_with_budget`、UTF-8 字节预算 `within_utf8_budget`、表头与行宽校验 |
 | [`decimal.mbt`](../decimal.mbt) | `ExactDecimal`（BigInt 系数 + 标度）的解析、规范化、对齐、加减乘、比较、绝对值与格式化；**不使用二进制浮点** |
 | [`date.mbt`](../date.mbt) | 严格 `YYYY-MM-DD` 解析（长度必须为 10）、闰年判定、格里高利日序号 |
 | [`rules.mbt`](../rules.mbt) | `normalize_value`（转换链 + 缺失 + 类型解析）、`compare_field`（状态、差异、阈值、解释）、`ascii_trim`、`ascii_lower` |
@@ -204,13 +204,19 @@ run_id   = sha256_hex(utf8(material))
 | | `edit_cells` | 20000000 |
 | | `max_component_side` | 100 |
 | | `max_edit_codepoints` | 512 |
-| [`csv.mbt`](../csv.mbt) | 整表文本上限 | 67108864 字节（64 MiB） |
+| [`csv.mbt`](../csv.mbt) | 源表文本上限 | 67108864 字节（64 MiB） |
 | | 单元上限 | 65536 字节（64 KiB） |
 | | 列数上限 | 256 |
 | | 数据记录上限 | 100000 |
+| [`decisions.mbt`](../decisions.mbt) | 原始模板字节 / 数据记录 | 128 MiB / 400000 |
+| | 非空 action 数据记录（去重前） | 100000 |
+| | 规范有效动作 CSV（含 31 字节标题） | 64 MiB |
 | [`decimal.mbt`](../decimal.mbt) | 有效位数 / 标度 | 64 位 / 18 |
 | [`assignment.mbt`](../assignment.mbt) | 左右规模上限 | 各 100 |
-| [`io.mjs`](../cli/io.mjs) | `DEFAULT_LIMITS.maxInputBytes` | 64 MiB |
+| [`io.mjs`](../cli/io.mjs) | `DEFAULT_LIMITS.maxInputBytes`（源表/快照/配置/manifest） | 64 MiB |
+| | `DEFAULT_LIMITS.maxDecisionBytes`（决策原始文件） | 128 MiB |
+
+规范动作 CSV 字节在 MoonBit 中计入 UTF-8、双引号加倍、必要的包围引号、逗号和 LF；Node 只选择原始角色字节守卫，不复制决定语义。累计导出最多 100000 动作、200000 记录空白和 100000 建议空白，后两类合计最多 4000000 字节，因此满足原始回导预算。空 action 行仍计入原始预算。
 
 计划明确说明「初始固定预算是引擎常量，不是用户可配置的生产选项」；测试可以通过内部入口注入更小的预算，CLI 不暴露覆盖开关。
 

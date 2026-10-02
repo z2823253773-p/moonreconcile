@@ -86,7 +86,7 @@ function makeContext(runtime) {
   return {
     cwd: runtime.cwd ?? process.cwd(),
     fs: runtime.fs ?? fsPromises,
-    limits: runtime.limits ?? DEFAULT_LIMITS,
+    limits: { ...DEFAULT_LIMITS, ...runtime.limits },
     statfs: runtime.statfs ?? defaultStatfs,
     stdout: runtime.stdout ?? ((text) => process.stdout.write(text)),
     stderr: runtime.stderr ?? ((text) => process.stderr.write(text)),
@@ -385,7 +385,7 @@ async function commandResolve(parsed, context) {
     });
   }
 
-  const decisionsBytes = await readFileBounded(context.fs, decisionsPath, context.limits.maxInputBytes, {
+  const decisionsBytes = await readFileBounded(context.fs, decisionsPath, context.limits.maxDecisionBytes, {
     phase: "decisions",
     side: "decisions",
   });

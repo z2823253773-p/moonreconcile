@@ -111,3 +111,11 @@ test "csv_total_byte_budget_counts_multibyte_utf8_at_boundary" {
   assert_true(within_utf8_budget("é".repeat(32), 64))
   assert_true(!within_utf8_budget("é".repeat(33), 64))
 }
+
+///|
+test "csv_private_raw_budget_counts_header_bom_utf8_and_separators" {
+  let csv = "\u{FEFF}id\r\né\r\n"
+  assert_eq(parse_csv_with_budget(csv, "left", 11, 1).unwrap().rows.length(), 1)
+  assert_true(parse_csv_with_budget(csv, "left", 10, 1) is Err(_))
+  assert_true(parse_csv_with_budget(csv, "left", 11, 0) is Err(_))
+}

@@ -326,3 +326,25 @@ test("compare rejects absent explicitly ignored columns on either side", () => {
     assert.equal(response.result.summary.structural_issue_count, 1);
   }
 });
+
+test("pure invoke admits decision templates above the source cap and rejects excess active or raw rows atomically", () => {
+  const request = {
+    op: "resolve", left_csv: "id\n1\n", right_csv: "id\n1\n",
+    config: { schema_version: 1, fields: [{ name: "id", left: "id", right: "id", type: "text" }] },
+  };
+  const header = "action,left_id,right_id,reason\n";
+  const admitted = call({ ...request, decisions_csv: header + ",L1,,\n".repeat(100002) });
+  assert.equal(admitted.ok, true);
+  assert.equal(admitted.result.exit_code, 1);
+  assert.equal(admitted.result.decisions.length, 0);
+  assert.deepEqual(admitted.result.records.map((row) => row.id), ["L1", "R1"]);
+  for (const [csv, code] of [
+    [header + ",,,\n".repeat(400001), "input_limit_exceeded"],
+    [header + "reject,L1,R1,x\n".repeat(100001), "decision_limit_exceeded"],
+  ]) {
+    const rejected = call({ ...request, decisions_csv: csv });
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.error.code, code);
+    assert.equal(Object.hasOwn(rejected, "result"), false);
+  }
+});

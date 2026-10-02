@@ -7,7 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { run } from "../cli/main.mjs";
-import { ENGINE_VERSION, canonicalJsonStringify, sha256Hex } from "../cli/io.mjs";
+import { DEFAULT_LIMITS, ENGINE_VERSION, canonicalJsonStringify, sha256Hex } from "../cli/io.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const CLI = path.join(ROOT, "cli", "main.mjs");
@@ -1618,4 +1618,61 @@ test("run identifiers are stable and independent of generated timestamps", async
   assert.equal(a.run_id, b.run_id);
   assert.deepEqual({ ...a, created: null }, { ...b, created: null });
   assert.match(a.created, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test("production 50001 per side templates replay with original IDs and applied history", async () => {
+  const dir = await mkTmp("moonreconcile-template-closure-");
+  const source = `value\n${"x\n".repeat(50001)}`;
+  const config = { schema_version: 1, fields: [{ name: "value", left: "value", right: "value", type: "text" }] };
+  const paths = await writeFixture(dir, { left: source, right: source, config });
+  let current = path.join(dir, "initial");
+  const compared = await quietRun(["compare", paths.left, paths.right, "--config", paths.config, "--out", current]);
+  assert.equal(compared.code, 1, compared.stderr);
+  const originalIds = ["L", "R"].flatMap((prefix) => Array.from({ length: 50001 }, (_, i) => `${prefix}${i + 1}`));
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    const decisionPath = path.join(current, "decisions.csv");
+    let template = await readText(decisionPath);
+    assert.equal(parseCsv(template).length - 1, 100002 + (iteration === 2 ? 1 : 0));
+    if (iteration === 1) {
+      template += "reject,L1,R1,reviewed negative evidence\n";
+      await fsPromises.writeFile(decisionPath, template);
+    }
+    const next = path.join(dir, `replay-${iteration}`);
+    const resolved = await quietRun(["resolve", current, "--decisions", decisionPath, "--out", next]);
+    assert.equal(resolved.code, 1, resolved.stderr);
+    const report = JSON.parse(await readText(path.join(next, "report.json")));
+    assert.deepEqual(report.records.map((row) => row.id), originalIds);
+    assert.ok(report.records.every((row) => row.status === "pending_review"));
+    assert.equal(report.summary.unresolved_count, 100002);
+    assert.equal(report.decisions.length, iteration === 0 ? 0 : 1);
+    assert.equal(await readText(path.join(next, "input/left.csv")), source);
+    assert.equal(await readText(path.join(next, "input/right.csv")), source);
+    current = next;
+  }
+});
+
+test("decision raw byte guard uses its own internal limit and preserves source guards", async () => {
+  assert.equal(DEFAULT_LIMITS.maxInputBytes, 64 * 1024 * 1024);
+  assert.equal(DEFAULT_LIMITS.maxDecisionBytes, 128 * 1024 * 1024);
+  const dir = await mkTmp();
+  const paths = await writeFixture(dir, {
+    left: "id\n1\n", right: "id\n1\n", config: { schema_version: 1, fields: [TEXT_ID] },
+  });
+  const initial = path.join(dir, "initial");
+  assert.equal((await quietRun(["compare", paths.left, paths.right, "--config", paths.config, "--out", initial])).code, 1);
+  const file = path.join(dir, "review.csv");
+  const csv = 'action,left_id,right_id,reason\n,L1,,"' + "é".repeat(1000) + '"\n';
+  await fsPromises.writeFile(file, csv);
+  const size = Buffer.byteLength(csv, "utf8");
+  const args = (name) => ["resolve", initial, "--decisions", file, "--out", path.join(dir, name)];
+  const exact = await quietRun(args("exact"), { limits: { maxInputBytes: 1024, maxDecisionBytes: size } });
+  assert.equal(exact.code, 1, exact.stderr);
+  const over = await quietRun(args("over"), { limits: { maxInputBytes: 1024, maxDecisionBytes: size - 1 } });
+  assert.equal(over.code, 2, over.stderr);
+  assert.equal(failingError(over.stderr).side, "decisions");
+  assert.equal(await exists(path.join(dir, "over")), false);
+  const sourceOver = await quietRun(args("source-over"), { limits: { maxInputBytes: 4, maxDecisionBytes: size } });
+  assert.equal(sourceOver.code, 2);
+  assert.equal(failingError(sourceOver.stderr).code, "input_limit_exceeded");
+  assert.equal(await exists(path.join(dir, "source-over")), false);
 });

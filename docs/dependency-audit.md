@@ -84,7 +84,7 @@ Export shape: cmd/bridge/bridge.js -> invoke_bridge
 
 - 测试使用 Node 内置 `node:test` + `node:assert`，无测试框架依赖。
 - 无 `dependencies` / `devDependencies` 字段。
-- 因此当前不存在第三方许可证传染或供应链风险面。
+- 当前未声明额外第三方 npm 运行时或开发依赖。这缩小了 npm 依赖面；MoonBit 工具链/核心库、Node.js、GitHub Actions 及 CI 下载的官方安装器仍属于依赖与供应链范围，空 npm 依赖列表不能证明风险不存在。
 
 ## 5. 许可证
 

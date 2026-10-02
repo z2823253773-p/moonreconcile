@@ -72,8 +72,38 @@ fn parse_decision_id(
 }
 
 ///|
+// Canonical CSV wire size: UTF-8 payload, doubled quotes, conditional enclosing
+// quotes. Row commas/LF and the header are counted by the caller.
+fn decision_csv_cell_bytes(value : String) -> Int {
+  let mut bytes = 0
+  let mut quoted = false
+  for ch in value {
+    bytes += utf8_char_size(ch)
+    if ch == '"' {
+      bytes += 1
+    }
+    if ch == '"' || ch == ',' || ch == '\r' || ch == '\n' {
+      quoted = true
+    }
+  }
+  bytes + (if quoted { 2 } else { 0 })
+}
+
+///|
 pub fn parse_decisions(csv : String) -> Result[Array[Decision], EngineError] {
-  let table = match parse_csv(csv, "decisions") {
+  parse_decisions_with_budget(csv, 134217728, 400000, 67108864, 100000)
+}
+
+///|
+fn parse_decisions_with_budget(
+  csv : String,
+  max_raw_bytes : Int,
+  max_raw_rows : Int,
+  max_active_bytes : Int,
+  max_active_rows : Int,
+) -> Result[Array[Decision], EngineError] {
+  let table = match
+    parse_csv_with_budget(csv, "decisions", max_raw_bytes, max_raw_rows) {
     Ok(value) => value
     Err(error) => return Err(error)
   }
@@ -87,6 +117,16 @@ pub fn parse_decisions(csv : String) -> Result[Array[Decision], EngineError] {
     )
   }
   let decisions : Array[Decision] = []
+  let mut active_bytes = 31 // action,left_id,right_id,reason plus LF
+  if active_bytes > max_active_bytes {
+    return Err(
+      decision_error(
+        "decision_limit_exceeded",
+        "canonical active decision CSV exceeds the \{max_active_bytes}-byte limit",
+        None,
+      ),
+    )
+  }
   for row_index in 0..<table.rows.length() {
     let row = table.rows[row_index]
     let action = row[0]
@@ -94,6 +134,31 @@ pub fn parse_decisions(csv : String) -> Result[Array[Decision], EngineError] {
       continue
     }
     let csv_record = row_index + 1
+    if decisions.length() >= max_active_rows {
+      return Err(
+        decision_error(
+          "decision_limit_exceeded",
+          "decision CSV exceeds the \{max_active_rows} nonblank-action row limit before deduplication",
+          Some(csv_record),
+        ),
+      )
+    }
+    // Each accepted cell is already capped at 64 KiB. Check each addition
+    // against the remaining budget, keeping all arithmetic bounded.
+    let mut row_bytes = 4 // three commas and LF
+    for cell in row {
+      row_bytes += decision_csv_cell_bytes(cell)
+    }
+    if row_bytes > max_active_bytes - active_bytes {
+      return Err(
+        decision_error(
+          "decision_limit_exceeded",
+          "canonical active decision CSV exceeds the \{max_active_bytes}-byte limit",
+          Some(csv_record),
+        ),
+      )
+    }
+    active_bytes += row_bytes
     let left_id = row[1]
     let right_id = row[2]
     let reason = row[3]

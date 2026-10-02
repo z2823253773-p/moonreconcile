@@ -582,3 +582,111 @@ test "resolve_rebuilds_base_and_applies_complete_decision_table" {
     _ => assert_true(false)
   }
 }
+
+///|
+test "decision_template_above_source_row_cap_keeps_blank_actions_ignored" {
+  let csv = "action,left_id,right_id,reason\n" + ",L1,,\n".repeat(100002)
+  assert_eq(parse_decisions(csv).unwrap().length(), 0)
+}
+
+///|
+test "decision_raw_rows_and_bytes_count_ignored_blank_actions" {
+  let csv = "action,left_id,right_id,reason\n,L1,,\n,L2,,\n"
+  assert_eq(parse_decisions_with_budget(csv, 43, 2, 31, 0).unwrap().length(), 0)
+  for
+    result in [
+      parse_decisions_with_budget(csv, 42, 2, 31, 0),
+      parse_decisions_with_budget(csv, 43, 1, 31, 0),
+    ] {
+    match result {
+      Err(error) => {
+        assert_eq(error.code, "input_limit_exceeded")
+        assert_eq(error.side, Json::string("decisions"))
+      }
+      Ok(_) => assert_true(false)
+    }
+  }
+}
+
+///|
+test "decision_active_rows_are_bounded_before_dedup_and_ignore_blanks" {
+  let header = "action,left_id,right_id,reason\n"
+  let row = "reject,L1,R1,x\n"
+  let csv = header + row + ",L1,R1,ignored\n" + row
+  assert_eq(
+    parse_decisions_with_budget(csv, 200, 3, 200, 2).unwrap().length(),
+    2,
+  )
+  match parse_decisions_with_budget(csv, 200, 3, 200, 1) {
+    Err(error) => {
+      assert_eq(error.code, "decision_limit_exceeded")
+      assert_eq(error.phase, "decisions")
+      assert_eq(error.record, Json::number(3.0))
+    }
+    Ok(_) => assert_true(false)
+  }
+}
+
+///|
+test "decision_active_canonical_bytes_include_header_unicode_and_csv_escaping" {
+  // header=31 bytes, ASCII row=15 bytes; quoted Unicode/quote/comma/CR/LF row=27.
+  let csv = "action,left_id,right_id,reason\nreject,L1,R1,x\nreject,L2,R2,\"é😀\"\",\r\n\"\n"
+  assert_eq(
+    parse_decisions_with_budget(csv, 200, 2, 73, 2).unwrap().length(),
+    2,
+  )
+  match parse_decisions_with_budget(csv, 200, 2, 72, 2) {
+    Err(error) => assert_eq(error.code, "decision_limit_exceeded")
+    Ok(_) => assert_true(false)
+  }
+  // Raw unnecessary quoting and CRLF do not inflate canonical active bytes.
+  let noncanonical = "\"action\",left_id,right_id,reason\r\n\"reject\",\"L1\",\"R1\",\"x\"\r\n"
+  assert_eq(
+    parse_decisions_with_budget(noncanonical, 200, 1, 46, 1).unwrap().length(),
+    1,
+  )
+  assert_true(
+    parse_decisions_with_budget(noncanonical, 200, 1, 45, 1) is Err(_),
+  )
+  assert_true(
+    parse_decisions_with_budget(
+      "action,left_id,right_id,reason\n", 200, 0, 31, 0,
+    )
+    is Ok(_),
+  )
+  assert_true(
+    parse_decisions_with_budget(
+      "action,left_id,right_id,reason\n", 200, 0, 30, 0,
+    )
+    is Err(_),
+  )
+}
+
+///|
+test "decision_templates_retain_strict_header_and_cell_cap" {
+  assert_true(
+    parse_decisions("action,left_id,right_id,reason,extra\n") is Err(_),
+  )
+  let header = "action,left_id,right_id,reason\n"
+  assert_true(
+    parse_decisions(header + ",L1,," + "é".repeat(32768) + "\n") is Ok(_),
+  )
+  match parse_decisions(header + ",L1,," + "é".repeat(32769) + "\n") {
+    Err(error) => assert_eq(error.code, "input_limit_exceeded")
+    Ok(_) => assert_true(false)
+  }
+}
+
+///|
+test "decision_production_raw_and_active_row_boundaries_are_separate" {
+  let header = "action,left_id,right_id,reason\n"
+  let blanks = header + ",,,\n".repeat(400000)
+  assert_eq(parse_decisions(blanks).unwrap().length(), 0)
+  assert_true(parse_decisions(blanks + ",,,\n") is Err(_))
+  let active = header + "reject,L1,R1,x\n".repeat(100000)
+  assert_eq(parse_decisions(active).unwrap().length(), 100000)
+  match parse_decisions(active + "reject,L1,R1,x\n") {
+    Err(error) => assert_eq(error.code, "decision_limit_exceeded")
+    Ok(_) => assert_true(false)
+  }
+}

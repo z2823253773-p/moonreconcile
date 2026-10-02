@@ -103,7 +103,8 @@ MoonReconcile 不会自动推断任何业务语义：
 - 规范化后去掉尾部零：`100.00` → `100`。
 - 差异 `difference` 是**左侧减右侧**的有符号十进制字符串。
 - 阈值 `threshold = max(abs_tol, rel_tol × max(|左|, |右|))`。
-- 当 `|difference| ≤ threshold` 时为 `equivalent_by_rule`（解释 `decimal_difference_within_tolerance`），阈内且原始字符串完全相同则为 `equal`；否则 `different`（解释 `decimal_difference_exceeds_tolerance`）。
+- 当 `|difference| ≤ threshold` 时，原始字符串完全相同且转换后的十进制差值为 0 才为 `equal`（解释 `raw_values_equal`）；其余阈内情况为 `equivalent_by_rule`（解释 `decimal_difference_within_tolerance`）。
+- 当 `|difference| > threshold` 时为 `different`（解释 `decimal_difference_exceeds_tolerance`）。
 - 任一侧解析失败 → `invalid_value`（解释 `value_does_not_match_declared_type`）。
 - 举例：`abs_tol = "0.02"` 时，`100.00` 与 `100.01` 的差异为 `-0.01`，阈值为 `0.02`，判定等价；`10` 与 `11` 的差异为 `-1`，判定不同。
 - 不允许使用 `days_tol`（必须为 `0`）。
@@ -130,7 +131,7 @@ MoonReconcile 不会自动推断任何业务语义：
 | 只有一侧是缺失标记 | `different` | `one_value_missing` |
 | 以上都不是，进入类型规则 | 见上 | 见上 |
 
-注意「无效」优先于「缺失」：若左侧解析失败、右侧是缺失标记，结果是 `invalid_value` 而不是「一侧缺失」。空白文本本身不是缺失，除非它被显式写进 `missing`；缺失/无效值在候选中恒得 0 分。
+注意「无效」优先于「缺失」：若左侧解析失败、右侧是缺失标记，结果是 `invalid_value` 而不是「一侧缺失」。空白文本本身不是缺失，除非它被显式写进 `missing`；候选中空/缺失身份信息得 0 分；无效类型证据的字段分数和候选总分为 `null`，保留诊断，不能作为有效数值 0 使用。
 
 ## 5. `key`
 
@@ -346,5 +347,7 @@ node cli/main.mjs check-config examples/orders/rules.json
 - **没有类型自动推断、货币识别、日期格式推断、主键推断或 Unicode 规范化**，这是设计边界而非疏漏，将来也不打算隐式加入。
 - **没有拆单/合单**：多笔付款对一张订单、一行对多行的场景不处理。
 - **没有远程数据源、数据库连接、多人协作、公式重算或任意时区**支持；日期不含时间与时区概念。
+- 源 CSV 每文件限 64 MiB、100000 数据逻辑记录、256 列、每格 64 KiB UTF-8。决策 CSV 原始模板限 128 MiB、400000 数据逻辑记录，标题必须恰为 `action,left_id,right_id,reason`，沿用每格 64 KiB 限制。
+- 核心另限非空 action 行最多 100000（去重前计数），这些行按标准 CSV 转义后的 UTF-8 字节加标题最多 64 MiB。空 action 行只被语义忽略，仍消耗原始行/字节预算。规范序列化计算双引号加倍、必要的包围引号、逗号和 LF；计入 31 字节标题。
 - 固定预算是引擎常量，**CLI 不提供**用户可调的预算覆盖开关。
 - 本文的示例数据全部为**合成**数据，不对应任何真实业务；文中不提供准确率或性能数字。
