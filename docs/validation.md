@@ -88,3 +88,22 @@ README 命令由 `scripts/readme-smoke.mjs` 从本地提交创建的新鲜 Git c
 ## Task 8 local delivery
 
 本节只记录最终干净提交 SHA 上实际执行的命令、版本、测试数和结果。CI 使用官方安装器的 `latest`，其真实远端结果必须关联最终 SHA；提交、推送或排队均不等于 CI 通过。
+
+Task 8 本地实现提交：`810dc3c`（其父提交 `4bd18b5` 首次加入实现；随后 smoke 探针发现 scratch 输出目录缺失，`810dc3c` 修复后从新鲜 clone 实跑通过）。门禁环境：Darwin 25.4.0 arm64（设备名已为公开报告脱敏）、Node v24.15.0 / npm 11.12.1、Python 3.14.6、Moon `0.1.20260920` / moonc `v0.10.14+7d59c7ec9`。MoonBit 工具位于隔离的 `/private/tmp/moonreconcile-task8-toolchain`，使用进程级 `MOON_HOME`、`MOONBIT_HOME` 和 `PATH`，未改用户全局工具链。`moon` 与 `moonc` SHA-256 分别为 `a0cd1c0014f2ca17089542939ac4ad3c983452c5952ca6140af0fcef258e1967` 与 `8a49fb209d896b8ce72322883aa53a2395a1bdd88d35423ebfd841fc66b8f127`。
+
+| 命令 | 实际结果 |
+| --- | --- |
+| `moon info` | exit 0；no work to do |
+| `moon fmt --check` | exit 0；28 tasks up to date。此前执行官方工具链 `moon fmt`，已提交机械格式迁移；生成 `.mbti` 变化只有尾部空行移除，无 API 声明变化 |
+| `moon check --target js` | exit 0 |
+| `moon test --target js` | exit 0；88/88 |
+| `npm test` | exit 0；构建成功，Node 53/53；附带 200 个独立累计决定/状态/字段/退出码案例及生产预算 101×101 全人工处置仍 incomplete/exit 3/unresolved 0 |
+| `python3 scripts/check-assignment-oracle.py` | exit 0；240 个穷举分配 golden 独立核对 |
+| `python3 scripts/check-library-consumer.py` | exit 0；90/90（88 个核心 + 2 个外部 consumer）；归档代码来自该提交的 exact HEAD。该脚本实际运行于 Python 3.14.6，不是 CI 的 3.12 |
+| `npm run test:workflows` | exit 0；orders/migration/catalog compare→resolve→replay 全通过，七种导出变异均被拒绝 |
+| `node scripts/readme-smoke.mjs` | exit 0；从本地提交克隆 checkout，抽取并运行 README 标注的 9 条命令；build/init/edit/check/copy/最终报告检查 exit 0，compare 和两次累计 resolve 按合同 exit 1 |
+| `git diff --cached --check` 与 staged payload scan | exit 0；最终清单 35 文件，无大于 1 MB 文件，扫描的个人路径和常见凭据模式均无命中。Task 8 后续 validation-only commit 在交付前还会重新检查 |
+
+README smoke 的初次 clean-clone 运行以 exit 1 失败，原因是 harness 未先创建临时输出父目录，`init-config` 正确返回 I/O exit 2；在 `810dc3c` 加入创建步骤后，同一标记代码块 9/9 命令通过。另一次直接检查发现报告字段与章节名假设错误，修正为实际 `computation.status` 与 `Field comparison` 后通过。
+
+没有在本机执行或声称 Node 22、Python 3.12、Ubuntu/macOS GitHub Actions 最终 run，也没有重跑历史 benchmark。公开远端历史 run `36739067019`（`8f8970c`）与 `36734569700`（`a0f9310`）曾在旧格式检查处失败；最终 Task 8 commit 的远端状态必须另行核验。真实 workflow (V05)、CSV/XLSX 适配 (V06)、广域独立审查 (D05) 与精确 SHA 发布/双平台 CI (D07–D09) 仍待根任务负责人完成。

@@ -33,6 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          persist-credentials: false
           # Full history: scripts/check-library-consumer.py uses `git archive`
           # of the exact HEAD revision.
           fetch-depth: 0
