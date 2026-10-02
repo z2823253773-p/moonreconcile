@@ -73,3 +73,5 @@ See [the specification](docs/spec.md), [configuration reference](docs/configurat
 ## License
 
 [MIT](LICENSE)
+
+Verified October delivery: [3c506f1 both-OS CI](https://github.com/z2823253773-p/moonreconcile/actions/runs/37055796591) passed all gates. See [delivery evidence](docs/final-delivery.md) and [one-page project description](docs/project-description-one-page.md). Real-workflow/export fit and contest acceptance remain unverified.

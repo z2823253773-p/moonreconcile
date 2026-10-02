@@ -1,0 +1,70 @@
+Selected actual CI log lines. Runner/tool/temp paths are public placeholders; source SHA, timestamps, versions, executable hashes and counts unchanged. Full logs remain at the linked GitHub run.
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6737650Z ^[[36;1mmoon version --all^[[0m
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6737880Z ^[[36;1mnode --version^[[0m
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6738170Z ^[[36;1mpython --version^[[0m
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6738690Z ^[[36;1mgit rev-parse HEAD^[[0m
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6738990Z ^[[36;1muname -a^[[0m
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6739280Z ^[[36;1mshasum -a 256 "$HOME/.moon/bin/moon" "$HOME/.moon/bin/moonc"^[[0m
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6778540Z shell: /bin/bash -e {0}
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6778740Z env:
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6778890Z   NODE_VERSION: 22
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6779110Z   PYTHON_VERSION: 3.12
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6779380Z   pythonLocation: $RUNNER_PATH
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6779840Z   PKG_CONFIG_PATH: $RUNNER_PATH
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6780270Z   Python_ROOT_DIR: $RUNNER_PATH
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6780620Z   Python2_ROOT_DIR: $RUNNER_PATH
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6781200Z   Python3_ROOT_DIR: $RUNNER_PATH
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.6781480Z ##[endgroup]
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7661710Z moon 0.1.20260920 (914d7da 2026-09-20) ~/.moon/bin/moon
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7662380Z moonc v0.10.14+7d59c7ec9 (2026-09-18) ~/.moon/bin/moonc
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7662920Z moonrun 0.1.20260920 (914d7da 2026-09-20) ~/.moon/bin/moonrun
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7663190Z 
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7663420Z Feature flags enabled: rr_moon_mod,rr_moon_pkg
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.7821040Z v22.23.2
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.8980290Z Python 3.12.10
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.9044450Z 3c506f15f27c32fc97fa83077292477be3f47b47
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.9067270Z Darwin $RUNNER_HOST 24.6.0 Darwin $RUNNER_HOST Version 24.6.0: Tue Jul 21 20:51:34 PDT 2026; root:xnu-11417.140.69.711.44~1/RELEASE_ARM64_VMAPPLE arm64
+macos-15	Record actual toolchain versions	2026-10-02T19:42:13.9489330Z a0cd1c0014f2ca17089542939ac4ad3c983452c5952ca6140af0fcef258e1967  $RUNNER_PATH
+macos-15	Record actual toolchain versions	2026-10-02T19:42:14.0640710Z 8a49fb209d896b8ce72322883aa53a2395a1bdd88d35423ebfd841fc66b8f127  $RUNNER_PATH
+macos-15	Core unit tests (MoonBit)	2026-10-02T19:42:16.2303610Z Total tests: 95, passed: 95, failed: 0.
+macos-15	Build bridge and run host integration tests	2026-10-02T19:42:28.1668400Z # tests 56
+macos-15	Build bridge and run host integration tests	2026-10-02T19:42:28.1669220Z # pass 56
+macos-15	Synthetic workflow end-to-end chains	2026-10-02T19:42:29.1467490Z Synthetic workflows and seven mutation checks passed. Temporary outputs: $RUNNER_PATH
+macos-15	Independent assignment oracle	2026-10-02T19:42:29.3153800Z 240 exhaustive assignment goldens independently verified
+macos-15	Independent MoonBit library consumer	2026-10-02T19:42:31.5841920Z Total tests: 97, passed: 97, failed: 0.
+macos-15	README acceptance smoke from fresh checkout	2026-10-02T19:42:32.7341720Z README smoke passed: 9 documented commands from fresh clone $RUNNER_PATH
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8134655Z ^[[36;1mmoon version --all^[[0m
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8134916Z ^[[36;1mnode --version^[[0m
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8135176Z ^[[36;1mpython --version^[[0m
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8135435Z ^[[36;1mgit rev-parse HEAD^[[0m
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8135679Z ^[[36;1muname -a^[[0m
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8135982Z ^[[36;1mshasum -a 256 "$HOME/.moon/bin/moon" "$HOME/.moon/bin/moonc"^[[0m
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8203814Z shell: /usr/bin/bash -e {0}
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8204108Z env:
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8204341Z   NODE_VERSION: 22
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8204573Z   PYTHON_VERSION: 3.12
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8204880Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.14/x64
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8205387Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.14/x64/lib/pkgconfig
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8205858Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.14/x64
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8206275Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.14/x64
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8206709Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.14/x64
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8207172Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.14/x64/lib
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8207523Z ##[endgroup]
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8544912Z moon 0.1.20260920 (914d7da 2026-09-20) ~/.moon/bin/moon
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8545574Z moonc v0.10.14+7d59c7ec9 (2026-09-18) ~/.moon/bin/moonc
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8546111Z moonrun 0.1.20260920 (914d7da 2026-09-20) ~/.moon/bin/moonrun
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8546383Z 
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8546656Z Feature flags enabled: rr_moon_mod,rr_moon_pkg
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8580635Z v22.23.3
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8703816Z Python 3.12.14
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8721365Z 3c506f15f27c32fc97fa83077292477be3f47b47
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.8733774Z Linux $RUNNER_HOST 6.17.0-1022-azure #22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:09.9333973Z 6da4919f45f4abf7c6d7f3cf8d9a457de77dca430d6fb811d21b27ae1ac8e11d  $RUNNER_PATH
+ubuntu-24.04	Record actual toolchain versions	2026-10-02T19:42:10.0888971Z d163b2c4c878ca584870764b75e633d73e8b9c178dcc6b00c692f6b2a6b1b2dc  $RUNNER_PATH
+ubuntu-24.04	Core unit tests (MoonBit)	2026-10-02T19:42:12.5641689Z Total tests: 95, passed: 95, failed: 0.
+ubuntu-24.04	Build bridge and run host integration tests	2026-10-02T19:42:25.8249567Z # tests 56
+ubuntu-24.04	Build bridge and run host integration tests	2026-10-02T19:42:25.8250121Z # pass 56
+ubuntu-24.04	Synthetic workflow end-to-end chains	2026-10-02T19:42:26.8532703Z Synthetic workflows and seven mutation checks passed. Temporary outputs: $RUNNER_PATH
+ubuntu-24.04	Independent assignment oracle	2026-10-02T19:42:26.9358043Z 240 exhaustive assignment goldens independently verified
+ubuntu-24.04	Independent MoonBit library consumer	2026-10-02T19:42:29.2595060Z Total tests: 97, passed: 97, failed: 0.
+ubuntu-24.04	README acceptance smoke from fresh checkout	2026-10-02T19:42:30.2350193Z README smoke passed: 9 documented commands from fresh clone $RUNNER_PATH

@@ -1,0 +1,193 @@
+{
+  "verified_date_local": "2026-10-03",
+  "run_id": 37055796591,
+  "url": "https://github.com/z2823253773-p/moonreconcile/actions/runs/37055796591",
+  "tested_sha": "3c506f15f27c32fc97fa83077292477be3f47b47",
+  "status": "completed",
+  "conclusion": "success",
+  "moon": "0.1.20260920 (914d7da)",
+  "moonc": "v0.10.14+7d59c7ec9",
+  "installer_sha256": "46495f8cdc0050f79b6cb195d66478d101cb3601d68506568fbe377fcdf2a9fe",
+  "jobs": [
+    {
+      "id": 111000070948,
+      "platform": "macos-15",
+      "conclusion": "success",
+      "versions": {
+        "node": "v22.23.2",
+        "python": "3.12.10",
+        "moon_sha256": "a0cd1c0014f2ca17089542939ac4ad3c983452c5952ca6140af0fcef258e1967",
+        "moonc_sha256": "8a49fb209d896b8ce72322883aa53a2395a1bdd88d35423ebfd841fc66b8f127"
+      },
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Python",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install MoonBit toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Record actual toolchain versions",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build and check core",
+          "conclusion": "success"
+        },
+        {
+          "name": "Core unit tests (MoonBit)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build bridge and run host integration tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Synthetic workflow end-to-end chains",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent assignment oracle",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent MoonBit library consumer",
+          "conclusion": "success"
+        },
+        {
+          "name": "README acceptance smoke from fresh checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Python",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 111000071369,
+      "platform": "ubuntu-24.04",
+      "conclusion": "success",
+      "versions": {
+        "node": "v22.23.3",
+        "python": "3.12.14",
+        "moon_sha256": "6da4919f45f4abf7c6d7f3cf8d9a457de77dca430d6fb811d21b27ae1ac8e11d",
+        "moonc_sha256": "d163b2c4c878ca584870764b75e633d73e8b9c178dcc6b00c692f6b2a6b1b2dc"
+      },
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Python",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install MoonBit toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Record actual toolchain versions",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build and check core",
+          "conclusion": "success"
+        },
+        {
+          "name": "Core unit tests (MoonBit)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build bridge and run host integration tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Synthetic workflow end-to-end chains",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent assignment oracle",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent MoonBit library consumer",
+          "conclusion": "success"
+        },
+        {
+          "name": "README acceptance smoke from fresh checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Python",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "counts_per_job": {
+    "moon": 95,
+    "node": 56,
+    "assignment_goldens": 240,
+    "consumer": 97,
+    "readme_commands": 9,
+    "synthetic_workflows": 3,
+    "rejected_mutations": 7
+  },
+  "remote_repository": {
+    "public": true,
+    "default_branch": "feature/initial-product",
+    "api_head": "3c506f15f27c32fc97fa83077292477be3f47b47",
+    "readme_blob": "10fabfa913a0d7c834e9a44c6501d84ca41b9b6e",
+    "readme_type": "file",
+    "rendered_html_verified": true
+  },
+  "limits": "No real workflow/adoption, XLSX export-fit, maximum capacity or contest application/approval inferred. Future commits require their own CI run; this evidence names the observed historical SHA."
+}

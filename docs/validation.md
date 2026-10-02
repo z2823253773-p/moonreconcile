@@ -115,3 +115,7 @@ README smoke 的初次 clean-clone 运行以 exit 1 失败，原因是 harness �
 根任务在精确`0bcf96753df06a7eeedb74fb30c2db7ac24b2eb7`独立重跑完整门禁，全部exit0：95核心、56Node（含200累计案例及生产101×101）、240分配golden、97独立库消费（核心95+外部2）、三个工作流/七变异、九条新鲜克隆README命令。环境仍是隔离Moon0.1.20260920/moonc0.10.14+7d59c7ec9、Node24.15.0、Python3.14.6。[机器可读命令记录](evidence/final-local-gates-2026-10-03.json)和[完整脱敏输出](evidence/final-local-gates-2026-10-03.txt)。这不是Node22/Python3.12远端验证。
 
 实际50001+50001源表导出的100002行空白模板能原样回导；加入reject后100003行累计模板继续回导，全部原始ID、待复核状态及源快照保留。源表限额不变，模板独立raw/active限额及规范CSV字节证明见修复报告。最大字节/DP/动作应用吞吐尚未实测；所有合成与真实需求缺证边界继续保留。远端证据另行追加。
+
+## 2026-10-03 实际公开交付与远端CI
+
+发布`3c506f15f27c32fc97fa83077292477be3f47b47`，远端提交API一致；默认分支公开，README blob`10fabfa913a0d7c834e9a44c6501d84ca41b9b6e`与本地相同，GitHub提供实际渲染HTML。[双平台CI run37055796591](https://github.com/z2823253773-p/moonreconcile/actions/runs/37055796591)已完成success，两OS每项门禁均通过。[完整结构化结果与版本/二进制哈希](evidence/remote-ci-2026-10-03.json)、[实际日志摘录](evidence/remote-ci-2026-10-03-excerpts.txt)。Moon版本与本地隔离工具一致；Node/Python为实际22/3.12，两平台补丁版本分别记录，不以本机24/3.14结果替代。历史失败run继续保留。这份记录针对实际3c506f1，后续证据文档提交会另核验真实CI，不编造自引用提交结果。

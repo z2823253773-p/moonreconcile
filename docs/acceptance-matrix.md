@@ -30,7 +30,7 @@
 
 `pass`表示已验证合同的保护逻辑、行为与列出的断言，不表示每种最大输入组合的吞吐、内存或实际用户价值。B01实际执行100000/100001源行、256/257列与64KiB单格；总字节用小阈值验证UTF-8/原始读取。B03有小阈值边界和真实101×101拒绝；B04的20,000,000累计DP保护通过同一分支的注入阈值验证，没有运行字面最大DP负载。B07实际解析400000/400001模板行和100000/100001动作行，并实际CLI重放50001+50001源记录；64/128MiB字节最大值未执行满负载，规范CSV逃逸与字节累计通过小阈值断言及复审证明闭环。
 
-V05/V06仍pending；D07–D09只有观察到实际外部结果后才关闭。其余每个验收ID由下表证据位置、末尾断言索引和上述实际执行记录共同支撑。[所有审查范围与缺证处理](evidence/final-review-scope-decisions.md)。
+V05/V06仍pending；D07–D09依据已观察的3c506f1远端一致性、README渲染与双平台CI关闭，详见交付记录。后续文档提交需另核验其实际CI。其余每个验收ID由下表证据位置、末尾断言索引和上述实际执行记录共同支撑。[所有审查范围与缺证处理](evidence/final-review-scope-decisions.md)。
 
 ## 1. 规格章节与产品闭环
 
@@ -134,9 +134,9 @@ V05/V06仍pending；D07–D09只有观察到实际外部结果后才关闭。其
 | D04 | 核心/CLI/oracle/工作流本地门禁通过，保存命令、退出码、版本和精确SHA | `docs/validation.md`；测试日志 | pass |
 | D05 | 独立审查发现与修复记录闭环；未解决功能缺陷未被标为交付通过 | `docs/validation.md`；审查问题与回归测试记录 | pass |
 | D06 | 公开载荷无凭据、个人/临床原始数据、旧项目内容、临时依赖缓存；合成来源显著 | 跟踪文件清单审查；`.gitignore`；`examples/` | pass |
-| D07 | 测试提交实际推送至公开GitHub；远端HEAD与本地SHA一致；README可见 | GitHub仓库/API证据；发布SHA记录 | pending |
-| D08 | Ubuntu/macOS远端CI在交付SHA实际完成；失败/未运行状态如实记录 | `.github/workflows/ci.yml`；真实Actions run链接 | pending |
-| D09 | 最终交付仓库地址、策划书、确切验证范围和剩余风险；不等同赛事通过或Mooncakes发布 | 最终交付记录；`docs/validation.md` | pending |
+| D07 | 测试提交实际推送至公开GitHub；远端HEAD与本地SHA一致；README可见 | [交付记录](final-delivery.md)；[准确SHA双平台CI证据](evidence/remote-ci-2026-10-03.json) | pass（已观察3c506f1；后续提交另核验） |
+| D08 | Ubuntu/macOS远端CI在交付SHA实际完成；失败/未运行状态如实记录 | [交付记录](final-delivery.md)；[准确SHA双平台CI证据](evidence/remote-ci-2026-10-03.json) | pass（已观察3c506f1；后续提交另核验） |
+| D09 | 最终交付仓库地址、策划书、确切验证范围和剩余风险；不等同赛事通过或Mooncakes发布 | [交付记录](final-delivery.md)；[准确SHA双平台CI证据](evidence/remote-ci-2026-10-03.json) | pass（已观察3c506f1；后续提交另核验） |
 
 ## 6. 证据更新格式与验收判断
 
@@ -179,7 +179,7 @@ V05/V06仍pending；D07–D09只有观察到实际外部结果后才关闭。其
 | V01–V04 | `npm run test:workflows`; `scripts/benchmark.mjs` and retained `task7-benchmark.json`; `examples/catalog/truth.json` plus fixture truth checks; claims and limits in `docs/validation.md` |
 | V05–V06 | Pending by design: no licensed real workflow or export inspection exists. Do not mark software tests as substitutes. |
 | D01–D04, D06 | Source review of MoonBit/Node boundary, `moon.mod`, `LICENSE`, dependency audit; final local commands in `validation.md`; public tracked payload review and synthetic fixture labels |
-| D05, D07–D09 | 最终整体审查及定向复审已通过；根任务本地门禁证据已归档。D07–D09继续等待实际推送、精确SHA双平台CI及交付记录。 |
+| D05, D07–D09 | 最终整体审查及定向复审已通过；根任务本地门禁证据已归档。D07–D09已由实际3c506f1推送/API/README与run37055796591双平台成功、交付记录关闭；后续提交在最终交付时另核验。 |
 
 ## 资源边界证据的实际尺度（最终修复）
 
