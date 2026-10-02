@@ -107,3 +107,11 @@ Task 8 本地实现先提交为 `4bd18b5`，README smoke harness 的 scratch 目
 README smoke 的初次 clean-clone 运行以 exit 1 失败，原因是 harness 未先创建临时输出父目录，`init-config` 正确返回 I/O exit 2；在 `810dc3c` 加入创建步骤后，同一标记代码块 9/9 命令通过。另一次直接检查发现报告字段与章节名假设错误，修正为实际 `computation.status` 与 `Field comparison` 后通过。
 
 没有在本机执行或声称 Node 22、Python 3.12、Ubuntu/macOS GitHub Actions 最终 run，也没有重跑历史 benchmark。公开远端历史 run `36739067019`（`8f8970c`）与 `36734569700`（`a0f9310`）曾在旧格式检查处失败；最终 Task 8 commit 的远端状态必须另行核验。真实 workflow (V05)、CSV/XLSX 适配 (V06)、广域独立审查 (D05) 与精确 SHA 发布/双平台 CI (D07–D09) 仍待根任务负责人完成。
+
+## 2026-10-03 最终功能门禁与复审
+
+整体独立审查在`c24ff15`发现导出决定模板超过自身读取限额的P2问题和三项文档错误；`0bcf967`集中修复，独立定向复审确认R1–R4全部解决，无新问题。[整体初审](evidence/final-product-review.md)、[修复报告](evidence/final-product-fixes.md)、[最终复审](evidence/final-product-rereview.md)保留失败和修复证据。
+
+根任务在精确`0bcf96753df06a7eeedb74fb30c2db7ac24b2eb7`独立重跑完整门禁，全部exit0：95核心、56Node（含200累计案例及生产101×101）、240分配golden、97独立库消费（核心95+外部2）、三个工作流/七变异、九条新鲜克隆README命令。环境仍是隔离Moon0.1.20260920/moonc0.10.14+7d59c7ec9、Node24.15.0、Python3.14.6。[机器可读命令记录](evidence/final-local-gates-2026-10-03.json)和[完整脱敏输出](evidence/final-local-gates-2026-10-03.txt)。这不是Node22/Python3.12远端验证。
+
+实际50001+50001源表导出的100002行空白模板能原样回导；加入reject后100003行累计模板继续回导，全部原始ID、待复核状态及源快照保留。源表限额不变，模板独立raw/active限额及规范CSV字节证明见修复报告。最大字节/DP/动作应用吞吐尚未实测；所有合成与真实需求缺证边界继续保留。远端证据另行追加。

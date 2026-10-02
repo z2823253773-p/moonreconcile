@@ -1,0 +1,185 @@
+Temporary runtime paths replaced with public placeholders; command results/counts/source SHA unchanged.
+Exact tested HEAD: 0bcf96753df06a7eeedb74fb30c2db7ac24b2eb7
+
+COMMAND ["moon", "version", "--all"]
+moon 0.1.20260920 (914d7da 2026-09-20) $ISOLATED_MOON/bin/moon
+moonc v0.10.14+7d59c7ec9 (2026-09-18) $ISOLATED_MOON/bin/moonc
+moonrun 0.1.20260920 (914d7da 2026-09-20) $ISOLATED_MOON/bin/moonrun
+
+Feature flags enabled: rr_moon_mod,rr_moon_pkg
+
+RESULT {"command": ["moon", "version", "--all"], "exit_code": 0, "seconds": 0.018}
+
+COMMAND ["node", "--version"]
+v24.15.0
+
+RESULT {"command": ["node", "--version"], "exit_code": 0, "seconds": 0.009}
+
+COMMAND ["python3", "--version"]
+Python 3.14.6
+
+RESULT {"command": ["python3", "--version"], "exit_code": 0, "seconds": 0.006}
+
+COMMAND ["moon", "info"]
+Finished. moon: ran 1 task, now up to date
+
+RESULT {"command": ["moon", "info"], "exit_code": 0, "seconds": 0.021}
+
+COMMAND ["moon", "fmt", "--check"]
+Finished. moon: ran 28 tasks, now up to date
+
+RESULT {"command": ["moon", "fmt", "--check"], "exit_code": 0, "seconds": 0.057}
+
+COMMAND ["moon", "check", "--target", "js"]
+Finished. moon: no work to do
+
+RESULT {"command": ["moon", "check", "--target", "js"], "exit_code": 0, "seconds": 0.012}
+
+COMMAND ["moon", "test", "--target", "js"]
+Total tests: 95, passed: 95, failed: 0.
+
+RESULT {"command": ["moon", "test", "--target", "js"], "exit_code": 0, "seconds": 0.471}
+
+COMMAND ["npm", "test"]
+
+> moonreconcile@0.1.0 test
+> npm run build && node --test tests/*.test.mjs
+
+
+> moonreconcile@0.1.0 build
+> node scripts/build.mjs
+
+Finished. moon: no work to do
+✔ bridge returns structured errors for malformed JSON and invalid config (1.614125ms)
+✔ no request may crash the host process (0.250917ms)
+✔ check_config returns canonical normalized defaults (0.698917ms)
+✔ init_config produces an unexecutable draft and check_config rejects it (0.910375ms)
+✔ init_config returns a structured error for malformed CSV (0.10875ms)
+✔ compare returns exact reconciliation JSON and resolve applies human review (4.186542ms)
+✔ compare follows the locked Result wire schema and returns normalized config (0.41825ms)
+✔ compare rejects absent explicitly ignored columns on either side (0.805458ms)
+✔ pure invoke admits decision templates above the source cap and rejects excess active or raw rows atomically (269.737708ms)
+✔ end to end compare, cumulative review after deleting originals (266.931542ms)
+✔ resolve is reproducible and read-only on the source run (321.018167ms)
+✔ strict argument parsing rejects unknown, repeated, missing and extra operands (307.530333ms)
+✔ check-config prints canonical normalized config and rejects drafts (79.107083ms)
+✔ invalid UTF-8 is fatal and publishes nothing (24.118375ms)
+✔ an initial BOM is accepted and preserved in snapshot bytes and hash (76.925125ms)
+✔ double and interior byte-order marks are rejected (52.069542ms)
+✔ the raw byte budget is enforced by an injectable internal limit, not a CLI flag (96.596959ms)
+✔ a canonical config containing U+FEFF string data can be replayed (164.299084ms)
+✔ rejecting a candidate keeps both still-pending endpoint rows in the cumulative template (159.224708ms)
+✔ summary renders source headers without activating HTML or Markdown (82.655917ms)
+✔ cell budgets stay with the MoonBit core and are reported to the CLI (37.306084ms)
+✔ output destinations must be absent or empty and never alias inputs (146.323917ms)
+✔ init-config never overwrites an existing file or an input alias (112.002458ms)
+✔ resolve refuses destinations inside or aliasing the source run (228.447458ms)
+✔ output paths with non ASCII segments work (83.991667ms)
+✔ a write failure publishes nothing and removes only its own staging (22.347417ms)
+✔ a file close failure aborts run publication and retains an earlier write error (51.33775ms)
+✔ init-config close failure leaves no published file (7.348292ms)
+✔ init-config never removes an unowned staging collision (1.91825ms)
+✔ init-config reports a failed owned-stage cleanup with its residual path (6.176166ms)
+✔ init-config reports cleanup failure after exclusive publication (6.474167ms)
+✔ init-config fails safely when atomic no-replace publication is unavailable (7.589875ms)
+✔ failed staging cleanup reports its residual path and retains the write error (21.121875ms)
+✔ a publish failure cleans staging rather than leaving a partial run (55.359333ms)
+✔ an fsync failure aborts publication (26.099ms)
+✔ the disk precheck is advisory: it blocks on a negative statfs and continues when unsupported (109.156833ms)
+✔ canonical config sorts numeric looking keys lexically and keeps arrays stable (52.950416ms)
+✔ resolve verifies fingerprints and engine version before invoking the engine (705.450708ms)
+✔ resolve rejects a missing snapshot or manifest (112.420584ms)
+✔ malformed decision files are rejected without publishing (306.048083ms)
+✔ a blank cumulative template replays as unfinished review (250.930584ms)
+✔ decision reasons with commas, quotes and newlines survive into evidence (175.14375ms)
+✔ exit priority 2 > 3 > 1 > 0 publishes artifacts for 0, 1 and 3 (415.187208ms)
+✔ unprocessed records stay visible after a fully reviewed incomplete run (418.652083ms)
+✔ a fully reviewed run with no usable key exits zero (171.973959ms)
+✔ every export is consistent with the locked Result (87.328042ms)
+✔ markdown escapes source values that could corrupt the layout (82.648666ms)
+✔ summary reports computation coverage separately from unresolved differences (166.25475ms)
+✔ init-config output is canonical and round-trips through check-config once edited (141.682875ms)
+✔ a checkout without a built bridge fails with an actionable error (27.932167ms)
+✔ concurrent compare runs do not collide in staging (93.719125ms)
+✔ the host engine version agrees with module metadata and the core Result (87.6235ms)
+✔ run identifiers are stable and independent of generated timestamps (168.948542ms)
+✔ production 50001 per side templates replay with original IDs and applied history (1576.241125ms)
+✔ decision raw byte guard uses its own internal limit and preserves source guards (96.666083ms)
+200 independent cumulative-review/state/field/exit cases passed
+Production 101x101 resource-limited fully-reviewed case preserved incomplete/exit3/unresolved0
+✔ tests/decisions-oracle.test.mjs (180.630542ms)
+ℹ tests 56
+ℹ suites 0
+ℹ pass 56
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7746.440125
+
+RESULT {"command": ["npm", "test"], "exit_code": 0, "seconds": 7.91}
+
+COMMAND ["python3", "scripts/check-assignment-oracle.py"]
+240 exhaustive assignment goldens independently verified
+
+RESULT {"command": ["python3", "scripts/check-assignment-oracle.py"], "exit_code": 0, "seconds": 0.021}
+
+COMMAND ["python3", "scripts/check-library-consumer.py"]
+Created moon.work
+Total tests: 97, passed: 97, failed: 0.
+Independent MoonBit consumer verified against 0bcf96753df06a7eeedb74fb30c2db7ac24b2eb7; workspace suite includes two external tests
+
+RESULT {"command": ["python3", "scripts/check-library-consumer.py"], "exit_code": 0, "seconds": 0.892}
+
+COMMAND ["npm", "run", "test:workflows"]
+
+> moonreconcile@0.1.0 test:workflows
+> node scripts/workflows.mjs
+
+mutation rejected: missing-record
+mutation rejected: pairs-csv-id
+mutation rejected: same-length-snapshot
+mutation rejected: config-json
+mutation rejected: markdown-summary
+mutation rejected: phantom-review-row
+orders: compare/resolve/replay passed with fixture identities, complete exports and conservation
+migration: compare/resolve/replay passed with fixture identities, complete exports and conservation
+mutation rejected: extra-applied-decision
+catalog: compare/resolve/replay passed with fixture identities, complete exports and conservation
+Synthetic workflows and seven mutation checks passed. Temporary outputs: $TMPDIR
+
+RESULT {"command": ["npm", "run", "test:workflows"], "exit_code": 0, "seconds": 0.859}
+
+COMMAND ["node", "scripts/readme-smoke.mjs"]
+$ npm run build
+
+> moonreconcile@0.1.0 build
+> node scripts/build.mjs
+
+Finished. moon: ran 3 tasks, now up to date
+$ node cli/main.mjs init-config examples/orders/left.csv examples/orders/right.csv --out "$SMOKE_DIR/draft.json"
+config: $TMPDIR
+$ node scripts/prepare-readme-smoke.mjs "$SMOKE_DIR/draft.json" "$SMOKE_DIR/rules.json"
+$ node cli/main.mjs check-config "$SMOKE_DIR/rules.json"
+{"candidates":null,"draft":false,"fields":[{"abs_tol":"0","both_missing":"equal","compare":false,"days_tol":0,"left":"order_id","left_values":{},"lower_ascii":false,"missing":[],"name":"order_id","rel_tol":"0","right":"external_ref","right_values":{},"trim_ascii":false,"type":"text"},{"abs_tol":"0","both_missing":"equal","compare":true,"days_tol":0,"left":"status","left_values":{},"lower_ascii":false,"missing":[],"name":"status","rel_tol":"0","right":"state","right_values":{"已支付":"paid"},"trim_ascii":false,"type":"text"},{"abs_tol":"0.02","both_missing":"equal","compare":true,"days_tol":0,"left":"amount","left_values":{},"lower_ascii":false,"missing":[],"name":"amount","rel_tol":"0","right":"total","right_values":{},"trim_ascii":false,"type":"decimal"},{"abs_tol":"0","both_missing":"equal","compare":true,"days_tol":0,"left":"day","left_values":{},"lower_ascii":false,"missing":[],"name":"day","rel_tol":"0","right":"settled_on","right_values":{},"trim_ascii":false,"type":"date"}],"ignore_left":[],"ignore_right":[],"key":["order_id"],"schema_version":1}
+$ node cli/main.mjs compare examples/orders/left.csv examples/orders/right.csv --config "$SMOKE_DIR/rules.json" --out "$SMOKE_DIR/run"
+run: $TMPDIR
+run_id: cf7e91fa29eb995c333d467227231a134bd299d2a3521c4688bf0ac0471f9638
+exit: 1
+$ cp examples/orders/reviewed.csv "$SMOKE_DIR/reviewed.csv"
+$ node cli/main.mjs resolve "$SMOKE_DIR/run" --decisions "$SMOKE_DIR/reviewed.csv" --out "$SMOKE_DIR/reviewed-run"
+run: $TMPDIR
+run_id: cf7e91fa29eb995c333d467227231a134bd299d2a3521c4688bf0ac0471f9638
+exit: 1
+$ node cli/main.mjs resolve "$SMOKE_DIR/reviewed-run" --decisions "$SMOKE_DIR/reviewed-run/decisions.csv" --out "$SMOKE_DIR/replayed-run"
+run: $TMPDIR
+run_id: cf7e91fa29eb995c333d467227231a134bd299d2a3521c4688bf0ac0471f9638
+exit: 1
+$ node scripts/check-readme-smoke-output.mjs "$SMOKE_DIR/replayed-run"
+README smoke passed: 9 documented commands from fresh clone $TMPDIR
+
+RESULT {"command": ["node", "scripts/readme-smoke.mjs"], "exit_code": 0, "seconds": 0.81}
+
+COMMAND ["git", "diff", "--check"]
+
+RESULT {"command": ["git", "diff", "--check"], "exit_code": 0, "seconds": 0.012}

@@ -1,0 +1,139 @@
+{
+  "tested_sha": "0bcf96753df06a7eeedb74fb30c2db7ac24b2eb7",
+  "end_sha": "0bcf96753df06a7eeedb74fb30c2db7ac24b2eb7",
+  "commands": [
+    {
+      "command": [
+        "moon",
+        "version",
+        "--all"
+      ],
+      "exit_code": 0,
+      "seconds": 0.018
+    },
+    {
+      "command": [
+        "node",
+        "--version"
+      ],
+      "exit_code": 0,
+      "seconds": 0.009
+    },
+    {
+      "command": [
+        "python3",
+        "--version"
+      ],
+      "exit_code": 0,
+      "seconds": 0.006
+    },
+    {
+      "command": [
+        "moon",
+        "info"
+      ],
+      "exit_code": 0,
+      "seconds": 0.021
+    },
+    {
+      "command": [
+        "moon",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.057
+    },
+    {
+      "command": [
+        "moon",
+        "check",
+        "--target",
+        "js"
+      ],
+      "exit_code": 0,
+      "seconds": 0.012
+    },
+    {
+      "command": [
+        "moon",
+        "test",
+        "--target",
+        "js"
+      ],
+      "exit_code": 0,
+      "seconds": 0.471
+    },
+    {
+      "command": [
+        "npm",
+        "test"
+      ],
+      "exit_code": 0,
+      "seconds": 7.91
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-assignment-oracle.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.021
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-library-consumer.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.892
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "test:workflows"
+      ],
+      "exit_code": 0,
+      "seconds": 0.859
+    },
+    {
+      "command": [
+        "node",
+        "scripts/readme-smoke.mjs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.81
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.012
+    }
+  ],
+  "all_pass": true,
+  "date": "2026-10-03",
+  "attribution": "root independently executed and inspected full output",
+  "runtime": {
+    "node": "v24.15.0",
+    "python": "3.14.6",
+    "moon": "0.1.20260920 (914d7da)",
+    "moonc": "v0.10.14+7d59c7ec9"
+  },
+  "counts": {
+    "moon_tests": 95,
+    "node_tests": 56,
+    "independent_cumulative_cases": 200,
+    "assignment_goldens": 240,
+    "consumer_tests": 97,
+    "external_consumer_tests": 2,
+    "synthetic_workflows": 3,
+    "rejected_mutations": 7,
+    "readme_commands": 9
+  },
+  "limits": "Local runtime differs from remote Node22/Python3.12. Injected byte and DP boundary tests do not prove maximum end-to-end throughput. No historic benchmark rerun."
+}
