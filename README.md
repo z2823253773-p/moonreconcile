@@ -35,9 +35,16 @@ CI runs these gates on Ubuntu 24.04 and macOS 15, recording the actual MoonBit i
 
 Run `node cli/main.mjs` without arguments for help. `init-config` writes a draft that must be edited, `check-config` normalizes and validates the edited rules, `compare` creates a self-contained run directory, and `resolve` replays reviewed decisions from its snapshots.
 
-Exit status precedence is 2 for input/configuration/I/O error, 3 for incomplete computation, 1 for a complete run with outstanding differences or review, and 0 for a complete run without issues. A complete run may therefore correctly return 1 or 3.
+Exit status precedence is 2 for input/configuration/I/O error, 3 for incomplete computation, 1 for a complete run with outstanding differences or review, and 0 for a complete run without issues. A command can produce reports while correctly returning 1 for outstanding issues or 3 for incomplete computation.
 
-The following commands are the acceptance smoke contract. `scripts/readme-smoke.mjs` extracts and runs these exact command lines from a fresh Git checkout. `@expect` comments state each command's accepted exit status. The helper edits the generated draft using the example's authored rules; both resolve commands exercise cumulative replay, and the last command checks that the final report remains available.
+For a manual run from the checkout root, create a fresh writable output directory in the same shell before running the commands below:
+
+```sh
+SMOKE_DIR="$(mktemp -d)"
+export SMOKE_DIR
+```
+
+The automated `scripts/readme-smoke.mjs` runner creates and sets its own fresh directory. It extracts and runs the nine exact command lines below from a fresh Git checkout. `@expect` comments state each command's accepted exit status. The helper edits the generated draft using the example's authored rules; both resolve commands exercise cumulative replay, and the last command checks that the final report remains available.
 
 <!-- README-SMOKE:START -->
 ```sh
