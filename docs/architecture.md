@@ -2,7 +2,7 @@
 
 创建日期：2026-09-30
 
-状态：**开发中。** 本文只描述当前源码中实际存在的结构。未实现或未验证的内容在末尾单独列出，不写成功语气。
+状态：**首版实现已完成。** 文中区分已实现代码、本地验证、远端验证和真实工作流证据。远端 CI 与真实工作流适配仍待核实。
 
 本文中所有路径均相对于仓库根目录。权威契约见[实施计划](plans/2026-09-30-table-reconcile.md)的 "Locked interfaces and file map"、"JSON protocol v1" 与 "Config v1" 三节。
 
@@ -214,12 +214,9 @@ run_id   = sha256_hex(utf8(material))
 
 计划明确说明「初始固定预算是引擎常量，不是用户可配置的生产选项」；测试可以通过内部入口注入更小的预算，CLI 不暴露覆盖开关。
 
-## 10. 已知不一致与未验证项
+## 10. 未验证项与仓库注记
 
-写文档时对照源码发现的、与仓库其它说明不一致的地方：
-
-1. [`README.md`](../README.md) 的状态表把「三个演示工作流、基准测试、CI」整体标为**未实现**。实际 [`scripts/workflows.mjs`](../scripts/workflows.mjs) 与 [`scripts/benchmark.mjs`](../scripts/benchmark.mjs) 都已存在，[`docs/validation.md`](validation.md) 的 "Task 7" 一节也记录了实测结果。**CI 确实未实现**：`.github/workflows/` 下只有 `copilot-setup-steps.yml`，没有计划里写的 `ci.yml`。README 该行把已实现和未实现混在一格，偏保守且易误读。
-2. [`docs/validation.md`](validation.md) 开头写「Tasks 7–8 和完整产品验收尚未完成」，但文件内已有完整的 Task 7 实测章节。文档头部与正文状态不一致。
-3. 实施计划的文件图把 `tests/oracle.test.mjs` 列为 Node 端测试；仓库中不存在该文件，实际为 [`tests/decisions-oracle.test.mjs`](../tests/decisions-oracle.test.mjs)，另有 [`tests/bridge.test.mjs`](../tests/bridge.test.mjs)、[`tests/cli.test.mjs`](../tests/cli.test.mjs) 与 [`tests/js_api_probe.mjs`](../tests/js_api_probe.mjs)。
-4. [`cmd/main/main.mbt`](../cmd/main/main.mbt) 仍是模板桩（`println("Hello")`），未被 `package.json` 或 CLI 引用；实际入口是 `cmd/bridge`。
-5. 本文中的工作流与基准数字均来自 `examples/` 下的**合成数据**；仓库没有任何真实用户、真实业务数据或准确率/性能承诺，本文也不提供。
+- `.github/workflows/ci.yml` 定义 Ubuntu 24.04/macOS 15 门禁。先前公开运行 `36739067019` 与 `36734569700` 均在格式检查失败，未运行其后测试；Task 8 更新格式后仍须对最终 SHA 执行远端复验。
+- `cmd/main/main.mbt` 是未被 CLI 使用的模板桩；公开 Node CLI 构建入口使用 `cmd/bridge`。它不参与本产品流程。
+- 工作流与基准数字只来自 `examples/` 合成数据和本地机器。仓库没有真实用户数据、准确率或工时节省证据。
+- 独立 MoonBit 库消费脚本是开发验收，Python 3.12 仅为该脚本的开发时需求；Node CLI 的运行时不依赖 Python。

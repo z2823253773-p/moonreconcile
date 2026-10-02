@@ -2,7 +2,7 @@
 
 创建日期：2026-09-30
 
-状态：**开发中。** 本文的所有命令、输出片段与错误信息都是在当前源码上实际运行得到的。未验证的部分在最后一节列出。
+状态：**首版复核合同。** 命令和输出对应当前源码；限制及外部验证缺口列在最后一节。CLI 运行时需要 Node.js，不需要 Python。
 
 相关文档：[架构说明](architecture.md)、[配置参考](configuration.md)、[实施计划](plans/2026-09-30-table-reconcile.md)。
 
@@ -277,6 +277,7 @@ node cli/main.mjs resolve /tmp/orders-run --decisions /tmp/orders-reviewed/decis
 注意两条容易误解的地方：
 
 - **`no_key_configured` 和 `key_not_found` 是信息性诊断，它们本身不阻止退出 0。** 一个没有配置 `key`、左右表完全一致的单行对账会退出 0。
+- `summary.key_issue_count` 仍会保留全部键诊断。重复键、无效键或缺失键异常只要没有被明确处理，仍然是实质问题并触发退出 1；只有前述两种信息性诊断不会单独触发退出 1。
 - 退出码 `2` 不是引擎算出来的，而是宿主的致命结果。引擎内部在「缺失已声明列」时会给出一个 `exit_code: 2` 的 incomplete 结果，但宿主只读响应的 `ok` 字段，看到 `ok:false` 就直接退出 2，不写 run 目录。
 
 ### 人为覆盖不会追认算法完成

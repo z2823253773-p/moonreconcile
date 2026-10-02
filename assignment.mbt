@@ -108,7 +108,7 @@ fn solve_assignment(
       col >= 0 &&
       col < right_count &&
       cost[row][col] != forbidden {
-      result.push({ left: row, right: col, weight: -cost[row][col] })
+      result.push({ left: row, right: col, weight: -cost[row][col], })
     }
   }
   result

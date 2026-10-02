@@ -2,12 +2,17 @@
 fn must_csv(text : String, side : String) -> Table {
   match parse_csv(text, side) {
     Ok(value) => value
-    Err(_) => { headers: [], rows: [] }
+    Err(_) => { headers: [], rows: [], }
   }
 }
 
 ///|
-fn must_config(key? : Bool = false, candidates? : Bool = false) -> Config {
+fn must_config(
+  key? : Bool = false,
+  candidates? : Bool = false,
+  edit_candidates? : Bool = false,
+  decimal_value? : Bool = false,
+) -> Config {
   let no_map : Map[String, String] = Map([])
   let id = {
     name: "id",
@@ -29,7 +34,11 @@ fn must_config(key? : Bool = false, candidates? : Bool = false) -> Config {
     name: "value",
     left: "value",
     right: "value",
-    field_type: "text",
+    field_type: if decimal_value {
+      "decimal"
+    } else {
+      "text"
+    },
     compare: true,
     trim_ascii: false,
     lower_ascii: false,
@@ -46,7 +55,7 @@ fn must_config(key? : Bool = false, candidates? : Bool = false) -> Config {
       "fields": Json::array([
         Json::object({
           "field": Json::string("value"),
-          "metric": Json::string("exact"),
+          "metric": Json::string(if edit_candidates { "edit" } else { "exact" }),
           "weight": Json::number(1.0),
         }),
       ]),
@@ -109,6 +118,95 @@ test "human_acceptance_recomputes_and_preserves_field_difference" {
 }
 
 ///|
+test "human_acceptance_preserves_identical_invalid_decimal_values" {
+  let left = must_csv("id,value\nA,not-a-number\n", "left")
+  let right = must_csv("id,value\nB,not-a-number\n", "right")
+  let config = must_config(decimal_value=true)
+  let base = compare_tables(left, right, config)
+  let decisions = must_decisions(
+    "action,left_id,right_id,reason\naccept,L1,R1,reviewed invalid source values\n",
+  )
+  let result = match apply_decisions(base, decisions, left, right, config) {
+    Ok(value) => value
+    Err(_) => {
+      assert_true(false)
+      base
+    }
+  }
+  assert_eq(result.pairs[0].fields[0].status, "invalid_value")
+  assert_eq(result.exit_code, 1)
+}
+
+///|
+test "positive_below_threshold_accept_requires_reason_and_is_override" {
+  let left = must_csv("id,value\nA,cat\n", "left")
+  let right = must_csv("id,value\nB,bat\n", "right")
+  let config = must_config(candidates=true, edit_candidates=true)
+  let base = compare_tables(left, right, config)
+  match base.candidates {
+    [Json::Object(candidate)] =>
+      match candidate.get("score") {
+        Some(Json::Number(score, ..)) => {
+          assert_true(score > 0.0)
+          assert_true(score < 10000.0)
+        }
+        _ => assert_true(false)
+      }
+    _ => assert_true(false)
+  }
+  let no_reason = must_decisions(
+    "action,left_id,right_id,reason\naccept,L1,R1,\n",
+  )
+  assert_true(apply_decisions(base, no_reason, left, right, config) is Err(_))
+  let with_reason = must_decisions(
+    "action,left_id,right_id,reason\naccept,L1,R1,manual exception\n",
+  )
+  let result = match apply_decisions(base, with_reason, left, right, config) {
+    Ok(value) => value
+    Err(_) => {
+      assert_true(false)
+      base
+    }
+  }
+  assert_true(result.pairs[0].is_override)
+}
+
+///|
+test "accepting_a_qualified_competing_candidate_is_not_an_override" {
+  let left = must_csv("id,value\nA,same\n", "left")
+  let right = must_csv("id,value\nB,same\nC,same\n", "right")
+  let config = must_config(candidates=true)
+  let base = compare_tables(left, right, config)
+  let mut alternative = ""
+  for candidate in base.candidates {
+    match candidate {
+      Json::Object(fields) =>
+        if fields.get("suggested") == Some(Json::boolean(false)) {
+          match fields.get("right_id") {
+            Some(Json::String(id)) => alternative = id
+            _ => ()
+          }
+        }
+      _ => ()
+    }
+  }
+  assert_true(alternative != "")
+  let decisions = must_decisions(
+    "action,left_id,right_id,reason\naccept,L1," +
+    alternative +
+    ",accepted competing qualified candidate\n",
+  )
+  let result = match apply_decisions(base, decisions, left, right, config) {
+    Ok(value) => value
+    Err(_) => {
+      assert_true(false)
+      base
+    }
+  }
+  assert_true(!result.pairs[0].is_override)
+}
+
+///|
 test "rejecting_candidate_keeps_both_rows_pending" {
   let left = must_csv("id,value\nA,same\n", "left")
   let right = must_csv("id,value\nB,same\n", "right")
@@ -167,6 +265,68 @@ test "exact_key_endpoints_are_locked" {
     "action,left_id,right_id,reason\nreject,L1,R1,change\n",
   )
   assert_true(apply_decisions(base, decisions, left, right, config) is Err(_))
+}
+
+///|
+test "exact_key_locks_all_four_review_actions" {
+  let left = must_csv("id,value\nA,old\n", "left")
+  let right = must_csv("id,value\nA,new\n", "right")
+  let config = must_config(key=true)
+  let base = compare_tables(left, right, config)
+  let cases = [
+    "accept,L1,R1,change", "reject,L1,R1,change", "left_unmatched,L1,,change", "right_unmatched,,R1,change",
+  ]
+  for row in cases {
+    let decisions = must_decisions(
+      "action,left_id,right_id,reason\n" + row + "\n",
+    )
+    assert_true(apply_decisions(base, decisions, left, right, config) is Err(_))
+  }
+}
+
+///|
+test "same_action_and_endpoints_with_different_reasons_conflict" {
+  let (left, right, config) = review_fixture()
+  let base = compare_tables(left, right, config)
+  let decisions = must_decisions(
+    "action,left_id,right_id,reason\naccept,L1,R1,verified by finance\naccept,L1,R1,verified by operations\n",
+  )
+  assert_true(apply_decisions(base, decisions, left, right, config) is Err(_))
+  assert_eq(base.pairs.length(), 0)
+}
+
+///|
+test "malformed_ids_and_extra_or_missing_endpoints_are_rejected" {
+  let (left, right, config) = review_fixture()
+  let base = compare_tables(left, right, config)
+  assert_true(
+    parse_decisions(
+      "action,left_id,right_id,reason\naccept,L01,R1,leading zero\n",
+    )
+    is Err(_),
+  )
+  assert_true(
+    parse_decisions(
+      "action,left_id,right_id,reason\nleft_unmatched,L1,R1,extra endpoint\n",
+    )
+    is Err(_),
+  )
+  assert_true(
+    parse_decisions(
+      "action,left_id,right_id,reason\nright_unmatched,L1,,wrong endpoint side\n",
+    )
+    is Err(_),
+  )
+  assert_true(
+    parse_decisions(
+      "action,left_id,right_id,reason\naccept,L1,,missing right endpoint\n",
+    )
+    is Err(_),
+  )
+  let unknown = must_decisions(
+    "action,left_id,right_id,reason\naccept,L1,R2,unknown right record\n",
+  )
+  assert_true(apply_decisions(base, unknown, left, right, config) is Err(_))
 }
 
 ///|

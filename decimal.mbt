@@ -62,7 +62,7 @@ fn decimal_parse(text : String) -> ExactDecimal? {
   if negative {
     coefficient = -coefficient
   }
-  Some(decimal_normalize({ coefficient, scale }))
+  Some(decimal_normalize({ coefficient, scale, }))
 }
 
 ///|
@@ -75,9 +75,9 @@ fn decimal_normalize(value : ExactDecimal) -> ExactDecimal {
     scale -= 1
   }
   if coefficient == @bigint.BigInt::from_int(0) {
-    return { coefficient: @bigint.BigInt::from_int(0), scale: 0 }
+    return { coefficient: @bigint.BigInt::from_int(0), scale: 0, }
   }
-  { coefficient, scale }
+  { coefficient, scale, }
 }
 
 ///|
@@ -96,12 +96,12 @@ fn decimal_align(
 ///|
 fn decimal_add(left : ExactDecimal, right : ExactDecimal) -> ExactDecimal {
   let (a, b, scale) = decimal_align(left, right)
-  decimal_normalize({ coefficient: a + b, scale })
+  decimal_normalize({ coefficient: a + b, scale, })
 }
 
 ///|
 fn decimal_subtract(left : ExactDecimal, right : ExactDecimal) -> ExactDecimal {
-  decimal_add(left, { coefficient: -right.coefficient, scale: right.scale })
+  decimal_add(left, { coefficient: -right.coefficient, scale: right.scale, })
 }
 
 ///|
@@ -127,7 +127,7 @@ fn decimal_compare(left : ExactDecimal, right : ExactDecimal) -> Int {
 ///|
 fn decimal_abs(value : ExactDecimal) -> ExactDecimal {
   if value.coefficient < @bigint.BigInt::from_int(0) {
-    { coefficient: -value.coefficient, scale: value.scale }
+    { coefficient: -value.coefficient, scale: value.scale, }
   } else {
     value
   }

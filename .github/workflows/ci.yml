@@ -3,17 +3,9 @@ name: CI
 # Task 8 requires CI on supported Ubuntu and arm64 macOS runners with a
 # recorded MoonBit toolchain, Node 22, Python 3.12, and the full local gates.
 #
-# The toolchain is PINNED to the version this repository was developed and
-# verified against. `latest` was tried first and failed on both runners: a
-# newer formatter emits trailing commas (`{ weight: 1, }`) that the pinned
-# local formatter does not, so `moon fmt --check` produced a diff and both
-# jobs aborted at the first gate. Pinning keeps CI's formatter identical to
-# the one that produced the committed sources; the cost is that CI no longer
-# detects breakage from newer toolchains, which is a deliberate trade.
-#
-# The official installer takes the version as its sole positional argument
-# (verified against cli.moonbitlang.com/install/unix.sh). The installer digest
-# and the printed tool versions are logged on every run for identification.
+# The official `latest` selector is mutable. Each run records the installer
+# digest, installed version strings, and executable hashes so its toolchain is
+# identifiable. CI runs on disposable hosted runners only.
 
 on:
   push:
@@ -25,9 +17,6 @@ permissions:
   contents: read
 
 env:
-  # Recorded toolchain from docs/dependency-audit.md section 1. This is the
-  # exact version the committed sources were formatted and tested with.
-  MOONBIT_VERSION: "0.1.20260713"
   NODE_VERSION: "22"
   PYTHON_VERSION: "3.12"
 
@@ -66,7 +55,7 @@ jobs:
             https://cli.moonbitlang.com/install/unix.sh \
             -o "$RUNNER_TEMP/moon-install.sh"
           shasum -a 256 "$RUNNER_TEMP/moon-install.sh"
-          bash "$RUNNER_TEMP/moon-install.sh" "$MOONBIT_VERSION"
+          bash "$RUNNER_TEMP/moon-install.sh" latest
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: Record actual toolchain versions
@@ -76,6 +65,7 @@ jobs:
           python --version
           git rev-parse HEAD
           uname -a
+          shasum -a 256 "$HOME/.moon/bin/moon" "$HOME/.moon/bin/moonc"
 
       - name: Build and check core
         run: |
@@ -97,3 +87,6 @@ jobs:
 
       - name: Independent MoonBit library consumer
         run: python3 scripts/check-library-consumer.py
+
+      - name: README acceptance smoke from fresh checkout
+        run: node scripts/readme-smoke.mjs

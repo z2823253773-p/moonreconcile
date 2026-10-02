@@ -70,8 +70,8 @@ test "task3_exact_pair_duplicate_missing_structure_and_conservation" {
 
 ///|
 test "task3_delimiter_key_collision_impossible_and_no_key_pending" {
-  let left = { headers: ["a", "b"], rows: [["x|y", "z"], ["x", "y|z"]] }
-  let right = { headers: ["a", "b"], rows: [["x|y", "z"], ["x", "y|z"]] }
+  let left = { headers: ["a", "b"], rows: [["x|y", "z"], ["x", "y|z"]], }
+  let right = { headers: ["a", "b"], rows: [["x|y", "z"], ["x", "y|z"]], }
   let config = match
     parse_config(
       @json.parse(
@@ -94,8 +94,8 @@ test "task3_delimiter_key_collision_impossible_and_no_key_pending" {
     Err(_) => abort("fixture config invalid")
   }
   let pending = compare_tables(
-    { headers: ["a"], rows: [["1"]] },
-    { headers: ["a"], rows: [["1"]] },
+    { headers: ["a"], rows: [["1"]], },
+    { headers: ["a"], rows: [["1"]], },
     no_key,
   )
   assert_eq(pending.pairs.length(), 0)
@@ -115,16 +115,16 @@ test "task3_equivalent_only_exit_zero_and_unmapped_column_exit_one" {
     Err(_) => abort("fixture config invalid")
   }
   let equal = compare_tables(
-    { headers: ["id", "amount"], rows: [["1", "100.00"]] },
-    { headers: ["id", "amount"], rows: [["1", "100"]] },
+    { headers: ["id", "amount"], rows: [["1", "100.00"]], },
+    { headers: ["id", "amount"], rows: [["1", "100"]], },
     config,
   )
   assert_eq(equal.exit_code, 0)
   assert_eq(equal.pairs[0].fields[0].status, "equivalent_by_rule")
 
   let extra = compare_tables(
-    { headers: ["id", "amount", "other"], rows: [["1", "100.00", "x"]] },
-    { headers: ["id", "amount"], rows: [["1", "100"]] },
+    { headers: ["id", "amount", "other"], rows: [["1", "100.00", "x"]], },
+    { headers: ["id", "amount"], rows: [["1", "100"]], },
     config,
   )
   assert_eq(extra.exit_code, 1)
@@ -143,8 +143,8 @@ test "task3_invalid_typed_and_empty_text_keys_stay_pending" {
     Err(_) => abort("fixture config invalid")
   }
   let invalid = compare_tables(
-    { headers: ["id"], rows: [["NaN"]] },
-    { headers: ["id"], rows: [["NaN"]] },
+    { headers: ["id"], rows: [["NaN"]], },
+    { headers: ["id"], rows: [["NaN"]], },
     decimal_key,
   )
   assert_eq(invalid.pairs.length(), 0)
@@ -162,8 +162,8 @@ test "task3_invalid_typed_and_empty_text_keys_stay_pending" {
     Err(_) => abort("fixture config invalid")
   }
   let empty = compare_tables(
-    { headers: ["id"], rows: [[""]] },
-    { headers: ["id"], rows: [[""]] },
+    { headers: ["id"], rows: [[""]], },
+    { headers: ["id"], rows: [[""]], },
     text_key,
   )
   assert_eq(empty.pairs.length(), 0)
@@ -183,8 +183,8 @@ test "task3_missing_mandatory_source_column_is_fatal" {
     Err(_) => abort("fixture config invalid")
   }
   let result = compare_tables(
-    { headers: ["other"], rows: [["x"]] },
-    { headers: ["right_id"], rows: [["1"]] },
+    { headers: ["other"], rows: [["x"]], },
+    { headers: ["right_id"], rows: [["1"]], },
     config,
   )
   assert_eq(result.exit_code, 2)

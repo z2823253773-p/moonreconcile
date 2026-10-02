@@ -1,6 +1,6 @@
 # 验证记录
 
-本文件只记录实际验证。Tasks 1–7 已各有本地实测记录；Task 8 的文档和 CI 配置已提交，但远端 CI 执行与完整产品验收尚未完成。
+本文件只记录实际验证。Tasks 1–7 的范围审查与本地记录见下文；Task 8 本地 smoke、格式迁移和门禁记录在末尾。D05/D07/D08/D09 仍由最终独立审查、推送和精确 SHA 远端结果决定。
 
 ## Task 1
 
@@ -42,6 +42,8 @@
 
 `summary.key_issue_count` 保留所有键诊断，包括信息性 `no_key_configured` 和 `key_not_found`。这两个代码不单独阻止完全人工复核且无其他问题的运行退出0；重复/缺失/无效键异常、内容差异、无对应和结构问题仍触发退出1。计算历史不完整仍优先退出3。运行目录指纹、文件事务与CLI是Task6，不能由核心复核测试替代。
 
+Task 8 补足 Task 5 初审保留的低严重度回归覆盖：`exact_key_locks_all_four_review_actions` 检验 accept/reject/双侧 unmatched 均不能改动精确键端点；`same_action_and_endpoints_with_different_reasons_conflict` 检验冲突理由原子拒绝；`malformed_ids_and_extra_or_missing_endpoints_are_rejected` 检验规范 ID、已不存在端点与 action 端点形状；新增两类 invalid-value / override 及竞争候选接受断言。Task 5 的生产 101×101 全人工处置仍 incomplete/exit 3/unresolved 0 证据已由 `tests/decisions-oracle.test.mjs` 保留。实现没有修改 Task 5 业务算法。
+
 ## Task 6
 
 初版 `ed0eeba` 的82MoonBit/43Node门禁通过，但[独立审查](evidence/task6-review.md)复现七项文件保护、I/O、回导及显示缺陷。因此初版未验收。修复提交 `4304f75c8fafbde63e2a6be8d88cbfa4a116bea9` 补充先红后绿的回归测试，82MoonBit/53Node通过，七项均在[独立定向复审](evidence/task6-rereview.md)确认修复。
@@ -75,10 +77,14 @@ The baseline build/run commands above were retained as the original comparison i
 
 `BENCH_COMPARE_WITH` requires identical driver bytes, host, Node/Moon versions, generated input hashes, and semantic report hashes. The benchmark now records the effective environment and driver/source identity. Its default output uses a timestamped filename; it refuses to overwrite existing evidence unless explicitly enabled. The historical full matrix is retained unchanged. RSS remains unavailable because `/usr/bin/time -l` emitted no maximum-resident-set line and reported `sysctl kern.clockrate: Operation not permitted`. The configured 100,000-row limit is not a tested capacity claim.
 
-The primary-documentation competitor audit does not establish local competitor execution or comparative benefit. No real customer data or adjudicated real-world truth set was available. Independent review identified the fixture-gate gaps documented above; the fix round is pending re-review.
+The primary-documentation competitor audit does not establish local competitor execution or comparative benefit. No real customer data or adjudicated real-world truth set was available. Task 7's fixture-gate findings are closed by the archived final scoped re-review, which did not repeat the full suite or remote CI.
 
 ## Task 8 configuration
 
-提交 `a0f9310` 增加架构、配置、复核流程和 README，并加入 Ubuntu 24.04 与 macOS 15 的 GitHub Actions 矩阵。随后修订工作流以使用 `actions/checkout@v6`、`actions/setup-node@v6`、`actions/setup-python@v6`、Node 22、Python 3.12 和官方 Unix 安装脚本的 `latest` 路径；历史可下载工具链固定版本未被验证，因此没有伪造固定 pin。工作流会记录安装脚本 SHA、MoonBit 版本、Node/Python 版本、提交 SHA 和 runner 平台。当前仅完成本地等价门禁，尚无远端 Actions run URL 或成功结论。
+提交 `a0f9310` 增加架构、配置、复核流程和 README，并加入 Ubuntu 24.04 与 macOS 15 的 GitHub Actions 矩阵。2026-10-01 远端只读核查发现，run `36739067019`（`8f8970c`）和 `36734569700`（`a0f9310`）均失败：两个 OS job 在旧工具链格式检查时报 diff/exit 255，后续测试未运行。历史 July 工具链固定版本未证明可下载；Task 8 改用官方 `latest` 并以匹配的官方格式化器迁移源文件，不静默跳过 formatter gate。CI 记录脚本 SHA、已安装 `moon`/`moonc` 版本和二进制哈希、Node/Python 版本、提交 SHA 与 runner 平台。两个历史失败结果不代表最终工作流结果。
 
-README 的公开命令和三组示例已在无构建缓存的 `git archive` 检出中复跑通过；独立库消费在本地新鲜 git clone 中通过 84/84。库消费脚本需要正常 checkout 的 `.git` 历史来确定 SHA，因此纯归档目录不作为该脚本的测试环境。这些本地结果不替代两种远端 runner 的验证。真实流程、XLSX、竞品运行和赛事审核仍为未验证事项。
+README 命令由 `scripts/readme-smoke.mjs` 从本地提交创建的新鲜 Git clone 中抽取并执行；逐命令 exit 1/3 由标注决定。独立库消费脚本需要 `.git` 历史来确定 SHA，因此纯归档目录不作为该脚本的测试环境。这些本地结果不替代两种远端 runner 的验证。真实流程、XLSX、竞品运行和赛事审核仍为未验证事项。
+
+## Task 8 local delivery
+
+本节只记录最终干净提交 SHA 上实际执行的命令、版本、测试数和结果。CI 使用官方安装器的 `latest`，其真实远端结果必须关联最终 SHA；提交、推送或排队均不等于 CI 通过。

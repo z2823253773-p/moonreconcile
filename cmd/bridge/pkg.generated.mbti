@@ -11,4 +11,3 @@ pub fn invoke_bridge(String) -> String
 // Type aliases
 
 // Traits
-

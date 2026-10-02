@@ -78,7 +78,7 @@ fn generate_candidates_with_budget(
   let unprocessed_right : Array[Int] = []
   let specs = match config.candidates {
     Json::Object(object) => object
-    _ => return { candidates, issues, unprocessed_left, unprocessed_right }
+    _ => return { candidates, issues, unprocessed_left, unprocessed_right, }
   }
   let fields = match json_array(specs.get("fields")) {
     Some(values) => values
@@ -112,7 +112,7 @@ fn generate_candidates_with_budget(
           ),
         }),
       )
-      return { candidates, issues, unprocessed_left, unprocessed_right }
+      return { candidates, issues, unprocessed_left, unprocessed_right, }
     }
   }
   let pair_left : Array[Int] = []
@@ -635,7 +635,7 @@ fn generate_candidates_with_budget(
             Json::Number(number, ..) => number.to_int()
             _ => 0
           }
-          local_edges.push({ left: li, right: ri, weight: value })
+          local_edges.push({ left: li, right: ri, weight: value, })
         }
         let chosen = solve_assignment(ls.length(), rs.length(), local_edges)
         for pair in chosen {
@@ -665,7 +665,7 @@ fn generate_candidates_with_budget(
       }),
     )
   }
-  { candidates, issues, unprocessed_left, unprocessed_right }
+  { candidates, issues, unprocessed_left, unprocessed_right, }
 }
 
 ///|

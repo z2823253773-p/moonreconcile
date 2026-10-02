@@ -2,7 +2,7 @@
   "label": "synthetic benchmark; end-to-end child CLI compare including CSV parse and report writing; fixture generation/build excluded",
   "recorded_at": "2026-09-30T12:06:46.673Z",
   "tested_sha": "849a92cd3ee09c455f5c0263925fe0a379550ae6",
-  "host": "Darwin HengruideMacBook-Air.local 25.4.0 Darwin Kernel Version 25.4.0: Thu Mar 19 19:33:43 PDT 2026; root:xnu-12377.101.15~1/RELEASE_ARM64_T8142 arm64",
+  "host": "Darwin 25.4.0 arm64; device hostname redacted for public documentation",
   "os": "darwin",
   "cpu": "arm64 architecture; CPU model unavailable (sysctl: sysctl fmt -1 1024 1: Operation not permitted)",
   "node": "v24.15.0",
@@ -347,7 +347,7 @@
     "description": "Same deterministic CSV/config generators and benchmark driver, old source archive 5daf04d and optimized source 849a92c; three separate child CLI runs per size. Output byte counts differ by 26 bytes because run provenance embeds paths under differently named checkouts; semantic outputs and candidate counts match. No universal complexity claim.",
     "baseline_node": "v24.15.0",
     "baseline_moon": "moon 0.1.20260713 (75c7e1f 2026-07-13) ~/.moon/bin/moon\nmoonc v0.10.4+2cc641edf (2026-07-15) ~/.moon/bin/moonc\nmoonrun 0.1.20260713 (75c7e1f 2026-07-13) ~/.moon/bin/moonrun\n\nFeature flags enabled: rr_moon_mod,rr_moon_pkg",
-    "baseline_host": "Darwin HengruideMacBook-Air.local 25.4.0 Darwin Kernel Version 25.4.0: Thu Mar 19 19:33:43 PDT 2026; root:xnu-12377.101.15~1/RELEASE_ARM64_T8142 arm64",
+    "baseline_host": "Darwin 25.4.0 arm64; device hostname redacted for public documentation",
     "comparisons": [
       {
         "case": "sparse-10000",
@@ -442,5 +442,6 @@
         ]
       }
     ]
-  }
+  },
+  "host_redaction_note": "The source benchmark hostname was replaced with a generic Darwin/architecture label for privacy; timing and output observations are unchanged. The original raw JSON is retained in ignored task scratch and pre-redaction Git history."
 }

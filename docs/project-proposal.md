@@ -1,10 +1,12 @@
 # MoonReconcile 项目策划书
 
-更新日期：2026-09-30  
+更新日期：2026-10-02
 状态：**首个可运行版本已完成；本文区分已交付软件、合成验证和仍待核查的真实需求。**
 项目仓库：[z2823253773-p/moonreconcile](https://github.com/z2823253773-p/moonreconcile)。公开仓库已创建，代码交付和远端验证状态以实际提交及 CI 证据为准。
 
-本项目按[规格](spec.md)与[实施计划](plans/2026-09-30-table-reconcile.md)实现；逐项结果登记在[验收矩阵](acceptance-matrix.md)。Task 1–7 的本地软件门禁已经完成，Task 8 的公开文档和 CI 配置已经提交；远端 CI、真实用户采用、XLSX 适配和赛事审核仍没有证据。
+本项目按[规格](spec.md)与[实施计划](plans/2026-09-30-table-reconcile.md)实现；逐项结果登记在[验收矩阵](acceptance-matrix.md)。Tasks 1–7 已实现并通过各自范围的本地审查。Task 8 已补齐 README smoke、工具链格式迁移及本地门禁；远端最终 SHA 的 CI、真实用户采用、CSV/XLSX 适配和赛事审核仍无证据。官方十月规则来源及其与仓库主分支的时间差，见[2026-10-01 核查记录](evidence/official-requirements-2026-10-01.md)。
+
+可复制编辑的一页项目说明草稿见 [`project-description-one-page.md`](project-description-one-page.md)。提交或对外使用前由项目所有者核实事实并按实际要求修改；本仓库未提交任何报名表。
 
 ## 1. 要解决的问题
 
@@ -36,10 +38,10 @@ MoonReconcile 提供一个可复用的 MoonBit 核心与命令行入口，将**�
 已实现的命令如下；实际门禁和未覆盖范围以 README 与验收记录为准：
 
 ```sh
-reconcile init-config left.csv right.csv --out rules.json
-reconcile check-config rules.json
-reconcile compare left.csv right.csv --config rules.json --out run-001
-reconcile resolve run-001 --decisions reviewed.csv --out run-001-reviewed
+node cli/main.mjs init-config left.csv right.csv --out rules.json
+node cli/main.mjs check-config rules.json
+node cli/main.mjs compare left.csv right.csv --config rules.json --out run-001
+node cli/main.mjs resolve run-001 --decisions reviewed.csv --out run-001-reviewed
 ```
 
 `init-config` 生成待填写模板，不猜类型或主键。`check-config` 检查内部一致性；真实输入列和键唯一性在 `compare` 中检查。
@@ -100,7 +102,7 @@ paired + unmatched + pending_review + unprocessed = 输入记录数
 | 7. 场景与规模 | 三组完整合成流程、可复现实测 | 1000/10000 行精确核对和不同候选密度；记录环境、时间、内存可得性及输出大小 |
 | 8. 交付 | 文档、许可证、CI、公开代码与策划书 | 干净检出复跑、精确提交 SHA、远端 CI 和仓库可见性证据 |
 
-[验收矩阵](acceptance-matrix.md)按规格逐项登记。初始状态为 `pending`；只有已有证据并能定位到提交和命令时才改为通过。配置预算不代表已测吞吐能力，本策划书不提供未经测量的性能数字。
+[验收矩阵](acceptance-matrix.md)保留全部规格 ID，并逐项链接命名断言和验证证据。配置预算不代表已测吞吐能力；本策划书仅引用留存的本机合成基准观察。
 
 ## 7. 资源边界与风险
 
@@ -118,3 +120,15 @@ CSV 是首个入口，但真实流程是否可无损导出仍未验证。若仅�
 首版不处理拆合单、自动学习权重、猜列或主键、远程数据库、多人协作、源表改写、任意时区和公式重算。指纹用于识别过期或不一致材料，不提供抗恶意篡改认证。公共代码交付、测试通过、真实用户验收、赛事重审通过和获奖是不同事实。
 
 赛事时间及资格以当前官方要求和组委会回复为准。本项目策划及实现不能保证审核结果；后续宣传只能描述有对应证据的已交付能力。
+
+## 8. 已实现测量及其边界
+
+Task 7 的本地测量记录在 [`docs/evidence/task7-benchmark.json`](evidence/task7-benchmark.json)，环境、退出语义和对照限制见 [`docs/validation.md`](validation.md)。主机为 Darwin 25.4.0 arm64、Node v24.15.0、Moon 0.1.20260713 / moonc v0.10.4+2cc641edf。精确 1k/10k 行每侧耗时分别为 125.839/342.846 ms。稀疏候选 10k/30k 行每侧中位耗时为 297.867/726.061 ms，候选数为 10k/30k。密集 101×101 分量以退出 3 标记 `candidate_component_limit_exceeded`；1001×100 以退出 3 标记 `candidate_pair_budget_exceeded`。`/usr/bin/time -l` 未报告子进程峰值 RSS，并出现系统调用权限错误，因此内存记录为不可用。
+
+这些数字是单机合成样例观察，不是吞吐承诺或支持容量。catalog 合成真值故意把最高分建议指向错误记录，以展示复核风险，不能外推为人群准确率。优化前后对照只支持留存的两个同驱动稀疏样例报告语义一致，不能证明更广泛的准确性或用户效益。
+
+## 9. 十月增量与继续标准
+
+不将九月已有代码重写日期称为十月新成果。十月持续工作从 `f892db50f64faf9128b6cc2316bfc0c6947535bf` 开始，后续提交关闭了 Task 7 的工作流证据、完整决定导出校验和基准复现缺口；Task 8 增补 README 可执行 smoke、当前规则来源、CI 工具链格式一致性和逐项验收证据。代码史与本地/远端状态按真实提交呈现。仓库代码和 CI 结果不构成赛事提交、组委会同意计入既有工作或真实业务采用。
+
+继续投入前需要获得一个经许可且可复现的真实表格流程，记录输入规模、现有步骤和误配代价；验证 CSV 导出能否无损保留关键值，若工作流依赖 XLSX 则另做入口范围评估；再用相同数据与基线工具比较设置成本、复核量和错误类型。如果现有工具已便捷完成且本项目无可观察收益，应停止独立功能扩展并评估贡献既有工具。

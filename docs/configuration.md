@@ -2,7 +2,7 @@
 
 创建日期：2026-09-30
 
-状态：**开发中。** 本文的每条规则都对应 [`config.mbt`](../config.mbt) 中的实际校验分支；文中所有错误信息与实测输出一致。未实现的选项在末尾列出。
+状态：**首版规则合同。** 本文描述当前 [`config.mbt`](../config.mbt) 中已实现的配置行为。候选评分必须显式声明；没有配置键、或剩余记录未落入键时出现的信息性诊断，不会仅凭 `key_issue_count` 强制退出 1。
 
 相关文档：[架构说明](architecture.md)、[复核流程](review-workflow.md)、[实施计划](plans/2026-09-30-table-reconcile.md)（"Config v1" 为权威契约）。
 

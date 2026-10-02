@@ -663,7 +663,7 @@ fn parse_config(json : Json) -> Result[Config, EngineError] {
             ),
           )
       }
-      Ok({ fields, key, ignore_left, ignore_right, candidates })
+      Ok({ fields, key, ignore_left, ignore_right, candidates, })
     }
     _ => Err(config_error("config must be a JSON object"))
   }

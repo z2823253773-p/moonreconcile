@@ -115,3 +115,7 @@ This was a primary-documentation review, not an installation or execution compar
 | [Python Record Linkage Toolkit 0.15 docs](https://recordlinkage.readthedocs.io/en/latest/) | A staged record-linkage API documents preprocessing, pair indexing, feature comparison, classification, annotation/manual labeling and evaluation metrics. | Official project documentation, docs version 0.15 | Not installed or run; exact fit, operational friction, output/report behavior, and accuracy on these fixtures unknown. |
 
 This table identifies relevant documented areas; it does not establish that this project fills an ecosystem gap or outperforms any of these tools. The fixture-only JavaScript baseline is separately scoped and must not be conflated with these named products.
+
+## Task 8 CI toolchain route
+
+The workflow uses the official Unix installer with the mutable `latest` selector because the historical July version URL was not verified as available (the endpoint returned HTTP 403). CI logs the installer SHA-256, `moon`/`moonc` version output, executable hashes, runner architecture, and actual Node/Python versions for each run. It runs only on disposable GitHub hosted runners. Local formatting and final local gates used the preexisting isolated official MoonBit distribution `0.1.20260920` / `moonc v0.10.14+7d59c7ec9`, under process-scoped `MOON_HOME`/`PATH`; the user's global toolchain was not changed. `latest` may move, so these logs identify the actual compiler resolved for a run rather than promising an immutable pin.

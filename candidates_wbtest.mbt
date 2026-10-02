@@ -10,8 +10,8 @@ test "task4_candidate_all_pairs_fixed_denominator_and_pending_suggestion" {
     Err(_) => abort("candidate fixture invalid")
   }
   let result = compare_tables(
-    { headers: ["a", "b"], rows: [["x", "u"]] },
-    { headers: ["a", "b"], rows: [["x", "v"]] },
+    { headers: ["a", "b"], rows: [["x", "u"]], },
+    { headers: ["a", "b"], rows: [["x", "v"]], },
     config,
   )
   assert_eq(result.status, "complete")
@@ -26,9 +26,9 @@ test "task4_candidate_all_pairs_fixed_denominator_and_pending_suggestion" {
 ///|
 test "task4_assignment_max_weight_partial_not_greedy" {
   let pairs = solve_assignment(2, 2, [
-    { left: 0, right: 0, weight: 9000 },
-    { left: 0, right: 1, weight: 8000 },
-    { left: 1, right: 0, weight: 8000 },
+    { left: 0, right: 0, weight: 9000, },
+    { left: 0, right: 1, weight: 8000, },
+    { left: 1, right: 0, weight: 8000, },
   ])
   assert_eq(pairs.length(), 2)
   assert_eq(pairs[0].left + pairs[1].left, 1)
@@ -48,8 +48,8 @@ test "task4_blocking_or_and_deduplicates_pairs_and_ignores_missing_keys" {
     Err(_) => abort("candidate fixture invalid")
   }
   let stage = generate_candidates_with_budget(
-    { headers: ["a", "b"], rows: [["x", "k"], ["y", "m"], ["", "z"]] },
-    { headers: ["a", "b"], rows: [["x", "k"], ["y", "n"], ["q", "z"]] },
+    { headers: ["a", "b"], rows: [["x", "k"], ["y", "m"], ["", "z"]], },
+    { headers: ["a", "b"], rows: [["x", "k"], ["y", "n"], ["q", "z"]], },
     [1, 2, 3],
     [1, 2, 3],
     config,
@@ -133,8 +133,8 @@ test "task4_edit_score_uses_unicode_codepoints_and_invalid_typed_score_is_null" 
     Err(_) => abort("candidate fixture invalid")
   }
   let result = compare_tables(
-    { headers: ["amount"], rows: [["NaN"]] },
-    { headers: ["amount"], rows: [["1"]] },
+    { headers: ["amount"], rows: [["NaN"]], },
+    { headers: ["amount"], rows: [["1"]], },
     config,
   )
   let json = result_to_json(result).stringify()
@@ -154,8 +154,8 @@ test "task4_qualified_component_limit_does_not_apply_to_pre_score_graph" {
     Ok(value) => value
     Err(_) => abort("candidate fixture invalid")
   }
-  let left = { headers: ["name"], rows: [["same"], ["same"]] }
-  let right = { headers: ["name"], rows: [["same"], ["same"]] }
+  let left = { headers: ["name"], rows: [["same"], ["same"]], }
+  let right = { headers: ["name"], rows: [["same"], ["same"]], }
   let stage = generate_candidates_with_budget(
     left,
     right,
@@ -191,15 +191,15 @@ test "task4_scoring_admission_is_component_atomic_and_budget_remains_for_later_w
     Ok(value) => value
     Err(_) => abort("candidate fixture invalid")
   }
-  let left = { headers: ["block", "name"], rows: [["a", "cat"], ["b", "z"]] }
-  let right = { headers: ["block", "name"], rows: [["a", "cat"], ["b", "z"]] }
+  let left = { headers: ["block", "name"], rows: [["a", "cat"], ["b", "z"]], }
+  let right = { headers: ["block", "name"], rows: [["a", "cat"], ["b", "z"]], }
   let stage = generate_candidates_with_budget(
     left,
     right,
     [1, 2],
     [1, 2],
     config,
-    { pairs: 2, edit_cells: 1, max_component_side: 10, max_edit_codepoints: 2 },
+    { pairs: 2, edit_cells: 1, max_component_side: 10, max_edit_codepoints: 2, },
   )
   assert_eq(stage.candidates.length(), 2)
   assert_eq(stage.issues.length(), 1)
@@ -229,8 +229,8 @@ test "task4_edit_codepoint_limit_513_marks_whole_component_unprocessed" {
   }
   let long = String::from_array(Array::make(513, 'x'))
   let stage = generate_candidates_with_budget(
-    { headers: ["name"], rows: [[long]] },
-    { headers: ["name"], rows: [[long]] },
+    { headers: ["name"], rows: [[long]], },
+    { headers: ["name"], rows: [[long]], },
     [1],
     [1],
     config,
@@ -253,14 +253,14 @@ test "task4_edit_codepoint_limit_513_marks_whole_component_unprocessed" {
 ///|
 test "task4_assignment_leaves_rows_unmatched_and_prefers_total_weight" {
   let high = solve_assignment(2, 2, [
-    { left: 0, right: 0, weight: 10000 },
-    { left: 0, right: 1, weight: 4000 },
-    { left: 1, right: 0, weight: 4000 },
+    { left: 0, right: 0, weight: 10000, },
+    { left: 0, right: 1, weight: 4000, },
+    { left: 1, right: 0, weight: 4000, },
   ])
   assert_eq(high.length(), 1)
   assert_eq(high[0].weight, 10000)
   assert_eq(solve_assignment(2, 2, []).length(), 0)
-  let unequal = solve_assignment(1, 3, [{ left: 0, right: 2, weight: 7000 }])
+  let unequal = solve_assignment(1, 3, [{ left: 0, right: 2, weight: 7000, }])
   assert_eq(unequal.length(), 1)
   assert_eq(unequal[0].right, 2)
 }
@@ -304,8 +304,8 @@ test "task4_256_max_weight_fields_use_wide_aggregate_arithmetic" {
     Err(_) => abort("256-field candidate fixture invalid")
   }
   let result = compare_tables(
-    { headers, rows: [values] },
-    { headers, rows: [values] },
+    { headers, rows: [values], },
+    { headers, rows: [values], },
     config,
   )
   assert_eq(result.candidates.length(), 1)
@@ -329,8 +329,8 @@ test "task4_edit_cell_budget_exact_boundary_succeeds_and_one_over_fails" {
     Err(_) => abort("candidate fixture invalid")
   }
   let text = String::from_array(Array::make(512, 'x'))
-  let left = { headers: ["name"], rows: [[text]] }
-  let right = { headers: ["name"], rows: [[text]] }
+  let left = { headers: ["name"], rows: [[text]], }
+  let right = { headers: ["name"], rows: [[text]], }
   let exact = generate_candidates_with_budget(left, right, [1], [1], config, {
     pairs: 1,
     edit_cells: 512 * 512,
@@ -367,7 +367,7 @@ test "task4_qualified_size_limit_is_per_component_and_exact_limit_succeeds" {
     headers: ["block", "name"],
     rows: [["a", "x"], ["a", "x"], ["b", "y"]],
   }
-  let right = { headers: ["block", "name"], rows: [["a", "x"], ["b", "y"]] }
+  let right = { headers: ["block", "name"], rows: [["a", "x"], ["b", "y"]], }
   let stage = generate_candidates_with_budget(
     left,
     right,
@@ -426,8 +426,8 @@ test "task4_records_outside_blocking_coverage_remain_pending_with_explanation" {
     Err(_) => abort("candidate fixture invalid")
   }
   let result = compare_tables(
-    { headers: ["block", "name"], rows: [["", "x"]] },
-    { headers: ["block", "name"], rows: [["a", "x"]] },
+    { headers: ["block", "name"], rows: [["", "x"]], },
+    { headers: ["block", "name"], rows: [["a", "x"]], },
     config,
   )
   assert_eq(result.candidates.length(), 0)

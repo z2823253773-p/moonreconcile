@@ -317,5 +317,5 @@ fn parse_csv(text : String, side : String) -> Result[CsvTable, EngineError] {
     }
     data_rows.push(data_row)
   }
-  Ok({ headers, rows: data_rows })
+  Ok({ headers, rows: data_rows, })
 }

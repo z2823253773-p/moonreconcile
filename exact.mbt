@@ -513,7 +513,7 @@ fn compare_tables_with_budget(
       left, right, pending_left_records, pending_right_records, config, budget,
     )
   } else {
-    { candidates: [], issues: [], unprocessed_left: [], unprocessed_right: [] }
+    { candidates: [], issues: [], unprocessed_left: [], unprocessed_right: [], }
   }
   let candidate_incomplete = !candidate_stage.unprocessed_left.is_empty() ||
     !candidate_stage.unprocessed_right.is_empty()

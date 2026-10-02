@@ -5,49 +5,49 @@
   "benchmark_driver_sha256": "7efc29b91ec5e4ea18bd381155eacc1f9560c06000cf33672228f0049fad2c93",
   "driver_argv": [
     "/usr/local/bin/node",
-    "/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile/scripts/benchmark.mjs"
+    "$REPO/scripts/benchmark.mjs"
   ],
-  "driver_working_directory": "/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile",
+  "driver_working_directory": "$REPO",
   "engine_worktrees": {
-    "baseline": "/private/tmp/moonreconcile-task7-before",
-    "optimized": "/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile"
+    "baseline": "$TMPDIR/moonreconcile-task7-before",
+    "optimized": "$REPO"
   },
-  "host": "Darwin HengruideMacBook-Air.local 25.4.0 Darwin Kernel Version 25.4.0: Thu Mar 19 19:33:43 PDT 2026; root:xnu-12377.101.15~1/RELEASE_ARM64_T8142 arm64",
+  "host": "Darwin 25.4.0 arm64",
   "os": "darwin",
   "cpu": "arm64 architecture; CPU model unavailable (sysctl: sysctl fmt -1 1024 1: Operation not permitted)",
   "node": "v24.15.0",
   "moon": "moon 0.1.20260713 (75c7e1f 2026-07-13) ~/.moon/bin/moon\nmoonc v0.10.4+2cc641edf (2026-07-15) ~/.moon/bin/moonc\nmoonrun 0.1.20260713 (75c7e1f 2026-07-13) ~/.moon/bin/moonrun\n\nFeature flags enabled: rr_moon_mod,rr_moon_pkg",
   "effective_environment": {
     "baseline": {
-      "BENCH_ROOT": "/private/tmp/moonreconcile-task7-before",
+      "BENCH_ROOT": "$TMPDIR/moonreconcile-task7-before",
       "BENCH_SHA": "5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9",
       "BENCH_CASES": "sparse-10000,sparse-30000",
       "BENCH_REPEATS": "1",
-      "BENCH_OUTPUT": "/private/tmp/task7-fixwave-baseline.json",
+      "BENCH_OUTPUT": "$TMPDIR/task7-fixwave-baseline.json",
       "BENCH_COMPARE_WITH": null,
       "BENCH_ALLOW_OVERWRITE": null
     },
     "optimized": {
-      "BENCH_ROOT": "/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile",
+      "BENCH_ROOT": "$REPO",
       "BENCH_SHA": null,
       "BENCH_CASES": "sparse-10000,sparse-30000",
       "BENCH_REPEATS": "1",
-      "BENCH_OUTPUT": "/private/tmp/task7-fixwave-optimized.json",
-      "BENCH_COMPARE_WITH": "/private/tmp/task7-fixwave-baseline.json",
+      "BENCH_OUTPUT": "$TMPDIR/task7-fixwave-optimized.json",
+      "BENCH_COMPARE_WITH": "$TMPDIR/task7-fixwave-baseline.json",
       "BENCH_ALLOW_OVERWRITE": null
     }
   },
   "baseline_preparation_commands": [
-    "mkdir -p /private/tmp/moonreconcile-task7-before",
-    "git archive 5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 | tar -x -C /private/tmp/moonreconcile-task7-before",
-    "cd /private/tmp/moonreconcile-task7-before && npm run build"
+    "mkdir -p $TMPDIR/moonreconcile-task7-before",
+    "git archive 5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 | tar -x -C $TMPDIR/moonreconcile-task7-before",
+    "cd $TMPDIR/moonreconcile-task7-before && npm run build"
   ],
   "optimized_clean_checkout_replay_instruction": "From the clean optimized Task 7 source root, run npm run build before the optimized_run_command. This is a replay prerequisite added after the retained comparison; it was not part of the historical optimized invocation, whose checkout already had _build available.",
   "driver_hash_scope_note": "The retained driver hash identifies the historical comparison invocation and is unchanged. Task 7 fix round 2 changes the current benchmark driver, so a replay will produce new comparison records and hashes.",
-  "baseline_run_command": "BENCH_ROOT=/private/tmp/moonreconcile-task7-before BENCH_SHA=5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_OUTPUT=/private/tmp/task7-fixwave-baseline.json node /Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile/scripts/benchmark.mjs",
-  "optimized_run_command": "BENCH_ROOT=/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_COMPARE_WITH=/private/tmp/task7-fixwave-baseline.json BENCH_OUTPUT=/private/tmp/task7-fixwave-optimized.json node /Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile/scripts/benchmark.mjs",
+  "baseline_run_command": "BENCH_ROOT=$TMPDIR/moonreconcile-task7-before BENCH_SHA=5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_OUTPUT=$TMPDIR/task7-fixwave-baseline.json node $REPO/scripts/benchmark.mjs",
+  "optimized_run_command": "BENCH_ROOT=$REPO BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_COMPARE_WITH=$TMPDIR/task7-fixwave-baseline.json BENCH_OUTPUT=$TMPDIR/task7-fixwave-optimized.json node $REPO/scripts/benchmark.mjs",
   "comparison": {
-    "baseline_file": "/private/tmp/task7-fixwave-baseline.json",
+    "baseline_file": "$TMPDIR/task7-fixwave-baseline.json",
     "baseline_tested_sha": "5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9",
     "current_tested_sha": "53ea36894ee8b870944baf0a2ac3c0bb11fba50b",
     "baseline_driver_sha256": "7efc29b91ec5e4ea18bd381155eacc1f9560c06000cf33672228f0049fad2c93",
@@ -103,5 +103,6 @@
       "optimized_exit": 1
     }
   ],
-  "limits": "Semantic report hashes and input hashes match for both sizes. Output byte counts differ by 26 bytes because provenance includes checkout-specific paths. One timing observation per size is only a focused reproducibility check, not a fresh performance estimate. Child RSS remains unavailable in this macOS sandbox."
+  "limits": "Semantic report hashes and input hashes match for both sizes. Output byte counts differ by 26 bytes because provenance includes checkout-specific paths. One timing observation per size is only a focused reproducibility check, not a fresh performance estimate. Child RSS remains unavailable in this macOS sandbox.",
+  "paths_redacted_note": "Host and checkout-specific path strings are sanitized placeholders, not verbatim raw invocation or hostname. $REPO and $TMPDIR show the path roles; shell commands are normalized for portability and were not executed in this spelling. The original raw JSON remains retained in ignored task scratch and in the pre-redaction Git history. Measurement values, source SHAs, input hashes, report hashes, and historical driver hash are unchanged."
 }

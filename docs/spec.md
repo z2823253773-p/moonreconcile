@@ -1,7 +1,7 @@
 # 表格对账与差异解释工具：设计稿 v2
 
-初稿日期：2026-09-29；本次修订：2026-09-30  
-状态：按用户反馈修订的产品规格；尚未实现，需求与性能待验证。本文不是已完成成果说明，也不代表通过赛事初审。
+初稿日期：2026-09-29；本次修订：2026-10-02
+状态：实现合同与产品边界。Tasks 1–7 的实现及各自范围验收已完成；Task 8 的本地文档、格式迁移与 README smoke 已交付。最终 SHA 的远端 CI、真实流程与 XLSX 适配仍未验证。本文不表示赛事报名或通过审核。
 
 ## 1. 产品目标与本次修改
 
@@ -152,14 +152,15 @@ CSV 解析优先评估复用 NyaCSV；先实际验证畸形输入、引号和换
 
 运行的 `complete/incomplete` 仅表示计算是否完成，不表示人工复核已结束。汇总同时报告计算覆盖、未解决记录、字段问题与结构问题；存在待复核时不得展示“全部对账完成”。人工确认无对应仍属于需要呈现的业务差异，不能因为已有决定就从差异总数中消失。
 
-拟议命令接口（尚未实现）：
+已实现的命令接口（公开入口为 `node cli/main.mjs`，仓库内可执行文件名不是 `reconcile`）：
 
 ```sh
-reconcile init-config left.csv right.csv --out rules.json
-reconcile check-config rules.json
-reconcile compare left.csv right.csv --config rules.json --out run-001
-reconcile resolve run-001 --decisions reviewed.csv --out run-001-reviewed
+node cli/main.mjs init-config left.csv right.csv --out rules.json
+node cli/main.mjs check-config rules.json
+node cli/main.mjs compare left.csv right.csv --config rules.json --out run-001
+node cli/main.mjs resolve run-001 --decisions reviewed.csv --out run-001-reviewed
 ```
+
 
 `init-config` 仅生成待填写的映射模板，不自动断言主键或类型。`check-config` 检查配置语法与内部一致性；涉及真实列名、输入类型和键唯一性的检查在 `compare` 中完成。
 
@@ -197,17 +198,15 @@ MoonBit 核心负责配置模型、规则、候选、分配、决策校验和报
 
 ## 11. 时间与提交边界
 
-前序于 2026-09-28 至 29 日查阅的赛事页面/源码将九月赛报名与验收截止日列为 9 月 30 日。用户收到的邮件允许在 9 月 30 日前修改材料重审，没有承诺开发延期；后续赛期资格和特殊安排需以组委会明确回复为准。
+前序于 2026-09-28 至 29 日查阅的赛事页面/源码记录的是九月批次，截止日为 9 月 30 日。用户当前目标为十月批次。2026-10-01 实际部署页面的规则、资源哈希及与 GitHub main 源码日期不一致的说明，见 [`docs/evidence/official-requirements-2026-10-01.md`](evidence/official-requirements-2026-10-01.md)。本项目文档不声称已报名、已获准将旧代码计入十月、已通过验收或获奖。
 
-本项目仍处于设计阶段。不能把本文拟议功能写成已经实现，也不能靠压到百行小表来宣称完成成熟工具。下一步按风险顺序推进：真实样例与依赖探针 → 精确对应和类型规则 → 决定回导 → 剩余候选与分配 → 三场景演示与规模实测 → 文档和发布。
-
-初审风险主要仍在真实需求、相对现有工具的价值、功能是否实际闭环以及赛事时间。完整工作流能够回应“功能太薄”的疑虑，但不能保证审核结果。
+软件已有六阶段实现和三个合成端到端示例；公开交付仍需精确 SHA 的远端 CI 与最终独立审查。真实流程、相对现有工具的可观察收益、CSV/XLSX 适配和赛事审核仍是未决风险。完整工作流说明交付范围，不能保证审核结果。
 
 ## 12. 来源与证据状态
 
 以下为前序调研来源或进一步核查入口，本次规格修订未重新运行这些项目。包页面会变化，实施时需固定实际依赖版本并复核能力。来源证明现有工具和赛事信息，不证明本项目已实现或存在独占需求。
 
-- [官方赛事页面](https://moonbitlang.github.io/Hackathon2026/) 与 [页面源码](https://github.com/moonbitlang/Hackathon2026/blob/main/src/App.tsx)：前序查阅的方向、要求和时间信息。
+- [官方赛事页面](https://moonbitlang.github.io/Hackathon2026/) 与 [页面源码](https://github.com/moonbitlang/Hackathon2026/blob/main/src/App.tsx)：源码主分支只代表其提交时内容；十月当前部署核查另见 [2026-10-01 证据记录](evidence/official-requirements-2026-10-01.md)。
 - [MoonRow 0.1.0](https://mooncakes.io/docs/JingLan0v0/moonrow@0.1.0)：前序查阅的精确键 CSV 比较能力。
 - [NyaCSV](https://mooncakes.io/docs/moonbit-community/NyaCSV)：CSV 解析候选依赖；仍需接口与错误路径探针。
 - [MoonVerity](https://mooncakes.io/docs/Wchwch777/moonverity)：数据契约和质量检查的相邻工具。
