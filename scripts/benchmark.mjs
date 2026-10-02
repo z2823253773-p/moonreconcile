@@ -76,4 +76,4 @@ if(process.env.BENCH_COMPARE_WITH){
 const stamp=new Date().toISOString().replaceAll(':','-');
 const destination=process.env.BENCH_OUTPUT?path.resolve(process.env.BENCH_OUTPUT):path.join(root,'docs/evidence',`task7-benchmark-${stamp}.json`);
 try{await fs.access(destination);if(process.env.BENCH_ALLOW_OVERWRITE!=='1')throw new Error(`refusing to overwrite existing benchmark evidence: ${destination}; set BENCH_ALLOW_OVERWRITE=1 explicitly`);}catch(error){if(error.code!=='ENOENT')throw error;}
-await fs.writeFile(destination,`${JSON.stringify(record,null,2)}\n`,{flag:'wx'});console.log(`wrote ${results.length} observations to ${destination}; temporary inputs/runs: ${tmp}`);
+await fs.writeFile(destination,`${JSON.stringify(record,null,2)}\n`,{flag:process.env.BENCH_ALLOW_OVERWRITE==='1'?'w':'wx'});console.log(`wrote ${results.length} observations to ${destination}; temporary inputs/runs: ${tmp}`);

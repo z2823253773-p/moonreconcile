@@ -186,17 +186,29 @@ function assertExportMatchesReport(exportName, rows, report) {
     const records = report.records.filter((record) => record.status === 'pending_review' || record.status === 'unprocessed');
     assert.deepEqual(body, records.map((record) => [record.side, record.id, String(record.record), record.status, record.reason]));
   } else if (exportName === 'decisions') {
+    const expectedRows = [];
+    const seenRows = new Set();
+    const seenPairs = new Set();
+    const appliedRecords = new Set();
+    const addExpected = (row) => {
+      const key = JSON.stringify(row);
+      if (!seenRows.has(key)) { seenRows.add(key); expectedRows.push(row); }
+    };
     for (const decision of report.decisions) {
-      const wanted = [decision.action, decision.left_id ?? '', decision.right_id ?? '', decision.reason ?? ''];
-      assert.ok(body.some((row) => JSON.stringify(row) === JSON.stringify(wanted)), `decisions.csv omitted ${decision.action} for ${decision.left_id ?? decision.right_id}`);
+      addExpected([decision.action, decision.left_id ?? '', decision.right_id ?? '', decision.reason ?? '']);
+      if (decision.action !== 'reject') {
+        if (decision.left_id) appliedRecords.add(decision.left_id);
+        if (decision.right_id) appliedRecords.add(decision.right_id);
+      }
+      if (decision.left_id && decision.right_id) seenPairs.add(JSON.stringify([decision.left_id, decision.right_id]));
     }
     for (const candidate of report.candidates.filter((item) => item.suggested)) {
-      const alreadyDecided = report.decisions.some((decision) => decision.left_id === candidate.left_id && decision.right_id === candidate.right_id);
-      if (!alreadyDecided) assert.ok(body.some((row) => row[0] === '' && row[1] === candidate.left_id && row[2] === candidate.right_id), `decisions.csv omitted suggested pair row ${candidate.left_id}/${candidate.right_id}`);
+      if (!seenPairs.has(JSON.stringify([candidate.left_id, candidate.right_id]))) addExpected(['', candidate.left_id, candidate.right_id, '']);
     }
     for (const record of report.records.filter((item) => item.status === 'pending_review' || item.status === 'unprocessed')) {
-      assert.ok(body.some((row) => row[0] === '' && (record.side === 'left' ? row[1] === record.id : row[2] === record.id)), `decisions.csv omitted blank review row for ${record.id}`);
+      if (!appliedRecords.has(record.id)) addExpected(record.side === 'left' ? ['', record.id, '', ''] : ['', '', record.id, '']);
     }
+    assert.deepEqual(body, expectedRows, 'decisions.csv must exactly match cumulative decision, suggestion and unresolved templates');
   }
 }
 
@@ -442,6 +454,14 @@ async function runMutationChecks(sourceDirectory, context) {
   }
 }
 
+async function runDecisionMutationCheck(name, sourceDirectory, context, appendedRow) {
+  const directory = path.join(temporaryRoot, `mutation-${name}`);
+  await fs.cp(sourceDirectory, directory, { recursive: true });
+  await fs.appendFile(path.join(directory, 'decisions.csv'), `${appendedRow}\n`);
+  await assert.rejects(validateRun(directory, context), /decisions\.csv/, `${name} mutation must be rejected`);
+  console.log(`mutation rejected: ${name}`);
+}
+
 for (const name of examples) {
   const base = path.join(root, 'examples', name);
   const leftBytes = readFileSync(path.join(base, 'left.csv'));
@@ -512,6 +532,8 @@ for (const name of examples) {
   assert.equal(result.code, resolvedExpected.exitCode, `${name} replay failed: ${result.stderr}`);
   const replayed = await validateRun(replayDir, context(resolvedExpected));
   assert.deepEqual(replayed.report, after.report, `${name} resolve replay semantic report changed`);
+  if (name === 'catalog') await runDecisionMutationCheck('extra-applied-decision', compareDir, context(compareExpected), 'accept,L1,R2,unexpected exported acceptance');
+  if (name === 'orders') await runDecisionMutationCheck('phantom-review-row', replayDir, context(resolvedExpected), ',L999,,phantom review row');
   console.log(`${name}: compare/resolve/replay passed with fixture identities, complete exports and conservation`);
 }
-console.log(`Synthetic workflows and five mutation checks passed. Temporary outputs: ${temporaryRoot}`);
+console.log(`Synthetic workflows and seven mutation checks passed. Temporary outputs: ${temporaryRoot}`);

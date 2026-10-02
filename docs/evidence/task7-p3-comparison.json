@@ -42,6 +42,8 @@
     "git archive 5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 | tar -x -C /private/tmp/moonreconcile-task7-before",
     "cd /private/tmp/moonreconcile-task7-before && npm run build"
   ],
+  "optimized_clean_checkout_replay_instruction": "From the clean optimized Task 7 source root, run npm run build before the optimized_run_command. This is a replay prerequisite added after the retained comparison; it was not part of the historical optimized invocation, whose checkout already had _build available.",
+  "driver_hash_scope_note": "The retained driver hash identifies the historical comparison invocation and is unchanged. Task 7 fix round 2 changes the current benchmark driver, so a replay will produce new comparison records and hashes.",
   "baseline_run_command": "BENCH_ROOT=/private/tmp/moonreconcile-task7-before BENCH_SHA=5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_OUTPUT=/private/tmp/task7-fixwave-baseline.json node /Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile/scripts/benchmark.mjs",
   "optimized_run_command": "BENCH_ROOT=/Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_COMPARE_WITH=/private/tmp/task7-fixwave-baseline.json BENCH_OUTPUT=/private/tmp/task7-fixwave-optimized.json node /Users/henryz/Desktop/\u6bd4\u8d5b/moonreconcile/scripts/benchmark.mjs",
   "comparison": {

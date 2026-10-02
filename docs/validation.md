@@ -67,8 +67,11 @@ mkdir -p /private/tmp/moonreconcile-task7-before
 git archive 5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 | tar -x -C /private/tmp/moonreconcile-task7-before
 (cd /private/tmp/moonreconcile-task7-before && npm run build)
 BENCH_ROOT=/private/tmp/moonreconcile-task7-before BENCH_SHA=5daf04d3102a98d4fb43edb0526c0bc5b0a76dd9 BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_OUTPUT=/private/tmp/task7-fixwave-baseline.json node scripts/benchmark.mjs
+npm run build
 BENCH_ROOT="$PWD" BENCH_CASES=sparse-10000,sparse-30000 BENCH_REPEATS=1 BENCH_COMPARE_WITH=/private/tmp/task7-fixwave-baseline.json BENCH_OUTPUT=/private/tmp/task7-fixwave-optimized.json node scripts/benchmark.mjs
 ```
+
+The baseline build/run commands above were retained as the original comparison invocation. The optimized `npm run build` line is a clean-checkout replay prerequisite added after review; it was not part of the retained historical optimized invocation, whose checkout already had `_build` available. The retained comparison JSON keeps the benchmark-driver hash from that historical run; Task 7 fix round 2 changes the current driver, so a replay will produce new comparison records and hashes.
 
 `BENCH_COMPARE_WITH` requires identical driver bytes, host, Node/Moon versions, generated input hashes, and semantic report hashes. The benchmark now records the effective environment and driver/source identity. Its default output uses a timestamped filename; it refuses to overwrite existing evidence unless explicitly enabled. The historical full matrix is retained unchanged. RSS remains unavailable because `/usr/bin/time -l` emitted no maximum-resident-set line and reported `sysctl kern.clockrate: Operation not permitted`. The configured 100,000-row limit is not a tested capacity claim.
 
