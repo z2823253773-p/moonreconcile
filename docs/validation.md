@@ -87,9 +87,9 @@ README 命令由 `scripts/readme-smoke.mjs` 从本地提交创建的新鲜 Git c
 
 ## Task 8 local delivery
 
-本节只记录最终干净提交 SHA 上实际执行的命令、版本、测试数和结果。CI 使用官方安装器的 `latest`，其真实远端结果必须关联最终 SHA；提交、推送或排队均不等于 CI 通过。
+本节记录 Task 8 最终代码/文档树上的实际命令、版本、测试数和结果；精确 HEAD 由忽略的 Task 8 交接报告记录，避免在被测试的提交中写入自引用 SHA。CI 使用官方安装器的 `latest`，其真实远端结果必须关联最终 SHA；提交、推送或排队均不等于 CI 通过。
 
-Task 8 本地实现提交：`810dc3c`（其父提交 `4bd18b5` 首次加入实现；随后 smoke 探针发现 scratch 输出目录缺失，`810dc3c` 修复后从新鲜 clone 实跑通过）。门禁环境：Darwin 25.4.0 arm64（设备名已为公开报告脱敏）、Node v24.15.0 / npm 11.12.1、Python 3.14.6、Moon `0.1.20260920` / moonc `v0.10.14+7d59c7ec9`。MoonBit 工具位于隔离的 `/private/tmp/moonreconcile-task8-toolchain`，使用进程级 `MOON_HOME`、`MOONBIT_HOME` 和 `PATH`，未改用户全局工具链。`moon` 与 `moonc` SHA-256 分别为 `a0cd1c0014f2ca17089542939ac4ad3c983452c5952ca6140af0fcef258e1967` 与 `8a49fb209d896b8ce72322883aa53a2395a1bdd88d35423ebfd841fc66b8f127`。
+Task 8 本地实现先提交为 `4bd18b5`，README smoke harness 的 scratch 目录修复为 `810dc3c`；修复后重新在提交树上运行全部下列门禁。随后只更新了验证记录和 CI checkout 凭据设置。门禁环境：Darwin 25.4.0 arm64（设备名已为公开报告脱敏）、Node v24.15.0 / npm 11.12.1、Python 3.14.6、Moon `0.1.20260920` / moonc `v0.10.14+7d59c7ec9`。MoonBit 工具位于隔离的 `/private/tmp/moonreconcile-task8-toolchain`，使用进程级 `MOON_HOME`、`MOONBIT_HOME` 和 `PATH`，未改用户全局工具链。`moon` 与 `moonc` SHA-256 分别为 `a0cd1c0014f2ca17089542939ac4ad3c983452c5952ca6140af0fcef258e1967` 与 `8a49fb209d896b8ce72322883aa53a2395a1bdd88d35423ebfd841fc66b8f127`。
 
 | 命令 | 实际结果 |
 | --- | --- |
