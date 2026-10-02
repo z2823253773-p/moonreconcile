@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,9 +7,10 @@ import { spawnSync } from "node:child_process";
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = await mkdtemp(join(tmpdir(), "moonreconcile-readme-smoke-"));
-const checkout = join(scratch, "checkout");
+  const checkout = join(scratch, "checkout");
 const smokeDir = join(scratch, "run");
 try {
+  await mkdir(smokeDir, { recursive: true });
   const clone = spawnSync("git", ["clone", "--quiet", "--no-hardlinks", sourceRoot, checkout], { encoding: "utf8" });
   assert.equal(clone.status, 0, `fresh clone failed: ${clone.stderr}`);
   const readme = await readFile(join(checkout, "README.md"), "utf8");
