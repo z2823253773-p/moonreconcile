@@ -1,0 +1,61 @@
+{
+  "scope": "synthetic pure-invoke correctness/performance; not filesystem, user benefit or maximum-capacity evidence",
+  "baseline_sha": "8aa28378662d71abb9f9343b6c85594a8aec9b60",
+  "current_sha": "4e4a4d82a44aad2a9c5df2b37a9f7d4a99467c0b",
+  "working_tree_dirty": false,
+  "baseline_source_files_verified": 37,
+  "baseline_bridge_sha256": "7cb216701a8a2b99bd88f0735474805841d80a2ebbc983e6ffafe207f7a5c8c9",
+  "current_bridge_sha256": "41325b4752b16f2ff8e8b7a023513857cacbc97243700da625a1872de45e5637",
+  "driver_sha256": "07ae63a0fd1b38ae24181ca2136a494eac1ea4757e6371f494083a70b7a743cd",
+  "node": "v24.15.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "observations": [
+    {
+      "mode": "accept",
+      "rows_per_side": 10000,
+      "active_actions": 10000,
+      "request_sha256": "d8f59b7b9922f692be5560272cc5bd5ff48e2fcccb954496c6826e47981f2edc",
+      "response_sha256": "e8f5cd972e65d9d43711b37eac60d05209ab82beb19a72c7e39f20edf77c98d6",
+      "response_bytes": 6640091,
+      "milliseconds": {
+        "baseline": [
+          1604.979791,
+          1597.551875,
+          1785.08675
+        ],
+        "current": [
+          126.24254199999973,
+          126.03887500000019,
+          102.07587500000045
+        ]
+      },
+      "baseline_median_ms": 1604.979791,
+      "current_median_ms": 126.03887500000019,
+      "ratio": 0.07852988287252534
+    },
+    {
+      "mode": "unmatched",
+      "rows_per_side": 10000,
+      "active_actions": 20000,
+      "request_sha256": "1b2d8e1e9434e9dfadd225468210334c6a4bd65a3e2935b61bdec765595e6b9f",
+      "response_sha256": "c878aace54f527cc4c539d58040df64be9c5e0cc6ca9bda6747c76238e976ec7",
+      "response_bytes": 3794513,
+      "milliseconds": {
+        "baseline": [
+          1927.4621669999997,
+          1938.4877500000002,
+          1645.6537499999995
+        ],
+        "current": [
+          88.23258299999998,
+          86.28808300000037,
+          81.07966699999997
+        ]
+      },
+      "baseline_median_ms": 1927.4621669999997,
+      "current_median_ms": 86.28808300000037,
+      "ratio": 0.04476771813078102
+    }
+  ]
+}

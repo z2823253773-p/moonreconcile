@@ -1,0 +1,58 @@
+{
+  "scope": "synthetic pure-invoke correctness/performance; not filesystem, user benefit or maximum-capacity evidence",
+  "baseline_sha": "8aa28378662d71abb9f9343b6c85594a8aec9b60",
+  "current_sha": "8aa28378662d71abb9f9343b6c85594a8aec9b60",
+  "working_tree_dirty": true,
+  "driver_sha256": "91ba06f35279b3709f01153de0a4c45c8c82978e1050cfff0b2179c8935953c8",
+  "node": "v24.15.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "observations": [
+    {
+      "mode": "accept",
+      "rows_per_side": 10000,
+      "active_actions": 10000,
+      "request_sha256": "d8f59b7b9922f692be5560272cc5bd5ff48e2fcccb954496c6826e47981f2edc",
+      "response_sha256": "e8f5cd972e65d9d43711b37eac60d05209ab82beb19a72c7e39f20edf77c98d6",
+      "response_bytes": 6640091,
+      "milliseconds": {
+        "baseline": [
+          1548.815,
+          1823.236833,
+          1601.8621669999993
+        ],
+        "current": [
+          1855.256458,
+          1645.8782909999995,
+          1511.3657910000002
+        ]
+      },
+      "baseline_median_ms": 1601.8621669999993,
+      "current_median_ms": 1645.8782909999995,
+      "ratio": 1.027478096996594
+    },
+    {
+      "mode": "unmatched",
+      "rows_per_side": 10000,
+      "active_actions": 20000,
+      "request_sha256": "1b2d8e1e9434e9dfadd225468210334c6a4bd65a3e2935b61bdec765595e6b9f",
+      "response_sha256": "c878aace54f527cc4c539d58040df64be9c5e0cc6ca9bda6747c76238e976ec7",
+      "response_bytes": 3794513,
+      "milliseconds": {
+        "baseline": [
+          1470.5564590000013,
+          1542.831250000001,
+          1747.596375000001
+        ],
+        "current": [
+          1922.0690419999992,
+          1630.3116670000018,
+          1922.9088749999974
+        ]
+      },
+      "baseline_median_ms": 1542.831250000001,
+      "current_median_ms": 1922.0690419999992,
+      "ratio": 1.2458063978157026
+    }
+  ]
+}

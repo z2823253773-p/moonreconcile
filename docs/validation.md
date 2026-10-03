@@ -119,3 +119,26 @@ README smoke 的初次 clean-clone 运行以 exit 1 失败，原因是 harness �
 ## 2026-10-03 实际公开交付与远端CI
 
 发布`3c506f15f27c32fc97fa83077292477be3f47b47`，远端提交API一致；默认分支公开，README blob`10fabfa913a0d7c834e9a44c6501d84ca41b9b6e`与本地相同，GitHub提供实际渲染HTML。[双平台CI run37055796591](https://github.com/z2823253773-p/moonreconcile/actions/runs/37055796591)已完成success，两OS每项门禁均通过。[完整结构化结果与版本/二进制哈希](evidence/remote-ci-2026-10-03.json)、[实际日志摘录](evidence/remote-ci-2026-10-03-excerpts.txt)。Moon版本与本地隔离工具一致；Node/Python为实际22/3.12，两平台补丁版本分别记录，不以本机24/3.14结果替代。历史失败run继续保留。这份记录针对实际3c506f1，后续证据文档提交会另核验真实CI，不编造自引用提交结果。
+
+## 2026-10-03 公开数据与复核性能增量
+
+增量代码 `4e4a4d82a44aad2a9c5df2b37a9f7d4a99467c0b` 增加实际公开OurAirports快照工作流、独立Python逐值期望、离线CI门禁，以及复核索引和无需构建的CLI帮助/版本入口。公开数据来源、固定上游SHA、全量与子集哈希、许可、重建命令见[案例说明](../examples/ourairports/README.md)。2558/2569记录、2558稳定ID对应、11新增、10条既有记录的18字段变化；compare→resolve→replay均完整，处置后未决为0，字段差异仍在，退出1。六个准备产物均从原始下载重新生成并与仓库逐字节一致。这是公开数据维护演示，处置为作者填写，未观察真实用户工作流、机场事实、耗时收益或Excel导出。
+
+本地实测96核心/57Node（含200累计案例与101×101不完整保持）/240分配golden/98独立消费（96核心+2外部）/三个合成工作流七变异/九README命令/新增公开数据门禁全部exit0。[执行阶段、环境、退出码](evidence/october-increment-local-gates.json)、[实际脱敏输出](evidence/october-increment-local-gates.txt)。核心接口没有变化。帮助入口在无桥接构建的临时checkout中通过，额外操作数仍退出2；先红后绿。决定优先级回归、原有200累计oracle与额外3000种子输入逐字节对照保留错误码、文本和记录号，其中116成功，其余错误分类在记录中列明。
+
+[复核性能记录](evidence/review-performance-2026-10-03.json)以固定旧版本 `8aa28378662d71abb9f9343b6c85594a8aec9b60` 为基线。准备两个各侧10000行的合成纯引擎请求，每引擎交替测3次，以中位数比较：10000接受动作1604.980→126.039ms；20000单边无对应动作1927.462→86.288ms。每次完整响应字节必须完全相同，记录含请求/响应、驱动和构建桥接哈希，37个基线源文件与Git对象逐字节核验。[初始未改引擎的性能验收](evidence/review-performance-red-2026-10-03.json)曾失败，该记录为修改前工作树且驱动哈希不同；后补来源校验不改变测量请求，两负载请求与响应哈希和最终记录一致，最终验收是当前中位数低于基线一半。它是本机Node24/Darwin观察，未测文件导出、内存、最大动作量、其他平台性能或用户工时；不作为CI速度门槛。
+
+性能与等价对照可在本仓库有完整Git历史时复现（需MoonBit工具链）：
+
+```sh
+BASELINE_DIR="$(mktemp -d)"
+git archive 8aa28378662d71abb9f9343b6c85594a8aec9b60 | tar -x -C "$BASELINE_DIR"
+(cd "$BASELINE_DIR" && npm run build)
+npm run build
+node scripts/check-review-equivalence.mjs "$BASELINE_DIR"
+node scripts/benchmark-review.mjs --baseline "$BASELINE_DIR" --baseline-sha 8aa28378662d71abb9f9343b6c85594a8aec9b60
+```
+
+后续运行产生新观察值；性能记录对应上述已测4e4a4d8，后续文档提交不冒充新性能测量。独立审查和实际双平台CI将关联各自观察到的SHA另记。
+
+独立增量审查针对8aa2837→4e4a4d8判定PASS，无可操作发现；另执行11无I/O参数案例、1440冲突排列和32阈值/覆盖/不完整案例，完整响应与冻结基线逐字节一致，并独立核对所有公开ID、18变化与来源哈希。[原始审查报告（仓库个人路径脱敏）](evidence/october-increment-review.md)。后补文档和保留汇总不在该固定生产差异审查范围；三条公开数据手工命令由根任务实际执行、保留汇总。

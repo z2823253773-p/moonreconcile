@@ -1,0 +1,129 @@
+{
+  "source_sha": "4e4a4d82a44aad2a9c5df2b37a9f7d4a99467c0b",
+  "source_tree": "7918355bc64a4695e2680450500c11e67b355fdf",
+  "date_local": "2026-10-03",
+  "environment": {
+    "moon": "0.1.20260920",
+    "moonc": "0.10.14+7d59c7ec9",
+    "node": "24.15.0",
+    "python": "3.14.6",
+    "platform": "Darwin arm64",
+    "toolchain": "isolated process environment; user global install unchanged"
+  },
+  "scope": "Working-tree gates ran immediately before this commit on the same source tree. Independent consumer, README fresh clone and same-driver performance ran after committing. All gates here are local, not remote Node22/Python3.12 CI.",
+  "commands": [
+    {
+      "phase": "working-tree",
+      "command": [
+        "moon",
+        "check",
+        "--target",
+        "js"
+      ],
+      "exit_code": 0,
+      "seconds": 0.064
+    },
+    {
+      "phase": "working-tree",
+      "command": [
+        "moon",
+        "test",
+        "--target",
+        "js"
+      ],
+      "exit_code": 0,
+      "seconds": 0.468
+    },
+    {
+      "phase": "working-tree",
+      "command": [
+        "npm",
+        "test"
+      ],
+      "exit_code": 0,
+      "seconds": 7.776
+    },
+    {
+      "phase": "working-tree",
+      "command": [
+        "python3",
+        "scripts/check-assignment-oracle.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.023
+    },
+    {
+      "phase": "working-tree",
+      "command": [
+        "npm",
+        "run",
+        "test:workflows"
+      ],
+      "exit_code": 0,
+      "seconds": 0.867
+    },
+    {
+      "phase": "working-tree",
+      "command": [
+        "npm",
+        "run",
+        "test:public-data"
+      ],
+      "exit_code": 0,
+      "seconds": 2.261
+    },
+    {
+      "phase": "committed",
+      "command": [
+        "python3",
+        "scripts/check-library-consumer.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.879
+    },
+    {
+      "phase": "committed",
+      "command": [
+        "node",
+        "scripts/readme-smoke.mjs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.83
+    },
+    {
+      "phase": "committed",
+      "command": [
+        "node",
+        "scripts/benchmark-review.mjs",
+        "--baseline",
+        "<owned-workdir>/baseline-8aa2837",
+        "--baseline-sha",
+        "8aa28378662d71abb9f9343b6c85594a8aec9b60",
+        "--out",
+        "<owned-workdir>/review-performance-4e4a4d8.json"
+      ],
+      "exit_code": 0,
+      "seconds": 11.67
+    }
+  ],
+  "additional_checks": {
+    "moon_info_and_fmt_check": 0,
+    "seeded_full_response_equivalence": {
+      "exit_code": 0,
+      "cases": 3000,
+      "success": 116,
+      "errors": {
+        "invalid_decision": 1162,
+        "invalid_decision_action": 1454,
+        "invalid_row_width": 196,
+        "locked_exact_pair": 60,
+        "conflicting_decisions": 4,
+        "manual_override_needs_reason": 8
+      }
+    },
+    "public_fixture_reproduction": {
+      "exit_code": 0,
+      "all_six_files_byte_identical": true
+    }
+  }
+}
