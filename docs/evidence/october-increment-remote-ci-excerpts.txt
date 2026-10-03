@@ -1,0 +1,30 @@
+ubuntu-24.04	Record actual toolchain versions	2026-10-03T04:13:40.4730674Z moon 0.1.20260920 (914d7da 2026-09-20) ~/.moon/bin/moon
+ubuntu-24.04	Record actual toolchain versions	2026-10-03T04:13:40.4731069Z moonc v0.10.14+7d59c7ec9 (2026-09-18) ~/.moon/bin/moonc
+ubuntu-24.04	Record actual toolchain versions	2026-10-03T04:13:40.4761107Z v22.23.3
+ubuntu-24.04	Record actual toolchain versions	2026-10-03T04:13:40.4883653Z Python 3.12.14
+ubuntu-24.04	Core unit tests (MoonBit)	2026-10-03T04:13:42.2191307Z Total tests: 96, passed: 96, failed: 0.
+ubuntu-24.04	Build bridge and run host integration tests	2026-10-03T04:13:50.9854458Z # 200 independent cumulative-review/state/field/exit cases passed
+ubuntu-24.04	Build bridge and run host integration tests	2026-10-03T04:13:50.9854940Z # Production 101x101 resource-limited fully-reviewed case preserved incomplete/exit3/unresolved0
+ubuntu-24.04	Build bridge and run host integration tests	2026-10-03T04:13:50.9862993Z # tests 57
+ubuntu-24.04	Build bridge and run host integration tests	2026-10-03T04:13:50.9863302Z # pass 57
+ubuntu-24.04	Synthetic workflow end-to-end chains	2026-10-03T04:13:51.6291938Z Synthetic workflows and seven mutation checks passed. Temporary outputs: <runner-path>
+ubuntu-24.04	Pinned actual public CSV snapshot workflow (no network)	2026-10-03T04:13:55.9076217Z Public OurAirports CN/FR snapshots: 2558/2569 records,2558 exact pairs,11 additions,18 changed fields; compare→review→replay and byte snapshots verified
+ubuntu-24.04	Independent assignment oracle	2026-10-03T04:13:55.9929780Z 240 exhaustive assignment goldens independently verified
+ubuntu-24.04	Independent MoonBit library consumer	2026-10-03T04:13:57.4889246Z Total tests: 98, passed: 98, failed: 0.
+ubuntu-24.04	README acceptance smoke from fresh checkout	2026-10-03T04:13:58.1520076Z README smoke passed: 9 documented commands from fresh clone <runner-path>
+macos-15	Record actual toolchain versions	2026-10-03T04:13:48.6042630Z moon 0.1.20260920 (914d7da 2026-09-20) ~/.moon/bin/moon
+macos-15	Record actual toolchain versions	2026-10-03T04:13:48.6043420Z moonc v0.10.14+7d59c7ec9 (2026-09-18) ~/.moon/bin/moonc
+macos-15	Record actual toolchain versions	2026-10-03T04:13:48.6226770Z v22.23.2
+macos-15	Record actual toolchain versions	2026-10-03T04:13:48.7330620Z Python 3.12.10
+macos-15	Record actual toolchain versions	2026-10-03T04:13:48.7905820Z a0cd1c0014f2ca17089542939ac4ad3c983452c5952ca6140af0fcef258e1967  <runner-path>
+macos-15	Record actual toolchain versions	2026-10-03T04:13:48.9095610Z 8a49fb209d896b8ce72322883aa53a2395a1bdd88d35423ebfd841fc66b8f127  <runner-path>
+macos-15	Core unit tests (MoonBit)	2026-10-03T04:13:50.9206270Z Total tests: 96, passed: 96, failed: 0.
+macos-15	Build bridge and run host integration tests	2026-10-03T04:14:02.6536370Z # 200 independent cumulative-review/state/field/exit cases passed
+macos-15	Build bridge and run host integration tests	2026-10-03T04:14:02.6537350Z # Production 101x101 resource-limited fully-reviewed case preserved incomplete/exit3/unresolved0
+macos-15	Build bridge and run host integration tests	2026-10-03T04:14:02.6540660Z # tests 57
+macos-15	Build bridge and run host integration tests	2026-10-03T04:14:02.6541290Z # pass 57
+macos-15	Synthetic workflow end-to-end chains	2026-10-03T04:14:03.5758840Z Synthetic workflows and seven mutation checks passed. Temporary outputs: <runner-path>
+macos-15	Pinned actual public CSV snapshot workflow (no network)	2026-10-03T04:14:08.1180300Z Public OurAirports CN/FR snapshots: 2558/2569 records,2558 exact pairs,11 additions,18 changed fields; compare→review→replay and byte snapshots verified
+macos-15	Independent assignment oracle	2026-10-03T04:14:08.2486060Z 240 exhaustive assignment goldens independently verified
+macos-15	Independent MoonBit library consumer	2026-10-03T04:14:10.6205940Z Total tests: 98, passed: 98, failed: 0.
+macos-15	README acceptance smoke from fresh checkout	2026-10-03T04:14:11.7368600Z README smoke passed: 9 documented commands from fresh clone <runner-path>

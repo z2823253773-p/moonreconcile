@@ -1,0 +1,217 @@
+{
+  "verified_date_local": "2026-10-03",
+  "tested_sha": "c108a2106ade4ee167f0e95e44520f7d85b81a24",
+  "functional_sha": "4e4a4d82a44aad2a9c5df2b37a9f7d4a99467c0b",
+  "run_id": 37095822483,
+  "url": "https://github.com/z2823253773-p/moonreconcile/actions/runs/37095822483",
+  "status": "completed",
+  "conclusion": "success",
+  "readme_blob": "783adce40ecfe977b842f3b79782fd22c498af36",
+  "readme_actual_html_checked": true,
+  "jobs": [
+    {
+      "id": 111125414056,
+      "platform": "ubuntu-24.04",
+      "conclusion": "success",
+      "versions": {
+        "node": "v22.23.3",
+        "python": "3.12.14",
+        "moon": "0.1.20260920 (914d7da 2026-09-20)",
+        "moonc": "v0.10.14+7d59c7ec9",
+        "moon_sha256": "6da4919f45f4abf7c6d7f3cf8d9a457de77dca430d6fb811d21b27ae1ac8e11d",
+        "moonc_sha256": "d163b2c4c878ca584870764b75e633d73e8b9c178dcc6b00c692f6b2a6b1b2dc"
+      },
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Python",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install MoonBit toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Record actual toolchain versions",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build and check core",
+          "conclusion": "success"
+        },
+        {
+          "name": "Core unit tests (MoonBit)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build bridge and run host integration tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Synthetic workflow end-to-end chains",
+          "conclusion": "success"
+        },
+        {
+          "name": "Pinned actual public CSV snapshot workflow (no network)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent assignment oracle",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent MoonBit library consumer",
+          "conclusion": "success"
+        },
+        {
+          "name": "README acceptance smoke from fresh checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Python",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "verified_counts": {
+        "core": 96,
+        "node": 57,
+        "assignment": 240,
+        "consumer": 98,
+        "synthetic_workflows": 3,
+        "mutations": 7,
+        "readme_commands": 9,
+        "public_snapshot_records": [
+          2558,
+          2569
+        ],
+        "public_additions": 11,
+        "public_changed_cells": 18
+      }
+    },
+    {
+      "id": 111125414209,
+      "platform": "macos-15",
+      "conclusion": "success",
+      "versions": {
+        "node": "v22.23.2",
+        "python": "3.12.10",
+        "moon": "0.1.20260920 (914d7da 2026-09-20)",
+        "moonc": "v0.10.14+7d59c7ec9",
+        "moon_sha256": "a0cd1c0014f2ca17089542939ac4ad3c983452c5952ca6140af0fcef258e1967",
+        "moonc_sha256": "8a49fb209d896b8ce72322883aa53a2395a1bdd88d35423ebfd841fc66b8f127"
+      },
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Python",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install MoonBit toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Record actual toolchain versions",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build and check core",
+          "conclusion": "success"
+        },
+        {
+          "name": "Core unit tests (MoonBit)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build bridge and run host integration tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Synthetic workflow end-to-end chains",
+          "conclusion": "success"
+        },
+        {
+          "name": "Pinned actual public CSV snapshot workflow (no network)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent assignment oracle",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent MoonBit library consumer",
+          "conclusion": "success"
+        },
+        {
+          "name": "README acceptance smoke from fresh checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Python",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "verified_counts": {
+        "core": 96,
+        "node": 57,
+        "assignment": 240,
+        "consumer": 98,
+        "synthetic_workflows": 3,
+        "mutations": 7,
+        "readme_commands": 9,
+        "public_snapshot_records": [
+          2558,
+          2569
+        ],
+        "public_additions": 11,
+        "public_changed_cells": 18
+      }
+    }
+  ]
+}

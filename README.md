@@ -12,7 +12,7 @@ The reusable comparison engine is written in MoonBit. Node.js provides the file 
 - Three complete synthetic examples for order reconciliation, migration checks, and product catalogs.
 - A pinned actual public-data case: two OurAirports CSV snapshots, with independently checked additions and field changes.
 
-The examples are authored fixtures, not customer data. The catalog fixture deliberately makes the highest-scoring suggestion false to demonstrate why suggestions require review. It does not establish real-world accuracy or improved matching performance.
+The three original business examples are authored fixtures, not customer data. The catalog fixture deliberately makes the highest-scoring suggestion false to demonstrate why suggestions require review. It does not establish real-world accuracy or improved matching performance.
 
 ## Install and build
 
@@ -76,4 +76,4 @@ See [the specification](docs/spec.md), [configuration reference](docs/configurat
 
 [MIT](LICENSE)
 
-Verified October delivery: [3c506f1 both-OS CI](https://github.com/z2823253773-p/moonreconcile/actions/runs/37055796591) passed all gates. See [delivery evidence](docs/final-delivery.md) and [one-page project description](docs/project-description-one-page.md). Real-workflow/export fit and contest acceptance remain unverified.
+Verified October increment: [c108a21 both-OS CI](https://github.com/z2823253773-p/moonreconcile/actions/runs/37095822483) passed all gates, including the actual public CSV case. See [delivery evidence](docs/final-delivery.md), [increment review](docs/evidence/october-increment-review.md), and [one-page project description](docs/project-description-one-page.md). User demand, XLSX fit and contest acceptance remain unverified.

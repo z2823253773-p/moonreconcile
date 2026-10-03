@@ -190,3 +190,7 @@ V05/V06仍pending；D07–D09依据已观察的3c506f1远端一致性、README�
 - **尚未执行**：字面 64 MiB 源表/有效动作、128 MiB 决策原始模板、20000000 DP 单元，以及所有预算同时达到上限的完整 compare→resolve 吞吐/峰值内存。上述边界守卫、闭环上界证明和历史基准不可替代这些最大负载证据。
 
 模板闭环上界为最多 100000 动作、200000 记录空白、100000 建议空白；后两类合法 ID 空白分别最多 11/18 字节，总追加最多 4000000 字节。动作规范 CSV 已含标题且不超过 64 MiB，因此总模板小于 128 MiB、数据行不超过 400000。源文件、快照、manifest/config 字节守卫仍为 64 MiB。最终 SHA 的门禁/发布状态由控制器看到实际结果后单独填写。
+
+## 2026-10-03 后续增量
+
+4e4a4d8的复核索引与CLI帮助经独立增量审查通过；c108a21实际远端双平台全部门禁完成成功，含V07公开数据案例。当前96核心/57Node/240分配/98消费/三个合成工作流七变异/九README命令。[增量本地记录](evidence/october-increment-local-gates.json)、[独立审查](evidence/october-increment-review.md)、[实际CI](evidence/october-increment-remote-ci.json)。这补充D04–D09及V07，V05和V06的真实用户/Excel证据仍pending；不改写此前阶段的历史测试数。

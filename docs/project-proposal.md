@@ -4,7 +4,7 @@
 状态：**首个可运行版本已完成；本文区分已交付软件、合成验证和仍待核查的真实需求。**
 项目仓库：[z2823253773-p/moonreconcile](https://github.com/z2823253773-p/moonreconcile)。公开仓库已创建，代码交付和远端验证状态以实际提交及 CI 证据为准。
 
-本项目按[规格](spec.md)与[实施计划](plans/2026-09-30-table-reconcile.md)实现；逐项结果登记在[验收矩阵](acceptance-matrix.md)。Tasks 1–7 已实现并通过各自范围的本地审查。Task 8 已补齐 README smoke、工具链格式迁移及本地门禁；整体独立审查及3c506f1双平台CI已通过，实际版本和精确SHA见[交付记录](final-delivery.md)；真实用户采用、CSV/XLSX适配及赛事审核仍无证据。官方十月规则来源及其与仓库主分支的时间差，见[2026-10-01 核查记录](evidence/official-requirements-2026-10-01.md)。
+本项目按[规格](spec.md)与[实施计划](plans/2026-09-30-table-reconcile.md)实现；逐项结果登记在[验收矩阵](acceptance-matrix.md)。Tasks 1–7 已实现并通过各自范围的本地审查。Task 8 已补齐 README smoke、工具链格式迁移及本地门禁；原版整体独立审查及后续增量审查、c108a21双平台CI已通过，实际版本和精确SHA见[交付记录](final-delivery.md)；真实用户采用、CSV/XLSX适配及赛事审核仍无证据。官方十月规则来源及其与仓库主分支的时间差，见[2026-10-01 核查记录](evidence/official-requirements-2026-10-01.md)。
 
 可复制编辑的一页项目说明草稿见 [`project-description-one-page.md`](project-description-one-page.md)。提交或对外使用前由项目所有者核实事实并按实际要求修改；本仓库未提交任何报名表。
 

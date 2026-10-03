@@ -142,3 +142,5 @@ node scripts/benchmark-review.mjs --baseline "$BASELINE_DIR" --baseline-sha 8aa2
 后续运行产生新观察值；性能记录对应上述已测4e4a4d8，后续文档提交不冒充新性能测量。独立审查和实际双平台CI将关联各自观察到的SHA另记。
 
 独立增量审查针对8aa2837→4e4a4d8判定PASS，无可操作发现；另执行11无I/O参数案例、1440冲突排列和32阈值/覆盖/不完整案例，完整响应与冻结基线逐字节一致，并独立核对所有公开ID、18变化与来源哈希。[原始审查报告（仓库个人路径脱敏）](evidence/october-increment-review.md)。后补文档和保留汇总不在该固定生产差异审查范围；三条公开数据手工命令由根任务实际执行、保留汇总。
+
+增量公开提交`c108a2106ade4ee167f0e95e44520f7d85b81a24`的[双平台run37095822483](https://github.com/z2823253773-p/moonreconcile/actions/runs/37095822483)实际完成success，每步骤成功，新增公开数据离线门禁在Ubuntu/macOS均通过。96核心、57Node、240golden、98消费、三个工作流七变异、九README命令均确认。远端实际Node22.23.3/22.23.2、Python3.12.14/3.12.10、Moon0.1.20260920/moonc0.10.14+7d59c7ec9。[结构化CI证据](evidence/october-increment-remote-ci.json)、[日志摘录](evidence/october-increment-remote-ci-excerpts.txt)。远端HEAD和README blob与本地一致，实际HTML含新增公开数据章节；后续归档提交会另核验，不编造自引用CI结果。
