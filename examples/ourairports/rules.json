@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "fields": [
+    {
+      "name": "id",
+      "left": "id",
+      "right": "id",
+      "type": "text",
+      "compare": false
+    },
+    {
+      "name": "ident",
+      "left": "ident",
+      "right": "ident",
+      "type": "text"
+    },
+    {
+      "name": "type",
+      "left": "type",
+      "right": "type",
+      "type": "text"
+    },
+    {
+      "name": "name",
+      "left": "name",
+      "right": "name",
+      "type": "text"
+    },
+    {
+      "name": "latitude_deg",
+      "left": "latitude_deg",
+      "right": "latitude_deg",
+      "type": "text"
+    },
+    {
+      "name": "longitude_deg",
+      "left": "longitude_deg",
+      "right": "longitude_deg",
+      "type": "text"
+    },
+    {
+      "name": "elevation_ft",
+      "left": "elevation_ft",
+      "right": "elevation_ft",
+      "type": "text"
+    },
+    {
+      "name": "continent",
+      "left": "continent",
+      "right": "continent",
+      "type": "text"
+    },
+    {
+      "name": "iso_country",
+      "left": "iso_country",
+      "right": "iso_country",
+      "type": "text"
+    },
+    {
+      "name": "iso_region",
+      "left": "iso_region",
+      "right": "iso_region",
+      "type": "text"
+    },
+    {
+      "name": "municipality",
+      "left": "municipality",
+      "right": "municipality",
+      "type": "text"
+    },
+    {
+      "name": "scheduled_service",
+      "left": "scheduled_service",
+      "right": "scheduled_service",
+      "type": "text"
+    },
+    {
+      "name": "icao_code",
+      "left": "icao_code",
+      "right": "icao_code",
+      "type": "text"
+    },
+    {
+      "name": "iata_code",
+      "left": "iata_code",
+      "right": "iata_code",
+      "type": "text"
+    },
+    {
+      "name": "gps_code",
+      "left": "gps_code",
+      "right": "gps_code",
+      "type": "text"
+    },
+    {
+      "name": "local_code",
+      "left": "local_code",
+      "right": "local_code",
+      "type": "text"
+    },
+    {
+      "name": "home_link",
+      "left": "home_link",
+      "right": "home_link",
+      "type": "text"
+    },
+    {
+      "name": "wikipedia_link",
+      "left": "wikipedia_link",
+      "right": "wikipedia_link",
+      "type": "text"
+    },
+    {
+      "name": "keywords",
+      "left": "keywords",
+      "right": "keywords",
+      "type": "text"
+    }
+  ],
+  "key": [
+    "id"
+  ]
+}

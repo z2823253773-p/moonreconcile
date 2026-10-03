@@ -1,0 +1,29 @@
+# Actual public CSV snapshot reconciliation
+
+This case uses **actual public records**, independently published by OurAirports, rather than authored rows. It demonstrates a local dataset-version maintenance workflow, not an upstream deployment, user interview or aviation-accuracy claim.
+
+Source: [official downloads and Public Domain terms](https://ourairports.com/data/), [official field dictionary](https://ourairports.com/help/data-dictionary.html), [upstream repository](https://github.com/davidmegginson/ourairports-data). The dictionary identifies `id` as persistent even when an airport code changes.
+
+The pinned source revisions are `bdd9fbc0a9c5e276366094a0298ab8f549eceffb` (2026-09-01 UTC) and `b62683270f29e5af471df9e5547b791b471f4ff9` (2026-10-01 UTC). Source CSVs contain 86013/86154 records. This bounded case filters `iso_country` to the literal values CN or FR, preserving original order and every one of the 19 logical cells, then reserializes with LF and standard minimal CSV quoting. Full/subset hashes and precise URLs are in [provenance.json](provenance.json). No values are invented or repaired.
+
+The subsets have 2558/2569 records. An independent Python CSV-and-stable-ID reference identifies 2558 corresponding pairs, 11 new IDs, and 18 changed cells across 10 existing records. Every field is mapped as text with exact comparison, except the persistent ID used only as key. Numeric-looking coordinate format changes therefore remain literal changes; this case does not infer tolerances or validate domain values.
+
+```sh
+npm run build
+npm run test:public-data
+```
+
+The network-free gate runs the public CLI compare→resolve→cumulative replay, checks every record state and exact identity, all 18 old/new field values, complete snapshots and 11 output files. Both compare and fully reviewed results intentionally exit 1: source differences remain visible. `reviewed.csv` is an authored maintenance disposition for IDs absent from the other complete filtered snapshot. It does not mean a human confirmed that an airport opened/closed, and it does not alter the 18 changed fields.
+
+To reproduce the fixture from original snapshots, use a fresh directory outside the repository:
+
+```sh
+DATA_DIR="$(mktemp -d)"
+curl -fsSL https://raw.githubusercontent.com/davidmegginson/ourairports-data/bdd9fbc0a9c5e276366094a0298ab8f549eceffb/airports.csv -o "$DATA_DIR/before.csv"
+curl -fsSL https://raw.githubusercontent.com/davidmegginson/ourairports-data/b62683270f29e5af471df9e5547b791b471f4ff9/airports.csv -o "$DATA_DIR/after.csv"
+python3 scripts/prepare-ourairports.py --before "$DATA_DIR/before.csv" --after "$DATA_DIR/after.csv" --out "$DATA_DIR/reproduced"
+```
+
+The preparation script refuses unexpected source hashes and existing output paths. Its six generated artifacts reproduce the committed files byte for byte. It uses Python's standard CSV library independently of the MoonBit parser.
+
+Public-data validation establishes this CSV input path and version-difference correctness. Actual user demand, current manual effort, financial cost of errors, time savings and XLSX/Excel export fidelity remain unmeasured. Upstream provides no accuracy guarantee. No member comments or user-profile dataset is used.

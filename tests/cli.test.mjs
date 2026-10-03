@@ -1676,3 +1676,29 @@ test("decision raw byte guard uses its own internal limit and preserves source g
   assert.equal(failingError(sourceOver.stderr).code, "input_limit_exceeded");
   assert.equal(await exists(path.join(dir, "source-over")), false);
 });
+
+
+test("help and version work without a built bridge and reject extra operands", async () => {
+  const temporary = await mkTmp("moonreconcile-help-");
+  try {
+    await fsPromises.mkdir(path.join(temporary, "cli"));
+    for (const name of ["main.mjs", "io.mjs", "bridge.mjs", "render.mjs"]) await fsPromises.copyFile(path.join(ROOT, "cli", name), path.join(temporary, "cli", name));
+    for (const args of [["--help"], ["compare", "--help"]]) {
+      const response = spawnSync(process.execPath, [path.join(temporary, "cli/main.mjs"), ...args], {encoding: "utf8"});
+      assert.equal(response.status, 0);
+      assert.equal(response.stderr, "");
+      assert.match(response.stdout, /reconcile compare LEFT RIGHT --config CONFIG --out RUN/);
+      assert.match(response.stdout, /incomplete computation/);
+    }
+    const version = spawnSync(process.execPath, [path.join(temporary, "cli/main.mjs"), "--version"], {encoding: "utf8"});
+    assert.equal(version.status, 0);
+    assert.equal(version.stdout, "MoonReconcile 0.1.0\n");
+    assert.equal(version.stderr, "");
+    for (const args of [["--help", "extra"], ["compare", "--help", "--out", "somewhere"], ["--version", "extra"]]) {
+      const response = spawnSync(process.execPath, [path.join(temporary, "cli/main.mjs"), ...args], {encoding: "utf8"});
+      assert.equal(response.status, 2);
+      assert.equal(failingError(response.stderr).code, "invalid_arguments");
+    }
+    assert.deepEqual((await fsPromises.readdir(temporary)).sort(), ["cli"]);
+  } finally { await fsPromises.rm(temporary, {recursive: true, force: true}); }
+});

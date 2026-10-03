@@ -1,0 +1,42 @@
+{
+  "retrieved_date": "2026-10-03",
+  "source": "OurAirports official community-maintained dataset",
+  "license": "Public Domain / upstream Unlicense",
+  "license_url": "https://ourairports.com/data/",
+  "repository": "https://github.com/davidmegginson/ourairports-data",
+  "dictionary": "https://ourairports.com/help/data-dictionary.html",
+  "filter": "iso_country in {'CN','FR'}; preserve source row order and all19 logical string cells; reserialize CSV with LF and minimal quoting",
+  "snapshots": [
+    {
+      "side": "left",
+      "commit": "bdd9fbc0a9c5e276366094a0298ab8f549eceffb",
+      "commit_date_utc": "2026-09-01T01:53:14Z",
+      "url": "https://raw.githubusercontent.com/davidmegginson/ourairports-data/bdd9fbc0a9c5e276366094a0298ab8f549eceffb/airports.csv",
+      "full_sha256": "818b499eb94d9d3d6f660c18495d7b7edcd95f16bc510ccfccb22f130a0c54a3",
+      "full_bytes": 12715073,
+      "full_records": 86013,
+      "subset_sha256": "ce61df3dc957a8fd5a214a5afae5f5cd6b490a34da6bd51d3cf673382a89dc7d",
+      "subset_bytes": 368385,
+      "subset_records": 2558
+    },
+    {
+      "side": "right",
+      "commit": "b62683270f29e5af471df9e5547b791b471f4ff9",
+      "commit_date_utc": "2026-10-01T01:53:30Z",
+      "url": "https://raw.githubusercontent.com/davidmegginson/ourairports-data/b62683270f29e5af471df9e5547b791b471f4ff9/airports.csv",
+      "full_sha256": "7a3fe6ee4a451469cb3197d43ad71838b587dc4bca8bef98728d779d2a475722",
+      "full_bytes": 12734002,
+      "full_records": 86154,
+      "subset_sha256": "0ee9dc77e58b88867361acd417a43af0bd7031c85baa3d7d8a40023b311152d3",
+      "subset_bytes": 369520,
+      "subset_records": 2569
+    }
+  ],
+  "identity_basis": "Official dictionary: id is persistent even if airport code changes. All mappings use exact text, no fuzzy identity or numeric tolerance inference.",
+  "review_basis": "Authored dataset-maintenance scenario; cumulative unmatched actions derive only from absent stable ID in the other complete filtered snapshot, not human aviation judgments.",
+  "limitations": [
+    "Public actual records, but no user interview, customer adoption, saved-time baseline or aviation accuracy claim",
+    "Not an observed deployment by upstream; local demonstration of a documented daily-export maintenance workflow",
+    "No Excel/XLSX conversion tested"
+  ]
+}

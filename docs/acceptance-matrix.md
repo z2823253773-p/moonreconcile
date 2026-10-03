@@ -127,13 +127,14 @@ V05/V06仍pending；D07–D09依据已观察的3c506f1远端一致性、README�
 | V03 | 稀疏/稠密候选及超预算案例实测；整表行数与候选分量规模分别报告 | `scripts/benchmark.mjs`；`docs/validation.md` | pass（历史单机合成测量；内存不可得已披露） |
 | V04 | 精确关联+业务规则基线及有标注合成真值的候选评价；不以配对增多证明准确性改善 | `examples/catalog/truth.json`; workflow assertion in `scripts/workflows.mjs`; [`task7-benchmark.json`](evidence/task7-benchmark.json) | pass |
 | V05 | 至少一个真实流程的来源、步骤、规模、规则、误配代价及当前基线；目前明确缺失 | `docs/limitations.md`；经许可脱敏的需求记录 | pending |
-| V06 | 实际CSV无损导出能力已验证，或需要XLSX时单独立项；目前未验证 | `docs/limitations.md`；真实工作流输入检查记录 | pending |
+| V06 | 实际CSV无损导出能力已验证，或需要XLSX时单独立项 | OurAirports公开CSV入口与快照字节已验证；实际业务Excel导出、XLSX仍无证据 | pending（公开CSV已有局部证据） |
+| V07 | 两个固定公开CSV版本由独立稳定ID/逐值对照核验，compare→resolve→replay可复现 | `examples/ourairports/`；`scripts/prepare-ourairports.py`；`npm run test:public-data`，2558/2569记录、11新增、18字段变化 | pass（公开数据，不代表真实用户采用） |
 | D01 | MoonBit承载算法与报告数据，Node仅适配；第三方依赖实际版本及选择理由可查 | `docs/architecture.md`；`docs/dependency-audit.md`；源码审查 | pass |
 | D02 | README安装/构建/运行/复核可由干净检出复跑；核心库独立于CLI可调用 | `README.md`；外部消费/干净检出日志 | pass |
 | D03 | OSI许可证、使用边界、配置说明、复核说明、策划书完整且无夸大 | `LICENSE`；`README.md`；`docs/` | pass |
 | D04 | 核心/CLI/oracle/工作流本地门禁通过，保存命令、退出码、版本和精确SHA | `docs/validation.md`；测试日志 | pass |
 | D05 | 独立审查发现与修复记录闭环；未解决功能缺陷未被标为交付通过 | `docs/validation.md`；审查问题与回归测试记录 | pass |
-| D06 | 公开载荷无凭据、个人/临床原始数据、旧项目内容、临时依赖缓存；合成来源显著 | 跟踪文件清单审查；`.gitignore`；`examples/` | pass |
+| D06 | 公开载荷无凭据、个人/临床原始数据、旧项目内容、临时依赖缓存；合成/公开来源显著 | 跟踪文件清单审查；`.gitignore`；`examples/` | pass |
 | D07 | 测试提交实际推送至公开GitHub；远端HEAD与本地SHA一致；README可见 | [交付记录](final-delivery.md)；[准确SHA双平台CI证据](evidence/remote-ci-2026-10-03.json) | pass（已观察3c506f1；后续提交另核验） |
 | D08 | Ubuntu/macOS远端CI在交付SHA实际完成；失败/未运行状态如实记录 | [交付记录](final-delivery.md)；[准确SHA双平台CI证据](evidence/remote-ci-2026-10-03.json) | pass（已观察3c506f1；后续提交另核验） |
 | D09 | 最终交付仓库地址、策划书、确切验证范围和剩余风险；不等同赛事通过或Mooncakes发布 | [交付记录](final-delivery.md)；[准确SHA双平台CI证据](evidence/remote-ci-2026-10-03.json) | pass（已观察3c506f1；后续提交另核验） |
@@ -177,7 +178,7 @@ V05/V06仍pending；D07–D09依据已观察的3c506f1远端一致性、README�
 | O01–O07 | `tests/cli.test.mjs`: `every export is consistent with the locked Result`, `summary reports computation coverage separately from unresolved differences`, `exit priority 2 > 3 > 1 > 0 publishes artifacts for 0, 1 and 3`; `scripts/workflows.mjs` checks full fixture record coverage, export rows and retained reports |
 | Q01–Q04 | `tests/cli.test.mjs`: `init-config output is canonical and round-trips through check-config once edited`, `check-config prints canonical normalized config and rejects drafts`, `end to end compare`, `resolve is reproducible and read-only on the source run`; exact commands are extracted from README by `node scripts/readme-smoke.mjs` |
 | V01–V04 | `npm run test:workflows`; `scripts/benchmark.mjs` and retained `task7-benchmark.json`; `examples/catalog/truth.json` plus fixture truth checks; claims and limits in `docs/validation.md` |
-| V05–V06 | Pending by design: no licensed real workflow or export inspection exists. Do not mark software tests as substitutes. |
+| V05–V06 | Pending by design: no observed customer workflow or Excel export inspection exists. The independently published public CSV case is V07; it does not close these requirements. |
 | D01–D04, D06 | Source review of MoonBit/Node boundary, `moon.mod`, `LICENSE`, dependency audit; final local commands in `validation.md`; public tracked payload review and synthetic fixture labels |
 | D05, D07–D09 | 最终整体审查及定向复审已通过；根任务本地门禁证据已归档。D07–D09已由实际3c506f1推送/API/README与run37055796591双平台成功、交付记录关闭；后续提交在最终交付时另核验。 |
 

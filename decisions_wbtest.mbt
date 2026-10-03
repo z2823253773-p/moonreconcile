@@ -690,3 +690,46 @@ test "decision_production_raw_and_active_row_boundaries_are_separate" {
     Ok(_) => assert_true(false)
   }
 }
+
+///|
+test "indexed_review_preserves_first_conflicting_record_and_reason_precedence" {
+  let left = must_csv("id,value\nA,same\nB,same\nC,same\n", "left")
+  let right = must_csv("id,value\nX,same\nY,same\nZ,same\n", "right")
+  let config = must_config()
+  let base = compare_tables(left, right, config)
+  let cases : Array[(String, String, Int)] = [
+    (
+      "right_unmatched,,R1,checked\nreject,L1,R1,checked\naccept,L1,R1,checked\n",
+      "conflicting_decisions", 1,
+    ),
+    (
+      "reject,L1,R1,checked\nright_unmatched,,R1,checked\naccept,L1,R1,checked\n",
+      "conflicting_decisions", 1,
+    ),
+    (
+      "accept,L1,R1,checked\naccept,L2,R1,checked\naccept,L1,R3,checked\n", "conflicting_decisions",
+      2,
+    ),
+    ("reject,L1,R1,checked\naccept,L1,R1,\n", "manual_override_needs_reason", 2),
+    (
+      "accept,L1,R1,checked\naccept,L1,R1,changed\nleft_unmatched,L99,,checked\n",
+      "conflicting_decisions", 2,
+    ),
+  ]
+  for (csv, code, record) in cases {
+    match
+      apply_decisions(
+        base,
+        must_decisions("action,left_id,right_id,reason\n" + csv),
+        left,
+        right,
+        config,
+      ) {
+      Ok(_) => assert_true(false)
+      Err(error) => {
+        assert_eq(error.code, code)
+        assert_eq(error.record, Json::number(record.to_double()))
+      }
+    }
+  }
+}

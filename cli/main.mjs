@@ -44,6 +44,11 @@ const USAGE = [
   "  reconcile check-config CONFIG",
   "  reconcile compare LEFT RIGHT --config CONFIG --out RUN",
   "  reconcile resolve RUN --decisions CSV --out REVIEWED",
+  "  reconcile --help | --version",
+  "",
+  "Exit codes: 0 complete without issues; 1 differences or outstanding review;",
+  "            2 input/configuration/I/O error; 3 incomplete computation.",
+  "Suggestions require review. init-config writes a draft, not executable rules.",
 ].join("\n");
 
 function parseArguments(argv) {
@@ -434,6 +439,15 @@ function reportFailure(error, context) {
 export async function run(argv, runtime = {}) {
   const context = makeContext(runtime);
   try {
+    if ((argv.length === 1 && argv[0] === "--help") ||
+      (argv.length === 2 && Object.hasOwn(COMMANDS, argv[0]) && argv[1] === "--help")) {
+      context.stdout(`${USAGE}\n`);
+      return 0;
+    }
+    if (argv.length === 1 && argv[0] === "--version") {
+      context.stdout(`MoonReconcile ${ENGINE_VERSION}\n`);
+      return 0;
+    }
     const parsed = parseArguments(argv);
     switch (parsed.command) {
       case "init-config":

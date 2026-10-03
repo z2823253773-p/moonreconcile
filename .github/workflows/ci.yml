@@ -83,6 +83,9 @@ jobs:
       - name: Synthetic workflow end-to-end chains
         run: npm run test:workflows
 
+      - name: Pinned actual public CSV snapshot workflow (no network)
+        run: npm run test:public-data
+
       - name: Independent assignment oracle
         run: python3 scripts/check-assignment-oracle.py
 

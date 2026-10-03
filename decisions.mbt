@@ -253,21 +253,6 @@ fn decision_to_json(decision : Decision) -> Json {
 }
 
 ///|
-fn decision_same(left : Decision, right : Decision) -> Bool {
-  left.action == right.action &&
-  left.left_record == right.left_record &&
-  left.right_record == right.right_record &&
-  left.reason == right.reason
-}
-
-///|
-fn decision_identity(left : Decision, right : Decision) -> Bool {
-  left.action == right.action &&
-  left.left_record == right.left_record &&
-  left.right_record == right.right_record
-}
-
-///|
 fn decision_threshold(config : Config) -> Int? {
   match json_object(Some(config.candidates)) {
     Some(specs) =>
@@ -280,26 +265,47 @@ fn decision_threshold(config : Config) -> Int? {
 }
 
 ///|
-fn threshold_candidate(
+fn qualified_review_pairs(
   base : ReconciliationResult,
-  decision : Decision,
   threshold : Int?,
-) -> Bool {
-  let left_id = result_record_id("left", decision.left_record.unwrap())
-  let right_id = result_record_id("right", decision.right_record.unwrap())
+) -> Map[String, Bool] {
+  let index : Map[String, Bool] = Map([])
   for candidate in base.candidates {
     match json_object(Some(candidate)) {
-      Some(fields) if fields.get("left_id") == Some(Json::string(left_id)) &&
-        fields.get("right_id") == Some(Json::string(right_id)) =>
-        match (fields.get("score"), threshold) {
-          (Some(Json::Number(score, ..)), Some(minimum)) =>
-            return score >= minimum.to_double()
-          _ => return false
+      Some(fields) =>
+        match
+          (
+            json_string(fields.get("left_id")),
+            json_string(fields.get("right_id")),
+          ) {
+          (Some(left_id), Some(right_id)) => {
+            let key = left_id + "#" + right_id
+            if !index.contains(key) {
+              index[key] = match (fields.get("score"), threshold) {
+                (Some(Json::Number(score, ..)), Some(minimum)) =>
+                  score >= minimum.to_double()
+                _ => false
+              }
+            }
+          }
+          _ => ()
         }
-      _ => ()
+      None => ()
     }
   }
-  false
+  index
+}
+
+///|
+fn review_pair_qualified(
+  index : Map[String, Bool],
+  decision : Decision,
+) -> Bool {
+  match (decision.left_record, decision.right_record) {
+    (Some(left), Some(right)) =>
+      index.get("L\{left}#R\{right}").unwrap_or(false)
+    _ => false
+  }
 }
 
 ///|
@@ -308,24 +314,6 @@ fn record_exists(record : Int?, total : Int) -> Bool {
     Some(value) => value > 0 && value <= total
     None => false
   }
-}
-
-///|
-fn record_is_exact(
-  base : ReconciliationResult,
-  left_record : Int?,
-  right_record : Int?,
-) -> Bool {
-  for pair in base.pairs {
-    if pair.source == "exact_key" &&
-      (
-        left_record == Some(pair.left_record) ||
-        right_record == Some(pair.right_record)
-      ) {
-      return true
-    }
-  }
-  false
 }
 
 ///|
@@ -362,16 +350,48 @@ fn decision_less(left : Decision, right : Decision) -> Bool {
 ///|
 fn sort_decisions(values : Array[Decision]) -> Array[Decision] {
   let sorted = values.copy()
-  for i in 0..<sorted.length() {
-    for j in 0..<(sorted.length() - i - 1) {
-      if decision_less(sorted[j + 1], sorted[j]) {
-        let item = sorted[j]
-        sorted[j] = sorted[j + 1]
-        sorted[j + 1] = item
-      }
+  sorted.sort_by(fn(a, b) {
+    if decision_less(a, b) {
+      -1
+    } else if decision_less(b, a) {
+      1
+    } else {
+      0
     }
-  }
+  })
   sorted
+}
+
+///|
+fn review_accept_index_add(
+  index : Map[Int, Array[Int]],
+  record : Int,
+  position : Int,
+) -> Unit {
+  match index.get(record) {
+    Some(positions) => if positions.length() < 2 { positions.push(position) }
+    None => index[record] = [position]
+  }
+}
+
+///|
+fn review_other_accept(
+  index : Map[Int, Array[Int]],
+  record : Int,
+  position : Int,
+  absent : Int,
+) -> Int {
+  match index.get(record) {
+    Some(positions) =>
+      if positions[0] != position {
+        positions[0]
+      } else if positions.length() > 1 {
+        positions[1]
+      } else {
+        absent
+      }
+    None => absent
+  }
 }
 
 ///|
@@ -387,7 +407,16 @@ pub fn apply_decisions(
   let unmatched_left_decisions : Array[Decision] = []
   let unmatched_right_decisions : Array[Decision] = []
   let unique : Array[Decision] = []
-  let threshold = decision_threshold(config)
+  let qualified = qualified_review_pairs(base, decision_threshold(config))
+  let exact_left : Map[Int, Bool] = Map([])
+  let exact_right : Map[Int, Bool] = Map([])
+  for pair in base.pairs {
+    if pair.source == "exact_key" {
+      exact_left[pair.left_record] = true
+      exact_right[pair.right_record] = true
+    }
+  }
+  let seen : Map[String, Decision] = Map([])
   for item in decisions {
     let exists = match item.action {
       "accept" | "reject" =>
@@ -410,7 +439,15 @@ pub fn apply_decisions(
         ),
       )
     }
-    if record_is_exact(base, item.left_record, item.right_record) {
+    let locked = (match item.left_record {
+        Some(record) => exact_left.contains(record)
+        None => false
+      }) ||
+      (match item.right_record {
+        Some(record) => exact_right.contains(record)
+        None => false
+      })
+    if locked {
       return Err(
         decision_error(
           "locked_exact_pair",
@@ -419,28 +456,61 @@ pub fn apply_decisions(
         ),
       )
     }
-    let mut duplicate = false
-    for previous in unique {
-      if decision_same(previous, item) {
-        duplicate = true
-      } else if decision_identity(previous, item) {
-        return Err(
-          decision_error(
-            "conflicting_decisions",
-            "the same action and endpoints have different reasons",
-            Some(item.csv_record),
-          ),
-        )
+    let identity = item.action +
+      "#" +
+      pair_key(item.left_record, item.right_record)
+    match seen.get(identity) {
+      Some(previous) =>
+        if previous.reason != item.reason {
+          return Err(
+            decision_error(
+              "conflicting_decisions",
+              "the same action and endpoints have different reasons",
+              Some(item.csv_record),
+            ),
+          )
+        }
+      None => {
+        seen[identity] = item
+        unique.push(item)
       }
     }
-    if !duplicate {
-      unique.push(item)
-    }
   }
-  for item in unique {
+  // Keep the original input-order error priority. For each acceptance, the
+  // earliest conflicting *other* row wins across all conflict categories.
+  let accept_left : Map[Int, Array[Int]] = Map([])
+  let accept_right : Map[Int, Array[Int]] = Map([])
+  let reject_pairs : Map[String, Int] = Map([])
+  let left_unmatched : Map[Int, Int] = Map([])
+  let right_unmatched : Map[Int, Int] = Map([])
+  for position in 0..<unique.length() {
+    let item = unique[position]
     match item.action {
       "accept" => {
-        if !threshold_candidate(base, item, threshold) &&
+        review_accept_index_add(
+          accept_left,
+          item.left_record.unwrap(),
+          position,
+        )
+        review_accept_index_add(
+          accept_right,
+          item.right_record.unwrap(),
+          position,
+        )
+      }
+      "reject" =>
+        reject_pairs[pair_key(item.left_record, item.right_record)] = position
+      "left_unmatched" => left_unmatched[item.left_record.unwrap()] = position
+      "right_unmatched" =>
+        right_unmatched[item.right_record.unwrap()] = position
+      _ => ()
+    }
+  }
+  for position in 0..<unique.length() {
+    let item = unique[position]
+    match item.action {
+      "accept" => {
+        if !review_pair_qualified(qualified, item) &&
           ascii_trim(item.reason).is_empty() {
           return Err(
             decision_error(
@@ -450,48 +520,54 @@ pub fn apply_decisions(
             ),
           )
         }
-        for other in unique {
-          if other.action == "accept" &&
-            !decision_same(item, other) &&
-            (
-              item.left_record == other.left_record ||
-              item.right_record == other.right_record
-            ) {
-            return Err(
-              decision_error(
-                "conflicting_decisions",
-                "accepted pairs cannot share a record endpoint",
-                Some(other.csv_record),
-              ),
-            )
+        let absent = unique.length()
+        let mut conflict = absent
+        let mut message = ""
+        for
+          other in [
+            review_other_accept(
+              accept_left,
+              item.left_record.unwrap(),
+              position,
+              absent,
+            ),
+            review_other_accept(
+              accept_right,
+              item.right_record.unwrap(),
+              position,
+              absent,
+            ),
+          ] {
+          if other < conflict {
+            conflict = other
+            message = "accepted pairs cannot share a record endpoint"
           }
-          if other.action == "reject" &&
-            pair_key(item.left_record, item.right_record) ==
-            pair_key(other.left_record, other.right_record) {
-            return Err(
-              decision_error(
-                "conflicting_decisions",
-                "the same pair cannot be both accepted and rejected",
-                Some(other.csv_record),
-              ),
-            )
+        }
+        let rejected = reject_pairs
+          .get(pair_key(item.left_record, item.right_record))
+          .unwrap_or(absent)
+        if rejected < conflict {
+          conflict = rejected
+          message = "the same pair cannot be both accepted and rejected"
+        }
+        for
+          other in [
+            left_unmatched.get(item.left_record.unwrap()).unwrap_or(absent),
+            right_unmatched.get(item.right_record.unwrap()).unwrap_or(absent),
+          ] {
+          if other < conflict {
+            conflict = other
+            message = "an accepted endpoint cannot also be confirmed unmatched"
           }
-          if (
-              other.action == "left_unmatched" &&
-              item.left_record == other.left_record
-            ) ||
-            (
-              other.action == "right_unmatched" &&
-              item.right_record == other.right_record
-            ) {
-            return Err(
-              decision_error(
-                "conflicting_decisions",
-                "an accepted endpoint cannot also be confirmed unmatched",
-                Some(other.csv_record),
-              ),
-            )
-          }
+        }
+        if conflict < absent {
+          return Err(
+            decision_error(
+              "conflicting_decisions",
+              message,
+              Some(unique[conflict].csv_record),
+            ),
+          )
         }
         accepted.push(item)
       }
@@ -532,7 +608,7 @@ pub fn apply_decisions(
       right_record,
       source: "human_review",
       reason: item.reason,
-      is_override: !threshold_candidate(base, item, threshold),
+      is_override: !review_pair_qualified(qualified, item),
       fields: comparisons,
     })
   }
@@ -554,46 +630,48 @@ pub fn apply_decisions(
   unmatched_left.sort()
   unmatched_right.sort()
 
+  let disposed_left : Map[Int, Bool] = Map([])
+  let disposed_right : Map[Int, Bool] = Map([])
+  for item in accepted {
+    disposed_left[item.left_record.unwrap()] = true
+    disposed_right[item.right_record.unwrap()] = true
+  }
+  for item in unmatched_left_decisions {
+    disposed_left[item.left_record.unwrap()] = true
+  }
+  for item in unmatched_right_decisions {
+    disposed_right[item.right_record.unwrap()] = true
+  }
+  let rejected_pairs : Map[String, Bool] = Map([])
+  for item in rejects {
+    rejected_pairs[pair_key(item.left_record, item.right_record)] = true
+  }
   let pending_left_records = base.pending_left_records.filter(fn(record) {
-    !accepted.any(fn(item) { item.left_record == Some(record) }) &&
-    !unmatched_left_decisions.any(fn(item) { item.left_record == Some(record) })
+    !disposed_left.contains(record)
   })
   let pending_right_records = base.pending_right_records.filter(fn(record) {
-    !accepted.any(fn(item) { item.right_record == Some(record) }) &&
-    !unmatched_right_decisions.any(fn(item) {
-      item.right_record == Some(record)
-    })
+    !disposed_right.contains(record)
   })
   let unprocessed_left = base.unprocessed_left_records.filter(fn(record) {
-    !accepted.any(fn(item) { item.left_record == Some(record) }) &&
-    !unmatched_left_decisions.any(fn(item) { item.left_record == Some(record) })
+    !disposed_left.contains(record)
   })
   let unprocessed_right = base.unprocessed_right_records.filter(fn(record) {
-    !accepted.any(fn(item) { item.right_record == Some(record) }) &&
-    !unmatched_right_decisions.any(fn(item) {
-      item.right_record == Some(record)
-    })
+    !disposed_right.contains(record)
   })
   let candidates = base.candidates.map(fn(candidate) {
     match json_object(Some(candidate)) {
       Some(fields) => {
-        let left_id = json_string(fields.get("left_id")).unwrap_or("")
-        let right_id = json_string(fields.get("right_id")).unwrap_or("")
-        let disposed = accepted.any(fn(item) {
-            item.left_record == Some(record_id_num(left_id)) ||
-            item.right_record == Some(record_id_num(right_id))
-          }) ||
-          unmatched_left_decisions.any(fn(item) {
-            item.left_record == Some(record_id_num(left_id))
-          }) ||
-          unmatched_right_decisions.any(fn(item) {
-            item.right_record == Some(record_id_num(right_id))
-          }) ||
-          rejects.any(fn(item) {
-            item.left_record == Some(record_id_num(left_id)) &&
-            item.right_record == Some(record_id_num(right_id))
-          })
-        if disposed {
+        let left_record = record_id_num(
+          json_string(fields.get("left_id")).unwrap_or(""),
+        )
+        let right_record = record_id_num(
+          json_string(fields.get("right_id")).unwrap_or(""),
+        )
+        if disposed_left.contains(left_record) ||
+          disposed_right.contains(right_record) ||
+          rejected_pairs.contains(
+            pair_key(Some(left_record), Some(right_record)),
+          ) {
           let copy = fields.copy()
           copy["suggested"] = Json::boolean(false)
           Json::object(copy)
@@ -654,7 +732,7 @@ pub fn apply_decisions(
         {
           ..item,
           is_override: item.action == "accept" &&
-          !threshold_candidate(base, item, threshold),
+          !review_pair_qualified(qualified, item),
         }
       }),
     ),

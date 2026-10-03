@@ -10,6 +10,7 @@ The reusable comparison engine is written in MoonBit. Node.js provides the file 
 - Unique-key matching, diagnostics for invalid or duplicate keys, and scored one-to-one suggestions for remaining rows. Suggestions always require human review.
 - Cumulative review decisions, integrity-checked input snapshots, and JSON, CSV, and Markdown reports.
 - Three complete synthetic examples for order reconciliation, migration checks, and product catalogs.
+- A pinned actual public-data case: two OurAirports CSV snapshots, with independently checked additions and field changes.
 
 The examples are authored fixtures, not customer data. The catalog fixture deliberately makes the highest-scoring suggestion false to demonstrate why suggestions require review. It does not establish real-world accuracy or improved matching performance.
 
@@ -26,6 +27,7 @@ npm test
 python3 scripts/check-assignment-oracle.py
 python3 scripts/check-library-consumer.py
 npm run test:workflows
+npm run test:public-data
 node scripts/readme-smoke.mjs
 ```
 
@@ -33,7 +35,7 @@ CI runs these gates on Ubuntu 24.04 and macOS 15, recording the actual MoonBit i
 
 ## CLI
 
-Run `node cli/main.mjs` without arguments for help. `init-config` writes a draft that must be edited, `check-config` normalizes and validates the edited rules, `compare` creates a self-contained run directory, and `resolve` replays reviewed decisions from its snapshots.
+Run `node cli/main.mjs --help` for usage or `node cli/main.mjs --version` for the engine version. Help works before building the bridge. `init-config` writes a draft that must be edited, `check-config` normalizes and validates the edited rules, `compare` creates a self-contained run directory, and `resolve` replays reviewed decisions from its snapshots.
 
 Exit status precedence is 2 for input/configuration/I/O error, 3 for incomplete computation, 1 for a complete run with outstanding differences or review, and 0 for a complete run without issues. A command can produce reports while correctly returning 1 for outstanding issues or 3 for incomplete computation.
 
@@ -62,11 +64,11 @@ node scripts/check-readme-smoke-output.mjs "$SMOKE_DIR/replayed-run" # @expect: 
 
 ## Example workflow
 
-For complete example inputs, rules, decisions, and expected outcomes, see [orders](examples/orders/README.md), [migration](examples/migration/README.md), and [catalog](examples/catalog/README.md). Their end-to-end gate is `npm run test:workflows`.
+For complete example inputs, rules, decisions, and expected outcomes, see [orders](examples/orders/README.md), [migration](examples/migration/README.md), and [catalog](examples/catalog/README.md). Their end-to-end gate is `npm run test:workflows`. The [actual public OurAirports snapshot case](examples/ourairports/README.md) adds 2558/2569 records, 11 additions and 18 changed fields, checked by `npm run test:public-data` without network access. Source hashes, independent expectations and fixture reproduction are included.
 
 ## Scope and evidence
 
-The current implementation reads and writes CSV; it does not read XLSX. No real workflow, user study, time saving, or population matching accuracy has been validated. The competitor comparison is based on published documentation, not local benchmark runs. The October 2026 official page evidence and its limits are recorded in [the dated source note](docs/evidence/official-requirements-2026-10-01.md). The repository documents delivered code and verification separately from contest eligibility, registration, acceptance, or adoption.
+The current implementation reads and writes CSV; it does not read XLSX. A public dataset-version workflow is verified; actual user demand, user studies, time saving and population matching accuracy remain unmeasured. The competitor comparison is based on published documentation, not local benchmark runs. The October 2026 official page evidence and its limits are recorded in [the dated source note](docs/evidence/official-requirements-2026-10-01.md). The repository documents delivered code and verification separately from contest eligibility, registration, acceptance, or adoption.
 
 See [the specification](docs/spec.md), [configuration reference](docs/configuration.md), [review workflow](docs/review-workflow.md), [architecture](docs/architecture.md), [acceptance matrix](docs/acceptance-matrix.md), [validation record](docs/validation.md), [limitations](docs/limitations.md), [dependency audit](docs/dependency-audit.md), and [project proposal](docs/project-proposal.md).
 

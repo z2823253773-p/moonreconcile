@@ -10,7 +10,8 @@
     "build": "node scripts/build.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:workflows": "node scripts/workflows.mjs",
-    "benchmark": "node scripts/benchmark.mjs"
+    "benchmark": "node scripts/benchmark.mjs",
+    "test:public-data": "node scripts/check-ourairports.mjs"
   },
   "engines": {
     "node": ">=22"
