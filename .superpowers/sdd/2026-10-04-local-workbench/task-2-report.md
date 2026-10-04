@@ -5,7 +5,7 @@ Status: **BLOCKED / partial implementation**. This checkout contains a working l
 | Evidence | Result |
 | --- | --- |
 | Base | `a52122c5aa915e17ff7abbe8835c0f59cdcd21ea` |
-| Implementation HEAD | `00584fb319b34296171a4ac2fc9a42674d59e792` |
+| Implementation commit | `95676b470a1fd26ca8283030397137a1de1a10d4` |
 | Build | `MOON_HOME=MOONBIT_HOME=/private/tmp/moonreconcile-task8-toolchain PATH=/private/tmp/moonreconcile-task8-toolchain/bin:$PATH npm run build` — exit 0, MoonBit reported no work |
 | Initial red | `node --test tests/workbench-{host,server,jobs}.test.mjs` — exit 1, 3 files failed to load because workbench modules did not exist |
 | Focused tests | `node --test tests/workbench-{host,server,jobs}.test.mjs` (loopback permission) — exit 0, 4/4 |
