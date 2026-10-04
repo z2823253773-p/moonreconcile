@@ -15,7 +15,7 @@
 - **GREEN：**`node --test tests/workbench-config.test.mjs` 通过 8/8。覆盖 Config v1 经核心规范化后的逐字节 JSON round-trip、`__proto__`/数字样式映射键、空 missing、`both_missing=issue`、compare=false、容差字符串、候选与 blocking、重复映射拒绝、未知属性核心拒绝、改类型/删字段保留值和引用、严格整数词法、令牌 fragment 清理、同源 API 路径、stale 状态以及静态白名单和 Import 元数据路由。
 - JavaScript 语法检查：对新增七个 `.mjs` 文件和 `workbench/server.mjs` 运行 `node --check`，全部通过。
 - `git diff --check` 通过。
-- 完整 Node 门禁：在隔离工具链环境执行 `MOON_HOME=.../.superpowers/sdd/2026-10-04-local-workbench/toolchain MOONBIT_HOME=.../.superpowers/sdd/2026-10-04-local-workbench/toolchain PATH="/bin:$PATH" npm test`；build 成功，Node 测试 100/100 通过，退出 0。运行时 Node 为 v24.15.0；这不替代后续 Node 22 离线包门禁。
+- Earlier implementation-stage gate: the prior report recorded 100/100 on an earlier commit. Its original full tool invocation and a persistent stdout log were not retained in this checkout, so that historical command is not reconstructed here and is not evidence for Round 1.
 - 全量测试包括 Task 2 的 loopback server/job/host 测试；沙箱默认运行曾因 `listen(127.0.0.1): EPERM` 失败。使用用户已授权的本地 loopback 测试权限重跑后通过。
 
 ## 浏览器操作状态
@@ -43,5 +43,16 @@
 - 上传新文件显示其实际文件名并清除当前示例来源总标签；保留另一侧各自准确的来源标签。
 - RED：新增 `tests/workbench-ui.test.mjs` 后，候选/映射分页边界、缺失项与 ignore 空数组、未映射列和校验摘要、延迟比较 stale 竞态、规范配置下载等待期间的编辑、文件替换来源标识均按相应旧行为失败；修正夹具后，回归断言基于可观察界面状态验证。
 - Focused GREEN：`node --test tests/workbench-ui.test.mjs`，7/7 通过；`git diff --check` 通过。
-- 最终完整门禁：在本轮全部源码下执行 `MOON_HOME='<worktree>/.superpowers/sdd/2026-10-04-local-workbench/toolchain' MOONBIT_HOME='<worktree>/.superpowers/sdd/2026-10-04-local-workbench/toolchain' PATH="/bin:$PATH" npm test`，build 成功，Node 测试 107/107 通过，退出 0。HTTP server tests 需要绑定 127.0.0.1，因此用已授权的本机 loopback 权限运行。
+- 最终完整门禁的实际工具调用命令为 `MOON_HOME='/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/.superpowers/sdd/2026-10-04-local-workbench/toolchain' MOONBIT_HOME='/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/.superpowers/sdd/2026-10-04-local-workbench/toolchain' PATH="/bin:$PATH" npm test`；build 成功，Node 测试 107/107 通过，退出 0。HTTP server tests 需要绑定 127.0.0.1，因此用已授权的本机 loopback 权限运行。该调用的 stdout 只作为 `functions.exec` 工具返回内容保存，没有另写持久日志文件；返回尾部为 `tests 107 / pass 107 / fail 0 / duration_ms 8520.765625`。
+- 环境转录说明：实际命令的 PATH 前缀确为 `/bin`，不是恢复工具链的 `bin` 目录；不能据此声称隔离 SDK `bin` 被放在 PATH 首位。恢复记录给出的可复用隔离配置是 `PATH='/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/.superpowers/sdd/2026-10-04-local-workbench/toolchain/bin:<existing PATH>'`，但这不是本次已执行命令，未为修正文案而重跑。
+- 修复代码提交为 `3bd65faa0baa5d8469c81341f48121a0ac17b101`。提交后代码工作区曾确认 clean；本次命令转录仅修改此报告，不改产品文件，也不另做提交。
 - 最终 SHA 的浏览器重验仍由控制器执行；上一轮 orders/CLI 字节一致、390px 键盘和布局截图属于诊断 SHA，本轮不把它们声明为最终 SHA 验收。
+
+## 审查修复：Round 2
+
+- 根因：check、原始 Config 导入和草稿下载成功后，表单的 `FormModel` 被写入共享 `store.config`；订阅者又把它当 Config v1 转成 `FormModel`，映射行遂变成类似 `0 → [object Object]` 的错误内容。现共享 store 只保存核心返回或下载得到的规范 Config v1；`FormModel` 留在配置表单模块内。不可表示的重复映射编辑保留在本地表单，调用 `state.invalidateRules()` 清除已校验绑定、标记旧结果并递增 source/rule generation；每次此类编辑都会递增，包括已经 dirty 后的后续编辑。该接口是 Task 4 共用状态合同：异步工作以 `generation()` 捕获上下文，任何来源或规则编辑（包括暂不可规范化的表单编辑）都会使旧上下文失效。
+- 校验绑定仅在 `config_asset_id` 或 `draft_dirty` 变化时也刷新摘要、未映射列区和导出按钮；stale 提示同步“可运行新比较/需重新校验”状态。配置摘要用 JSON 数组表示 missing 项，因此 `['']` 和 `[]` 清晰可辨。
+- RED：共享 canonical-state 回归先按 check、导入和非法映射修复三条成功路径失败，观察到共享 state 中映射行对象替代规范映射对象。修正后，测试再以可观察行为发现并阻止“绑定清除后旧导出仍启用”的问题。
+- Focused GREEN：`node --test tests/workbench-ui.test.mjs`，11/11 通过。新增真实 MoonBit 核心 `check_config` 规范化与 compare 覆盖 `__proto__`、`2`/`10` 数字样式键、空 missing 项、成功 raw import、成功草稿、无关字段编辑后重校验、重复映射暂存本地再修复，以及最终核心比较结果。
+- Full GREEN：实际执行 `set -o pipefail`，随后执行 `MOON_HOME='/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/.superpowers/sdd/2026-10-04-local-workbench/toolchain' MOONBIT_HOME='/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/.superpowers/sdd/2026-10-04-local-workbench/toolchain' PATH='/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/.superpowers/sdd/2026-10-04-local-workbench/toolchain/bin':"$PATH" npm test 2>&1 | tee /private/tmp/task3-round2-npm-test.log`。隔离 SDK `bin` 在 PATH 首位；build 成功，Node 测试 111/111 通过，退出 0，日志为 `/private/tmp/task3-round2-npm-test.log`，尾部 `tests 111 / pass 111 / fail 0 / duration_ms 8035.636`。`git diff --check` 和两个修改过的 `.mjs` 文件 `node --check` 也通过。
+- 本轮最终提交 SHA 的真实浏览器复验仍待控制器执行；本报告不把先前诊断 SHA 截图当作本 SHA 证据。

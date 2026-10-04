@@ -30,6 +30,20 @@ function configWith({mappingCount=0,candidates=0}={}) {
   assert.equal(JSON.parse(invoke(JSON.stringify({op:'check_config',config}))).ok,true);
   return config;
 }
+function mappingFixture() {
+  const values=()=>{const map={};Object.defineProperty(map,'__proto__',{value:'special',enumerable:true,configurable:true,writable:true});map['10']='ten';map['2']='two';return map;};
+  const field=(name,{left_values={},right_values={},missing=[]}={})=>({name,left:name,right:name,type:'text',compare:name!=='id',trim_ascii:false,lower_ascii:false,left_values,right_values,missing,both_missing:'equal',abs_tol:'0',rel_tol:'0',days_tol:0});
+  return {schema_version:1,fields:[field('id'),field('status',{left_values:values(),right_values:values(),missing:['']}),field('memo')],key:['id'],ignore_left:[],ignore_right:[],candidates:null};
+}
+function coreConfigApi() {
+  let serial=0;const uploads=new Map(),canonical=new Map(),jobs=new Map();
+  return {
+    upload:async(_kind,file)=>{const id=`upload-${++serial}`;uploads.set(id,JSON.parse(await file.text()));return{asset_id:id};},
+    request:async(path,{body}={})=>{assert.equal(path,'/api/config/check');const checked=JSON.parse(invoke(JSON.stringify({op:'check_config',config:uploads.get(body.config_asset_id)})));assert.equal(checked.ok,true,JSON.stringify(checked.error));const id=`config-${serial}`,job=`job-${serial}`;canonical.set(id,checked.config);jobs.set(job,{config_asset_id:id});return{job_id:job};},
+    waitJob:async(id)=>({output:jobs.get(id)}),
+    download:async(path)=>new Blob([JSON.stringify(canonical.get(path.split('/')[3]))]),
+  };
+}
 function mountConfig(config,{headersLeft=['left-0','unused-left'],headersRight=['right-0','unused-right']}={}) {
   const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState();
   const dispose=renderConfigView({root,store,api:{}});
@@ -179,6 +193,81 @@ test('blank missing markers remain editable and clearing ignore lists creates em
   const ignore=inputByLabel(root,'忽略左侧列（每行一项）');ignore.value='';await ignore.fire('input');
   assert.deepEqual(store.get().config.ignore_left,[]);
   dispose();
+});
+
+test('draft download stores canonical Config while the form keeps editable mapping rows locally', async () => {
+  const config=mappingFixture(),document=makeDocument(),root=new FakeNode('main'),store=createWorkbenchState();globalThis.document=document;
+  const api={request:async(path)=>{assert.equal(path,'/api/config/draft');return{job_id:'draft-job'};},waitJob:async()=>({output:{config_asset_id:'draft-asset'}}),download:async(path)=>{assert.equal(path,'/api/configs/draft-asset/export');return new Blob([JSON.stringify(config)]);}};
+  renderConfigView({root,store,api});store.update({left_import_id:'left',right_import_id:'right',left_headers:['id','status','memo'],right_headers:['id','status','memo']});
+  await buttonBy(root,'从当前列生成空白草稿').fire('click');
+  assert.deepEqual(store.get().config,config,'draft state is canonical Config v1, never the editor FormModel');
+  const statusCard=walk(root).find((node)=>node.tag==='article'&&node.className==='field-card'&&node.textContent.includes('字段 2: status'));
+  const mapSection=walk(statusCard).find((node)=>node.tag==='section'&&node.children[0]?.textContent.startsWith('左侧值映射'));
+  assert.deepEqual(mapSection.querySelectorAll('input').map((input)=>input.value),['2','two','10','ten','__proto__','special']);
+  assert.equal(store.get().config_asset_id,null);assert.equal(store.get().draft_dirty,true);
+});
+
+test('successful check stores canonical mappings and unrelated edits recheck to the same core result', async () => {
+  const raw=mappingFixture(),expected=JSON.parse(invoke(JSON.stringify({op:'check_config',config:raw}))).config;
+  const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState(),api=coreConfigApi();
+  renderConfigView({root,store,api});store.update({left_import_id:'left',right_import_id:'right',left_headers:['id','status','memo'],right_headers:['id','status','memo'],config:raw,draft_dirty:true});
+  await buttonBy(root,'校验并保存规则').fire('click');
+  assert.deepEqual(store.get().config,expected,'validated state remains normalized Config v1, not the FormModel');
+  assert.match(root.textContent,/缺失标记 \[""\]/);
+  const memoCard=walk(root).find((node)=>node.tag==='article'&&node.className==='field-card'&&node.textContent.includes('字段 3: memo'));
+  const memoName=inputByLabel(memoCard,'逻辑字段名');memoName.value='memo-renamed';await memoName.fire('input');
+  await buttonBy(root,'校验并保存规则').fire('click');
+  const rechecked=JSON.parse(invoke(JSON.stringify({op:'check_config',config:{...expected,fields:expected.fields.map((field)=>field.name==='memo'?{...field,name:'memo-renamed'}:field)}}))).config;
+  assert.deepEqual(store.get().config,rechecked);
+  assert.deepEqual(Object.entries(store.get().config.fields[1].left_values),[['2','two'],['10','ten'],['__proto__','special']]);
+  assert.deepEqual(store.get().config.fields[1].missing,['']);
+  const csv='id,status,memo\n1,__proto__,same\n2,2,same\n';
+  const compared=JSON.parse(invoke(JSON.stringify({op:'compare',left_csv:csv,right_csv:csv,config:store.get().config})));
+  assert.equal(compared.ok,true,JSON.stringify(compared.error));assert.equal(compared.result.exit_code,0);assert.equal(compared.result.summary.unresolved_count,0);
+});
+
+test('successful raw Config JSON import keeps canonical special mappings and blank missing marker', async () => {
+  const raw=mappingFixture(),expected=JSON.parse(invoke(JSON.stringify({op:'check_config',config:raw}))).config;
+  const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState(),api=coreConfigApi();
+  renderConfigView({root,store,api});store.update({left_import_id:'left',right_import_id:'right',left_headers:['id','status','memo'],right_headers:['id','status','memo']});
+  const file=inputByLabel(root,'导入配置 JSON');file.files=[{name:'mapped.json',text:async()=>JSON.stringify(raw)}];await file.fire('change');
+  assert.deepEqual(store.get().config,expected,'imported validation publishes the core-normalized Config v1');
+  assert.deepEqual(Object.entries(store.get().config.fields[1].right_values),[['2','two'],['10','ten'],['__proto__','special']]);
+  assert.deepEqual(store.get().config.fields[1].missing,['']);
+  const statusCard=walk(root).find((node)=>node.tag==='article'&&node.className==='field-card'&&node.textContent.includes('字段 2: status'));
+  const mapSection=walk(statusCard).find((node)=>node.tag==='section'&&node.children[0]?.textContent.startsWith('左侧值映射'));
+  assert.deepEqual(mapSection.querySelectorAll('input').map((input)=>input.value),['2','two','10','ten','__proto__','special']);
+  assert.match(root.textContent,/缺失标记 \[""\]/,'the checked summary distinguishes a blank item from an empty list');
+});
+
+test('invalid duplicate mapping stays local and can be fixed before lossless recheck', async () => {
+  const raw=mappingFixture(),expected=JSON.parse(invoke(JSON.stringify({op:'check_config',config:raw}))).config;
+  const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState(),api=coreConfigApi();
+  renderConfigView({root,store,api});store.update({left_import_id:'left',right_import_id:'right',left_headers:['id','status','memo'],right_headers:['id','status','memo'],config:raw,draft_dirty:true});
+  await buttonBy(root,'校验并保存规则').fire('click');
+  assert.deepEqual(store.get().config,expected);
+  const canonicalBefore=store.get().config;
+  let statusCard=walk(root).find((node)=>node.tag==='article'&&node.className==='field-card'&&node.textContent.includes('字段 2: status'));
+  let leftMap=walk(statusCard).find((node)=>node.tag==='section'&&node.children[0]?.textContent.startsWith('左侧值映射'));
+  let mappingInputs=leftMap.querySelectorAll('input');
+  mappingInputs[2].value='2';await mappingInputs[2].fire('input');
+  assert.equal(store.get().config,canonicalBefore,'unrepresentable duplicate rows stay only in the local form');
+  assert.equal(store.get().draft_dirty,true);assert.equal(store.get().config_asset_id,null);
+  assert.equal(buttonBy(root,'导出已校验配置').disabled,true);
+  assert.equal(walk(root).filter((node)=>node.className==='notice success validation-summary')[0].hidden,true);
+  const invalidGeneration=store.generation();
+  const memoCard=walk(root).find((node)=>node.tag==='article'&&node.className==='field-card'&&node.textContent.includes('字段 3: memo'));
+  const memoName=inputByLabel(memoCard,'逻辑字段名');memoName.value='memo-renamed';await memoName.fire('input');
+  assert.ok(store.generation()>invalidGeneration,'each additional unrepresentable edit invalidates async context');
+  assert.equal(store.get().config,canonicalBefore);
+  mappingInputs=leftMap.querySelectorAll('input');mappingInputs[2].value='10';await mappingInputs[2].fire('input');
+  await buttonBy(root,'校验并保存规则').fire('click');
+  assert.equal(store.get().config.fields[2].name,'memo-renamed');
+  assert.deepEqual(Object.entries(store.get().config.fields[1].left_values),[['2','two'],['10','ten'],['__proto__','special']]);
+  assert.deepEqual(store.get().config.fields[1].missing,['']);
+  const csv='id,status,memo\n1,__proto__,same\n2,2,same\n';
+  const compared=JSON.parse(invoke(JSON.stringify({op:'compare',left_csv:csv,right_csv:csv,config:store.get().config})));
+  assert.equal(compared.ok,true,JSON.stringify(compared.error));assert.equal(compared.result.exit_code,0);assert.equal(compared.result.summary.unresolved_count,0);
 });
 
 async function waitFor(predicate) { for(let i=0;i<100;i++){if(predicate())return;await new Promise((resolve)=>setTimeout(resolve,0));}throw new Error('Timed out waiting for UI state'); }

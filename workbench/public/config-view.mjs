@@ -55,8 +55,8 @@ export function renderConfigView({ root, store, api }) {
   };
   const updateDraft = () => {
     editGeneration++;
-    try { store.update({ config: formToConfig(model), draft_dirty: true, error: null }); }
-    catch { store.update({ config: structuredClone(model), draft_dirty: true, error: null }); }
+    try { store.update({ config: formToConfig(model), config_asset_id: null, draft_dirty: true, error: null }); }
+    catch { store.invalidateRules({ error: null }); }
   };
   const inputFor = (text, node, key, convert = (v) => v) => {
     node.addEventListener('input', () => { text[key] = convert(node.value); updateDraft(); }); return label(FIELD_LABELS[key] ?? key, node);
@@ -86,7 +86,7 @@ export function renderConfigView({ root, store, api }) {
         const out = await runJob(() => api.request('/api/config/draft', { method: 'POST', body: { left_import_id: current.left_import_id, right_import_id: current.right_import_id } }));
         const blob = await api.download(`/api/configs/${out.config_asset_id}/export`), text = await blob.text();
         if (!contextMatches(context)) throw new Error('草稿生成期间来源或规则已变化；保留当前表单，请重新生成。');
-        model = configToForm(JSON.parse(text)); model.draft = true; resetPages(); store.update({ config: model, config_asset_id: null, draft_dirty: true, error: null }); render();
+        const draftConfig=JSON.parse(text);model = configToForm(draftConfig);resetPages();store.update({ config: draftConfig, config_asset_id: null, draft_dirty: true, error: null }); render();
       } catch(error) {store.update({error:error.message});render();}
     }, { disabled: globallyBusy }));
     const configFile = element('input', { type: 'file', accept: '.json,application/json', disabled: globallyBusy });
@@ -100,7 +100,7 @@ export function renderConfigView({ root, store, api }) {
         const checked=await runJob(()=>api.request('/api/config/check',{method:'POST',body:{left_import_id:current.left_import_id,right_import_id:current.right_import_id,config_asset_id:uploaded.asset_id}}));
         const blob=await api.download(`/api/configs/${checked.config_asset_id}/export`),text=await blob.text();
         if(!contextMatches(context))throw new Error('校验期间来源或规则已变化；保留当前表单，请重新校验。');
-        const next=configToForm(JSON.parse(text));model=next;resetPages();store.update({config:model,config_asset_id:checked.config_asset_id,draft_dirty:false,error:null});render();
+        const normalized=JSON.parse(text);model=configToForm(normalized);resetPages();store.update({config:normalized,config_asset_id:checked.config_asset_id,draft_dirty:false,error:null});render();
       }catch(error){store.update({error:error.message});render();/* Keep the current form and validated binding on import/check failure. */}
       finally{busy=false;store.update({active_job:null});render();}
     });
@@ -160,8 +160,8 @@ export function renderConfigView({ root, store, api }) {
         const out=await runJob(()=>api.request('/api/config/check',{method:'POST',body:{left_import_id:current.left_import_id,right_import_id:current.right_import_id,config_asset_id:asset.asset_id}}));
         const canonicalBlob=await api.download(`/api/configs/${out.config_asset_id}/export`),canonicalText=await canonicalBlob.text();
         if(!contextMatches(context))throw new Error('校验期间来源或规则已变化；保留当前表单，请重新校验。');
-        model=configToForm(JSON.parse(canonicalText));resetPages();
-        store.update({config:model,config_asset_id:out.config_asset_id,draft_dirty:false,error:null});render();
+        const normalized=JSON.parse(canonicalText);model=configToForm(normalized);resetPages();
+        store.update({config:normalized,config_asset_id:out.config_asset_id,draft_dirty:false,error:null});render();
       } catch(error) {store.update({error:error.message});render(); /* error remains visible */}
       finally{busy=false;store.update({active_job:null});render();}
     },{disabled:busy||!model}));
@@ -173,7 +173,7 @@ export function renderConfigView({ root, store, api }) {
     for(const field of validated?.fields??[]) {
       const transforms=[field.trim_ascii?'去除 ASCII 首尾空白':null,field.lower_ascii?'ASCII 转小写':null].filter(Boolean);
       const maps=(items)=>{const pairs=Array.isArray(items)?items.map(({key,value})=>[key,value]):Object.entries(items??{});return pairs.length?pairs.map(([key,value])=>`${key} → ${value}`).join('；'):'无';};
-      validationNote.append(element('p',{text:`字段 ${field.name}：${field.type}；左列 ${field.left}；右列 ${field.right}；${validated.key.includes(field.name)?'主键；':''}${field.compare?'参与比较':'不参与比较'}；双方缺失 ${field.both_missing}；变换 ${transforms.length?transforms.join('、'):'无'}；左右映射 ${maps(field.left_values)} / ${maps(field.right_values)}；缺失标记 ${field.missing.join('、')||'无'}；容差 abs=${field.abs_tol}, rel=${field.rel_tol}, days=${field.days_tol}。`}));
+      validationNote.append(element('p',{text:`字段 ${field.name}：${field.type}；左列 ${field.left}；右列 ${field.right}；${validated.key.includes(field.name)?'主键；':''}${field.compare?'参与比较':'不参与比较'}；双方缺失 ${field.both_missing}；变换 ${transforms.length?transforms.join('、'):'无'}；左右映射 ${maps(field.left_values)} / ${maps(field.right_values)}；缺失标记 ${JSON.stringify(field.missing)}；容差 abs=${field.abs_tol}, rel=${field.rel_tol}, days=${field.days_tol}。`}));
     }
     validationNote.append(element('p',{text:`主键：${validated?.key?.join('、')||'无'}；忽略左侧：${validated?.ignore_left?.join('、')||'无'}；忽略右侧：${validated?.ignore_right?.join('、')||'无'}。`}));
     if(validated?.candidates) {
@@ -186,19 +186,21 @@ export function renderConfigView({ root, store, api }) {
   };
   function resetMapPages(){leftMapPage={};rightMapPage={};missingPages={};}
   function resetPages(){fieldPage=0;candidatePage=0;resetMapPages();}
-  let lastLeft=store.get().left_import_id,lastRight=store.get().right_import_id,lastConfig=store.get().config,lastStale=store.get().stale,lastJob=store.get().active_job;
-  const syncStaleNotice=()=>{const existing=root.querySelector('.stale-notice');if(store.get().stale&&!existing){root.querySelector('h2')?.after(element('p',{className:'notice warning stale-notice',role:'status',text:staleMessage()}));}else if(!store.get().stale)existing?.remove();};
+  let lastLeft=store.get().left_import_id,lastRight=store.get().right_import_id,lastConfig=store.get().config,lastStale=store.get().stale,lastAsset=store.get().config_asset_id,lastDraft=store.get().draft_dirty,lastJob=store.get().active_job;
+  const syncStaleNotice=()=>{const existing=root.querySelector('.stale-notice');if(store.get().stale&&!existing){root.querySelector('h2')?.after(element('p',{className:'notice warning stale-notice',role:'status',text:staleMessage()}));}else if(store.get().stale&&existing)existing.textContent=staleMessage();else if(!store.get().stale)existing?.remove();};
   const dispose = store.subscribe((next) => {
     const sourceChanged=next.left_import_id!==lastLeft||next.right_import_id!==lastRight;
     const configChanged=next.config!==lastConfig;
+    const bindingChanged=next.config_asset_id!==lastAsset||next.draft_dirty!==lastDraft;
     if(sourceChanged){lastLeft=next.left_import_id;lastRight=next.right_import_id;resetPages();if(configChanged)model=next.config?configToForm(next.config):null;render();}
     else if(lastStale!==next.stale)syncStaleNotice();
     if(configChanged){
       if(next.config_asset_id&&!next.draft_dirty){model=next.config?configToForm(next.config):null;resetPages();render();}
       else syncBindingPresentation();
     }
+    if(bindingChanged){syncBindingPresentation();syncStaleNotice();}
     if(lastJob!==next.active_job){lastJob=next.active_job;if(!busy)render();else syncBindingPresentation();}
-    lastConfig=next.config;lastStale=next.stale;
+    lastConfig=next.config;lastStale=next.stale;lastAsset=next.config_asset_id;lastDraft=next.draft_dirty;
   });
   render();
   return () => { dispose(); root.replaceChildren(); };
