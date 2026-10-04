@@ -5,6 +5,7 @@
 ### 实施前接口裁决（2026-10-04，优先于下文同名旧表述）
 
 - CSV 校验失败沿用核心 record：含表头的逻辑记录 1 基编号；Preview/Cell 的 record 是数据记录 1 基编号。界面明确区分，不改核心错误。
+- inspect 请求的 offset 与 cell.record 先按 JSON 数值有限、整数、范围校验，再转换为 MoonBit Int；offset 范围为 0..2147483647，cell.record 转换后还须位于 1..row_count。拒绝2147483648等越界值，不允许饱和转换后误报成功。
 - Job.kind 补齐 example、branch。summary 返回原 Result 的 structure；issues 集合精确映射 Result.key_issues，计算问题由 computation.issues 展示。分页 items 为 `{source_index,item}`，index 始终是原数组下标，原引擎对象不变。
 - 配额由父进程每 250ms 异步监管 owned 用量，child 写入时仍精确计数；同步 bridge 不能依赖自身 timer。上传与任务共用预留账本。reset 在上传或 child 活跃时均 409，close 等写入终止再清理，generation 拒绝旧回调。监管间隔不保证磁盘瞬时零超量。
 - IPC result 只是候选；child 退出后才准备发布。hash/quota/head 等异步校验后，最终 running/generation/head 检查、注册表/head 更新与 succeeded 转换须在无 await 的提交段完成。取消/超时/超限共用禁止发布门闩；exit 后才清 staging；提交后取消幂等。

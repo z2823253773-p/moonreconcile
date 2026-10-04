@@ -268,6 +268,7 @@ fn handle_request(request_json : String) -> Json {
     "check_config" => handle_check_config(object)
     "compare" => handle_compare(object)
     "resolve" => handle_resolve(object)
+    "inspect_csv" => handle_inspect_csv(object)
     _ =>
       error_to_json(
         request_error(
