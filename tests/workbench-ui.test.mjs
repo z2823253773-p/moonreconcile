@@ -429,3 +429,66 @@ test('exact-pair review actions stay disabled while lock loading fails', async (
 });
 
 async function waitFor(predicate) { for(let i=0;i<100;i++){if(predicate())return;await new Promise((resolve)=>setTimeout(resolve,0));}throw new Error('Timed out waiting for UI state'); }
+
+test('removing a pending action immediately updates the immutable-export notice state',async()=>{
+  globalThis.document=makeDocument();const root=new FakeNode('main'),store=createWorkbenchState(),revision={revision_id:'pending-removal',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};store.update({revision,stale:false});
+  const api={request:async route=>route.startsWith('/api/imports/')?{import:{headers:[]}}:{items:[],total:0,next_offset:0,has_more:false}};
+  const dispose=renderResultView({root,store,api,summary:{revision},onPublished:async()=>{}});await waitFor(()=>!buttonBy(root,'添加手工决定').disabled);
+  walk(root).find(node=>node.tag==='select').value='left_unmatched';inputByLabel(root,'左侧 ID').value='L3';await buttonBy(root,'添加手工决定').fire('click');assert.equal(store.get().pending_decisions.length,1);
+  await buttonBy(root,'移除待应用动作').fire('click');assert.deepEqual(store.get().pending_decisions,[]);dispose();
+});
+
+for(const changed of [false,true])test(`revision input binding normalizes empty selection and ${changed?'preserves a late history choice':'keeps the outer lock through visible binding'}`,async()=>{
+  globalThis.document=makeDocument();const root=new FakeNode('main'),store=createWorkbenchState();let release,entered=false;const gate=new Promise(resolve=>release=resolve);
+  const revision={revision_id:'restored',left_import_id:'fresh-left',right_import_id:'fresh-right',config_asset_id:'fresh-config'};
+  const config={schema_version:1,fields:[{name:'id',left:'id',right:'id',type:'text'}],key:['id']};
+  const preview={headers:['id'],row_count:1,column_count:1,rows:[],offset:0,has_more:false};
+  const api={request:async route=>{if(route.endsWith('/preview'))return{job_id:route};return{asset:{name:'restored.csv',bytes:4,sha256:'a'.repeat(64)},import:{import_id:route.split('/').at(-1),headers:['id']}};},waitJob:async()=>({output:{preview}}),download:async()=>{entered=true;await gate;return new Blob([JSON.stringify(config)]);}};
+  const view=renderImportView({root,store,api}),outer={job_id:null,phase:'revision-bind',state:'running'};store.update({active_job:outer});const pending=view.bindRevision(revision);
+  await waitFor(()=>entered);assert.ok(store.get().active_job,'binding reserves shared task state before metadata awaits');
+  if(changed)store.update({revision:{revision_id:'history-choice'},stale:true});release();
+  if(changed){await assert.rejects(pending,/选择的版本/);assert.equal(store.get().revision.revision_id,'history-choice');assert.equal(store.get().left_import_id,null);assert.doesNotMatch(root.textContent,/完整校验 1 行/);}
+  else{await pending;assert.equal(store.get().revision.revision_id,'restored');assert.equal(store.get().left_import_id,'fresh-left');assert.equal(store.get().config_asset_id,'fresh-config');assert.match(root.textContent,/完整校验 1 行/);}
+  assert.equal(store.get().active_job,outer,'the outer restore/branch owner must release its own lock');view.dispose();
+});
+
+test('ZIP export owns the shared lock through download and reports pending drafts without bundling them',async()=>{
+  const {renderExportView}=await import('../workbench/public/export-view.mjs');globalThis.document=makeDocument();const root=new FakeNode('main'),store=createWorkbenchState();store.update({revision:{revision_id:'zip-view'},pending_decisions:[{action:'left_unmatched',left_id:'L3'}]});
+  let release,downloadEntered=false,posts=0;const gate=new Promise(resolve=>release=resolve),api={request:async(route,{body})=>{posts++;assert.equal(route,'/api/runs/zip-view/bundle');assert.deepEqual(body,{});assert.ok(store.get().active_job);return{job_id:'pack'};},waitJob:async()=>({output:{bundle_asset_id:'zip'}}),download:async()=>{downloadEntered=true;await gate;throw Object.assign(new Error('ZIP read failed'),{code:'invalid_csv',phase:'decisions',side:'decisions',record:3,field:'action'});}};
+  const dispose=renderExportView({root,store,api});assert.match(root.textContent,/待应用决定：1 项/);await buttonBy(root,'下载完整运行 ZIP').fire('click');await waitFor(()=>downloadEntered);assert.ok(store.get().active_job);assert.equal(buttonBy(root,'重置本机工作台').disabled,true);assert.equal(posts,1);release();
+  await waitFor(()=>root.textContent.includes('ZIP 导出失败'));assert.equal(store.get().active_job,null);assert.match(root.textContent,/CSV 逻辑记录（含表头） 3/);assert.match(root.textContent,/字段 action/);dispose();assert.equal(root.children.length,0);
+});
+
+test('cancelled compare restores the previous visible summary and keeps its download revision',async()=>{
+  const document=makeDocument();globalThis.document=document;const appRoot=new FakeNode('main');document.querySelector=()=>appRoot;globalThis.location={origin:'http://127.0.0.1:7777',hash:'#token=cancel-test',pathname:'/',search:''};globalThis.history={replaceState(){}};
+  const preview={headers:['id'],row_count:1,column_count:1,rows:[],offset:0,next_offset:1,has_more:false},config=JSON.parse(invoke(JSON.stringify({op:'check_config',config:{schema_version:1,fields:[{name:'id',left:'id',right:'id',type:'text'}],key:['id']}}))).config;
+  const revision={revision_id:'prior-visible',exit_code:0,left_import_id:'left',right_import_id:'right',config_asset_id:'cfg'};let comparisons=0;const jobs=new Map(),ok=body=>new Response(JSON.stringify({ok:true,...body}),{status:200});
+  globalThis.fetch=async(url,options={})=>{
+    const route=new URL(url).pathname;
+    if(route==='/api/examples/orders'){jobs.set('example',{state:'succeeded',output:{left_import_id:'left',right_import_id:'right',config_asset_id:'cfg',source_label:'example'}});return ok({job_id:'example'});}
+    if(route==='/api/imports/left'||route==='/api/imports/right')return ok({import:{import_id:route.split('/').at(-1),headers:['id']},asset:{name:'source.csv',bytes:4,sha256:'a'.repeat(64)}});
+    if(route.endsWith('/preview')){const id=route;jobs.set(id,{state:'succeeded',output:{preview}});return ok({job_id:id});}
+    if(route==='/api/configs/cfg/export')return new Response(JSON.stringify(config));
+    if(route==='/api/runs'){const id=`compare-${++comparisons}`;jobs.set(id,comparisons===1?{state:'succeeded',output:{revision}}:{state:'cancelled',output:null,error:null});return ok({job_id:id});}
+    if(route.startsWith('/api/jobs/'))return ok({job:jobs.get(decodeURIComponent(route.slice('/api/jobs/'.length)))});
+    if(route.endsWith('/summary'))return ok({revision,summary:{},computation:{status:'complete'}});
+    if(route.startsWith('/api/runs/prior-visible/'))return ok({items:[],total:0,next_offset:0,has_more:false});
+    throw Error(`Unexpected ${route} ${options.method}`);
+  };
+  await import('../workbench/public/app.mjs?cancel-summary-regression');await buttonBy(appRoot,'载入合成 orders 示例').fire('click');await waitFor(()=>!buttonBy(appRoot,'运行核心比较').disabled);await buttonBy(appRoot,'运行核心比较').fire('click');await waitFor(()=>Boolean(appRoot.querySelector('.result-summary')));
+  await buttonBy(appRoot,'运行核心比较').fire('click');await waitFor(()=>appRoot.textContent.includes('任务已取消'));assert.ok(appRoot.querySelector('.result-summary'),'the prior summary stays visible after cancellation');assert.match(appRoot.textContent,/prior-visible/);assert.equal(buttonBy(appRoot,'下载 report.json').disabled,false);assert.equal(buttonBy(appRoot,'运行核心比较').disabled,false);
+});
+
+test('source transition clears the task label when the global job finishes while review stays stale',async()=>{
+  globalThis.document=makeDocument();const root=new FakeNode('main'),store=createWorkbenchState(),revision={revision_id:'stale-task-label',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};store.update({revision,stale:false});
+  const api={request:async route=>route.startsWith('/api/imports/')?{import:{headers:[]}}:{items:[],total:0,next_offset:0,has_more:false}},dispose=renderResultView({root,store,api,summary:{revision},onPublished:async()=>{}});await waitFor(()=>!buttonBy(root,'添加手工决定').disabled);
+  store.update({active_job:{job_id:'import',phase:'validating',state:'running'}});store.update({left_import_id:'new-left'});assert.equal(buttonBy(root,'正在应用…').disabled,true);
+  store.update({active_job:null});assert.equal(buttonBy(root,'应用待处理决定').disabled,true,'stale state stays locked while the completed task label resets');assert.equal(walk(root).some(node=>node.tag==='button'&&node.textContent==='正在应用…'),false);dispose();
+});
+
+test('rebuilding the selected revision preserves its pending draft and keeps removal synchronized',async()=>{
+  globalThis.document=makeDocument();const root=new FakeNode('main'),store=createWorkbenchState(),revision={revision_id:'rebuild-pending',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'},draft={action:'left_unmatched',left_id:'L3',right_id:null,reason:'confirm'};store.update({revision,stale:false,pending_decisions:[draft]});
+  const api={request:async route=>route.startsWith('/api/imports/')?{import:{headers:[]}}:{items:[],total:0,next_offset:0,has_more:false}};
+  let dispose=renderResultView({root,store,api,summary:{revision},onPublished:async()=>{}});await waitFor(()=>!buttonBy(root,'添加手工决定').disabled);assert.match(root.textContent,/待应用（1）/);dispose();
+  dispose=renderResultView({root,store,api,summary:{revision},onPublished:async()=>{}});await waitFor(()=>!buttonBy(root,'添加手工决定').disabled);assert.match(root.textContent,/待应用（1）/);assert.deepEqual(store.get().pending_decisions,[draft]);await buttonBy(root,'移除待应用动作').fire('click');assert.deepEqual(store.get().pending_decisions,[]);dispose();
+});

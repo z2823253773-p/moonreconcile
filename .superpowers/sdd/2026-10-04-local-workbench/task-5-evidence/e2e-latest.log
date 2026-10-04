@@ -1,0 +1,51 @@
+
+> moonreconcile@0.1.0 test:workbench:e2e
+> playwright test
+
+Finished. moon: no work to do
+
+Running 5 tests using 1 worker
+
+(node:31755) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✘  1 tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes (18.7s)
+(node:31784) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✓  2 tests/e2e/workbench.spec.mjs:148:1 › catalog form threshold, core manual reason rejection, competing reject/accept/unmatched, conflict preservation and CSV replay (6.1s)
+  ✓  3 tests/e2e/workbench.spec.mjs:172:1 › HTML and long Chinese are text; malformed CSV and invalid config preserve precise locations (2.3s)
+  ✓  4 tests/e2e/workbench.spec.mjs:185:1 › real core compare cancellation preserves the last published report and releases all controls (1.8s)
+  ✓  5 tests/e2e/workbench.spec.mjs:196:1 › resource-limited comparison stays incomplete and exit 3 after UI review (3.8s)
+
+
+  1) tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes
+
+    Error: expect(locator).not.toContainText(expected) failed
+
+    Locator: locator('#imports')
+    Expected substring: not "完整校验"
+    Received string: "选择左右 CSV文件仅发送到本机服务暂存。每侧显示抽样预览行数与完整校验总行数；SHA-256、文件字节和列数来自服务端。左侧来源左侧来源 CSV选择 CSV，或将文件拖放到这里右侧来源右侧来源 CSV选择 CSV，或将文件拖放到这里交换左右并重置关联规则载入合成 orders 示例载入合成 migration 示例载入合成 catalog 示例载入OurAirports 公开快照"
+    Timeout: 15000ms
+
+    Call log:
+      - Expect "not toContainText" locator('#imports') with timeout 15000ms
+      - waiting for locator('#imports')
+        34 × locator resolved to <section id="imports" class="panel">…</section>
+           - unexpected value "选择左右 CSV文件仅发送到本机服务暂存。每侧显示抽样预览行数与完整校验总行数；SHA-256、文件字节和列数来自服务端。左侧来源左侧来源 CSV选择 CSV，或将文件拖放到这里右侧来源右侧来源 CSV选择 CSV，或将文件拖放到这里交换左右并重置关联规则载入合成 orders 示例载入合成 migration 示例载入合成 catalog 示例载入OurAirports 公开快照"
+
+
+      133 |   await expect(page.getByRole('button',{name:'应用待处理决定',exact:true})).toBeDisabled();
+      134 |   page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'重置本机工作台',exact:true}).click();
+    > 135 |   await expect(panel(page)).toContainText('本机工作台已重置');await expect(page.locator('#imports')).not.toContainText('完整校验');
+          |                                                                                                  ^
+      136 |   await page.getByLabel('ZIP 工作包',{exact:true}).setInputFiles(bundle);await page.getByRole('button',{name:'恢复 ZIP 工作包',exact:true}).click();
+      137 |   await expect(panel(page)).toContainText('ZIP 已重放验证并恢复');await expect(page.locator('#imports')).toContainText('完整校验 3 行');await expect(page.locator('#imports')).toContainText('完整校验 2 行');
+      138 |   await expect(page.locator('.notice.success.validation-summary')).toBeVisible();await expect(section(page,'已应用决定（只读）')).toContainText('left_unmatched');
+        at /Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/e2e/workbench.spec.mjs:135:98
+
+    Error Context: test-results/workbench-orders-blank-for-fa9f6-file-replay-match-CLI-bytes/error-context.md
+
+  1 failed
+    tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes
+  4 passed (34.2s)

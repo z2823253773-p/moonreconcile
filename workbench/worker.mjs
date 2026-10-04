@@ -9,7 +9,7 @@ process.on('message',async message=>{
   const {job_id,task}=message;
   const send=(value)=>process.send?.({job_id,...value},()=>process.disconnect());
   try {
-    process.send?.({job_id,type:'phase',phase:task.kind==='compare'||task.kind==='branch'?'comparing':task.kind==='review'?'resolving':'validating'});
+    process.send?.({job_id,type:'phase',phase:task.kind==='compare'||task.kind==='branch'?'comparing':task.kind==='review'?'resolving':task.kind==='bundle'?'packing':task.kind==='restore'?'restoring':'validating'});
     const invoke=await loadBridgeInvoke(task.bridge_path);
     const output=await executeTask(task,{invoke,signal:{get aborted(){return !process.connected;}}});send({type:'result',output});
   }catch(e){send({type:'error',error:sanitizeError(e,Object.values(task.paths??{}))});}

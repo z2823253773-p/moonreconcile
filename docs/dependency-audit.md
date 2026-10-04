@@ -78,13 +78,22 @@ Export shape: cmd/bridge/bridge.js -> invoke_bridge
 
 包公开 API `CSV::parse_string(String, options?) -> CSV` 没有错误返回值，也没有逐行源位置/逻辑记录号诊断接口。源码中的 `parse` 结束后也不检查 `in_quotes`。因此若复用它，还需另写严格解析/定位逻辑；维护两套解析路径反而容易不一致。正式代码选择单套 MoonBit 严格状态机。源码定位：[NyaCSV 仓库](https://github.com/moonbit-community/NyaCSV/blob/d59f2e2aef192aeaac8187f5c5cc0926a12e5a84/parser.mbt)；该 GitHub HEAD 仅是调研时的源码参照，**不冒充 Mooncakes 0.3.3 下载包的同一提交**。运行测试才是本节版本行为的主要证据。
 
-## 4. 运行时依赖
+## 4. npm 依赖（Task 5，2026-10-05）
 
-除 MoonBit 核心库与 Node.js 内置模块外，`package.json` **无任何第三方依赖**：
+Task 5 为白名单 ZIP 增加了运行时依赖 `yauzl@3.4.0`、`yazl@3.3.1` 和 `buffer-crc32@1.0.0`，并用开发依赖 `@playwright/test@1.63.0` 执行真实浏览器工作流。`package-lock.json` 为所有条目锁定版本和 registry integrity；直接包的官方 registry 元数据为：
 
-- 测试使用 Node 内置 `node:test` + `node:assert`，无测试框架依赖。
-- 无 `dependencies` / `devDependencies` 字段。
-- 当前未声明额外第三方 npm 运行时或开发依赖。这缩小了 npm 依赖面；MoonBit 工具链/核心库、Node.js、GitHub Actions 及 CI 下载的官方安装器仍属于依赖与供应链范围，空 npm 依赖列表不能证明风险不存在。
+| Package | Role | Registry integrity | License |
+| --- | --- | --- | --- |
+| yauzl 3.4.0 | ZIP reader | `sha512-jIH9yLR9wqr0wOS0TpBvo/g/2UgZH5qePVbjgRliiF0BYvOZyaBknKsF+x9Iht0O6sqgnB93rCICdOZFecJuDw==` | MIT |
+| yazl 3.3.1 | ZIP writer | `sha512-BbETDVWG+VcMUle37k5Fqp//7SDOK2/1+T7X8TD96M3D9G8jK5VLUdQVdVjGi8im7FGkazX7kk5hkU8X4L5Bng==` | MIT |
+| buffer-crc32 1.0.0 | Streaming CRC comparison; also yazl dependency | `sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w==` | MIT |
+| @playwright/test 1.63.0 | Browser tests only | `sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==` | Apache-2.0 |
+
+The pinned runtime graph is `yauzl -> pend@1.2.0` and `yazl -> buffer-crc32@1.0.0`; Playwright's development graph is `@playwright/test -> playwright -> playwright-core`, all pinned by the lockfile. The initial default-sandbox `npm audit --json --fetch-retries=0 --fetch-timeout=15000` attempt on 2026-10-05 exited 1 with `ENOTFOUND registry.npmjs.org`. After approved execution became available, the same audit command completed with exit 0 and advisory metadata showing **0 vulnerabilities** (info/low/moderate/high/critical all zero). Both attempts are retained in the Task 5 evidence ledger; this is a dated registry advisory result, not proof that future advisories cannot occur. `npm ls --all --json` completed with exit 0 and no missing or invalid dependencies. Installed package manifests and lockfile versions/integrities were inspected locally; these checks do not substitute for the live advisory audit.
+
+The yauzl 3.4.0 source exposes Central Directory CRC metadata and validates decompressed size when `validateEntrySizes` is enabled, but its documented read-stream validation does not compare CRC. The reader therefore computes CRC across the actual decompressed stream with the exact, Node >=8 compatible `buffer-crc32@1.0.0` package and compares it with the archive metadata. A known-vector probe returned `cbf43926` for `123456789`.
+
+The production CLI still imports no ZIP packages; the workbench process uses the three production dependencies. Browser dependencies and browser binaries are development-only and do not enter the application runtime package. No XML or XLSX parser was added.
 
 ## 5. 许可证
 

@@ -1,0 +1,106 @@
+{
+  "base_head": "ede6ac5cd01ee1487013550ac071635982cac55b",
+  "source_files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "7deecc1d2789ec30b4ef677fb156bc0d033642630cffa1c4c608aac3c64c875d"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "553f071e949ebcb51db6051f765334323311cba392f9acb58e5493c87406f371"
+    },
+    {
+      "path": "docs/dependency-audit.md",
+      "sha256": "63cd48f8e55fc0a74fdf4427742eaf871f812cc19da730f630307452d9e8b499"
+    },
+    {
+      "path": "package.json",
+      "sha256": "121e057f0eb43108ed1c817890030f31725ddaa4fa02c9467425eacc56d1d57f"
+    },
+    {
+      "path": "tests/workbench-server.test.mjs",
+      "sha256": "ecac378aa176e3de47333b4bc8c64f2c6a87a32b04e104dbc56d592fbc7eebdf"
+    },
+    {
+      "path": "tests/workbench-ui.test.mjs",
+      "sha256": "7d583a5897f1f49fad500e2436466b57c74f4c119b21e9dd4fa94997d3e4b36f"
+    },
+    {
+      "path": "workbench/engine-host.mjs",
+      "sha256": "d46af41f955649d5003bdc589ff5503e26ec3c8d656f116a0a568022367df871"
+    },
+    {
+      "path": "workbench/jobs.mjs",
+      "sha256": "cdcd64f50a51e2c22833bd10d2318da95a21257b417cbe9b14dd3521e33575da"
+    },
+    {
+      "path": "workbench/public/app.mjs",
+      "sha256": "66fad38cf9c3715831bbd0b3b4b23db03b5946710903a7c1bea69c0eaed8bf99"
+    },
+    {
+      "path": "workbench/public/config-view.mjs",
+      "sha256": "2c89e75eed48e7de6b95051d510b19b406dac9719980687152a818fe9ba136f9"
+    },
+    {
+      "path": "workbench/public/import-view.mjs",
+      "sha256": "cab521a3b2001ab847e31096a93626cd2c9532968626c0f650316fcf7ef68681"
+    },
+    {
+      "path": "workbench/public/result-view.mjs",
+      "sha256": "fa6d0487bd4fbdd2eae7652c0a928ea48702b397eb6fe67c7a8eaf4782814de9"
+    },
+    {
+      "path": "workbench/public/state.mjs",
+      "sha256": "fc9307f46228f17a627d0900342cae91784c2acd649f400d998eb5c4322f6241"
+    },
+    {
+      "path": "workbench/public/styles.css",
+      "sha256": "f95993e0f27d0601b8e93f7e3c406597fb0886d16a40be299af1bc20940d6520"
+    },
+    {
+      "path": "workbench/server.mjs",
+      "sha256": "6318a3104c25e942ac9b9eb2a5a31285f6e27972e5d83dceefeb99e07b6b35f0"
+    },
+    {
+      "path": "workbench/session.mjs",
+      "sha256": "beaf4db5e392933efb06ff08bc4be5463d83f7809cb29b17156ed6085ae2e88c"
+    },
+    {
+      "path": "workbench/start.mjs",
+      "sha256": "49da38edac6fa1b90e9564d102556e0738ee8a670c6f44acec417a0c375cc280"
+    },
+    {
+      "path": "workbench/worker.mjs",
+      "sha256": "e9f6c19f807e4b0f8bc0bc2119359e1f5f98e95c6c792894c84a3d551e8c5fb1"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "c65a16d179a65deb6557d75986df9cd5273755cf3284ec4c1c5620ddad152925"
+    },
+    {
+      "path": "playwright.config.mjs",
+      "sha256": "e910c64a86e9a62d0e2709612c687988866513e5beb599098cc0bb16af7db082"
+    },
+    {
+      "path": "tests/e2e/workbench.spec.mjs",
+      "sha256": "49c20a53ac048eed9de0fc206da0108251a5a5d72d903872cb5c0a711c0879e9"
+    },
+    {
+      "path": "tests/workbench-archive-host.test.mjs",
+      "sha256": "dfb954d3f2510412fe8e48998e406002d30669973f5979c676aacbd7000f3b34"
+    },
+    {
+      "path": "tests/workbench-archive.test.mjs",
+      "sha256": "b6176fe3ddab91ada56a69ea8c00708fdfe86d724189b2185ef6c66298f1d38b"
+    },
+    {
+      "path": "workbench/archive.mjs",
+      "sha256": "c396636bc2fd780b73af0972ad0a1ca66598c0661614ad34929b0975eed658c7"
+    },
+    {
+      "path": "workbench/public/export-view.mjs",
+      "sha256": "74bbbd190ae3b8c953719002393687783a68df70e875c712af73feb8e6c2d927"
+    }
+  ],
+  "bridge_sha256": "e6f817bd20b68f9cd7b304759abeca5e0573a96554f970de798a651bc2d09bd0"
+}

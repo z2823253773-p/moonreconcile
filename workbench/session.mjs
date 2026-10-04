@@ -62,9 +62,13 @@ export async function createSession({rootParent,limits:overrides={}}={}) {
     try{await reserve(key,Buffer.byteLength(data),dir);const file=path.join(dir,'data');await fs.writeFile(file,data,{mode:0o600,flag:'wx'});const entry=await prepareAsset(kind,name,file);await checkQuota();commitAsset(entry);return entry;}
     catch(e){await remove(dir);throw e;}finally{release(key);}
   }
-  async function prepareRevision({runPath,left_import_id,right_import_id,config_asset_id,parent_revision_id=null,baseline_revision_id=null}) {
+  async function prepareRevision({runPath,left_import_id,right_import_id,config_asset_id,parent_revision_id=null,baseline_revision_id=null,prospectiveAssets=[],prospectiveImports=[]}) {
     if(revisions.size>=limits.revisions)throw failure('quota_exceeded','Revision count quota exceeded',413);
-    await owned(runPath);get(imports,left_import_id);get(imports,right_import_id);get(assets,config_asset_id);
+    await owned(runPath);
+    const pendingAsset=id=>prospectiveAssets.find(item=>item.asset_id===id),pendingImport=id=>prospectiveImports.find(item=>item.import_id===id);
+    if(!imports.has(left_import_id)&&!pendingImport(left_import_id))get(imports,left_import_id);
+    if(!imports.has(right_import_id)&&!pendingImport(right_import_id))get(imports,right_import_id);
+    if(!assets.has(config_asset_id)&&!pendingAsset(config_asset_id))get(assets,config_asset_id);
     const files=['manifest.json','report.json','input/left.csv','input/right.csv','config.json','pairs.csv','fields.csv','candidates.csv','decisions.csv','unresolved.csv','summary.md'];
     for(const f of files)await owned(path.join(runPath,f));
     const report=await fs.readFile(path.join(runPath,'report.json')),manifest=JSON.parse(await fs.readFile(path.join(runPath,'manifest.json'),'utf8')),result=JSON.parse(report);
@@ -77,11 +81,27 @@ export async function createSession({rootParent,limits:overrides={}}={}) {
     if(revision.parent_revision_id&&heads.get(revision.baseline_revision_id)!==revision.parent_revision_id)throw failure('stale_revision','Branch head changed',409);
   }
   function commitRevision(revision) {checkRevision(revision);revisions.set(revision.revision_id,revision);heads.set(revision.baseline_revision_id,revision.revision_id);}
+  function checkRestoreCapacity({newAssets=[],newImports=[],revision}) {
+    if(assets.size+newAssets.length>limits.assets||imports.size+newImports.length>limits.imports||revisions.size+1>limits.revisions)throw failure('quota_exceeded','Restore would exceed registry capacity',413,'publishing');
+    const assetIds=new Set();for(const asset of newAssets){project('asset',asset);if(assets.has(asset.asset_id)||assetIds.has(asset.asset_id))throw failure('invalid_restore','Duplicate restored asset');assetIds.add(asset.asset_id);}
+    const importIds=new Set();for(const entry of newImports){project('import',entry);if(imports.has(entry.import_id)||importIds.has(entry.import_id))throw failure('invalid_restore','Duplicate restored import');if(!assets.has(entry.asset_id)&&!assetIds.has(entry.asset_id))throw failure('invalid_restore','Restored import has no asset');importIds.add(entry.import_id);}
+    if(newImports.length!==2||newAssets.length!==3||!revision)throw failure('invalid_restore','Incomplete restored registry batch');
+    checkRevision(revision);
+  }
+  function commitRestored({newAssets,newImports,configAssetId,revision}) {
+    checkRestoreCapacity({newAssets,newImports,revision});
+    const config=newAssets.find(asset=>asset.asset_id===configAssetId),left=newImports.find(entry=>entry.side==='left'),right=newImports.find(entry=>entry.side==='right');
+    if(!config||config.kind!=='config'||!left||!right)throw failure('invalid_restore','Restored config binding is incomplete');
+    for(const asset of newAssets)assets.set(asset.asset_id,asset);
+    for(const entry of newImports)imports.set(entry.import_id,entry);
+    bindings.set(configAssetId,[left.import_id,right.import_id]);
+    revisions.set(revision.revision_id,revision);heads.set(revision.baseline_revision_id,revision.revision_id);
+  }
   async function publishRevision(args) {const g=generation;const revision=await prepareRevision(args);if(closed||resetting||g!==generation)throw failure('session_closed','Session changed',409);commitRevision(revision);return project('revision',revision);}
   async function reset() {
     if(closed||resetting||reservations.size)throw failure('session_busy','Active uploads or tasks prevent reset',409);
     resetting=true;try{await owned();await fs.rm(root,{recursive:true});await newRoot();generation++;for(const m of [assets,imports,revisions,heads,bindings])m.clear();}finally{resetting=false;}
   }
   async function close() {if(closed)return;if(reservations.size)throw failure('session_busy','Active writes prevent cleanup',409);await owned();await fs.rm(root,{recursive:true});closed=true;generation++;}
-  return {get root(){return root;},get generation(){return generation;},get closed(){return closed;},limits,assets,imports,revisions,heads,bindings,reservations,owned,bytes,checkQuota,reserve,release,staging,remove,hashFile,prepareAsset,commitAsset,commitImport,registerImport:commitImport,prepareRevision,checkRevision,commitRevision,publishRevision,saveAsset,getAsset:id=>get(assets,id),getImport:id=>get(imports,id),getRevision:id=>get(revisions,id),reset,close};
+  return {get root(){return root;},get generation(){return generation;},get closed(){return closed;},limits,assets,imports,revisions,heads,bindings,reservations,owned,bytes,checkQuota,reserve,release,staging,remove,hashFile,prepareAsset,commitAsset,commitImport,registerImport:commitImport,prepareRevision,checkRestoreCapacity,commitRestored,checkRevision,commitRevision,publishRevision,saveAsset,getAsset:id=>get(assets,id),getImport:id=>get(imports,id),getRevision:id=>get(revisions,id),reset,close};
 }

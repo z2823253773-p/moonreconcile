@@ -1,0 +1,131 @@
+[
+  {
+    "name": "core-check",
+    "command": [
+      "moon",
+      "check",
+      "--target",
+      "js"
+    ],
+    "started": "2026-10-04T20:59:15.702Z",
+    "finished": "2026-10-04T20:59:15.718Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-verified/core-check.log"
+  },
+  {
+    "name": "core-info",
+    "command": [
+      "moon",
+      "info"
+    ],
+    "started": "2026-10-04T20:59:15.719Z",
+    "finished": "2026-10-04T20:59:15.731Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-verified/core-info.log"
+  },
+  {
+    "name": "core-format",
+    "command": [
+      "moon",
+      "fmt"
+    ],
+    "started": "2026-10-04T20:59:15.731Z",
+    "finished": "2026-10-04T20:59:15.781Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-verified/core-format.log"
+  },
+  {
+    "name": "core-format-check",
+    "command": [
+      "moon",
+      "fmt",
+      "--check"
+    ],
+    "started": "2026-10-04T20:59:15.781Z",
+    "finished": "2026-10-04T20:59:15.838Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-verified/core-format-check.log"
+  },
+  {
+    "name": "core-test",
+    "command": [
+      "moon",
+      "test",
+      "--target",
+      "js"
+    ],
+    "started": "2026-10-04T20:59:15.839Z",
+    "finished": "2026-10-04T20:59:16.325Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-verified/core-test.log"
+  },
+  {
+    "name": "npm-test",
+    "command": [
+      "npm",
+      "test"
+    ],
+    "started": "2026-10-04T20:59:16.326Z",
+    "finished": "2026-10-04T20:59:26.595Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-verified/npm-test.log"
+  },
+  {
+    "name": "workbench",
+    "command": [
+      "npm",
+      "run",
+      "test:workbench"
+    ],
+    "started": "2026-10-04T20:59:26.595Z",
+    "finished": "2026-10-04T20:59:35.882Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-verified/workbench.log"
+  },
+  {
+    "name": "workflows",
+    "command": [
+      "npm",
+      "run",
+      "test:workflows"
+    ],
+    "started": "2026-10-04T20:59:35.882Z",
+    "finished": "2026-10-04T20:59:36.735Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-verified/workflows.log"
+  },
+  {
+    "name": "public-data",
+    "command": [
+      "npm",
+      "run",
+      "test:public-data"
+    ],
+    "started": "2026-10-04T20:59:36.735Z",
+    "finished": "2026-10-04T20:59:39.008Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-verified/public-data.log"
+  },
+  {
+    "name": "e2e",
+    "command": [
+      "npm",
+      "run",
+      "test:workbench:e2e"
+    ],
+    "started": "2026-10-04T20:59:39.008Z",
+    "finished": "2026-10-04T21:00:00.537Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-verified/e2e.log"
+  }
+]

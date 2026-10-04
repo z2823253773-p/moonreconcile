@@ -3,6 +3,7 @@ import path from 'node:path';
 import { run } from '../cli/main.mjs';
 import { canonicalJsonStringify, decodeUtf8Fatal, parseJsonText } from '../cli/io.mjs';
 import { assertDto, exact, failure, sanitizeError, errorDto } from './contracts.mjs';
+import { readRunBundle, writeRunBundle } from './archive.mjs';
 
 function engineError(error,paths=[]) {const safe=sanitizeError(error,paths);return Object.assign(new Error(safe.message),{code:safe.code,error:safe});}
 export function callEngine(request,invoke) {
@@ -24,7 +25,7 @@ async function runCli(argv,invoke,cwd) {
   }
   throw engineError(error??errorDto('cli_failure','CLI failed without a valid machine error'),[cwd,...argv.filter(x=>path.isAbsolute(x))]);
 }
-const kinds=new Set(['import','preview','cell','draft','check','compare','example','review','branch']);
+const kinds=new Set(['import','preview','cell','draft','check','compare','example','review','branch','restore','bundle']);
 export async function executeTask(task,{invoke,signal}={}) {
   if(!kinds.has(task.kind))throw failure('invalid_task',`unknown task kind: ${task.kind}`);
   if(signal?.aborted)throw failure('cancelled','Task cancelled');
@@ -54,6 +55,22 @@ export async function executeTask(task,{invoke,signal}={}) {
     if(task.kind==='branch') {
       const exit_code=await runCli(['compare',paths.left,paths.right,'--config',paths.config,'--out',paths.run],invoke,path.dirname(paths.run));
       return {run_path:paths.run,exit_code};
+    }
+    if(task.kind==='bundle') {
+      const sidecar=parseJsonText(decodeUtf8Fatal(await fs.readFile(paths.sidecar),{phase:'input',what:'workbench bundle metadata'}),{phase:'input',what:'workbench bundle metadata'});
+      const bundle=await writeRunBundle({runPath:paths.run,sidecar,destPath:paths.bundle,limits:p.limits});
+      return {bundle_path:paths.bundle,...bundle};
+    }
+    if(task.kind==='restore') {
+      const {runPath,sidecar}=await readRunBundle({assetPath:paths.bundle,stagingPath:paths.restore,limits:p.limits});
+      const replay=path.join(paths.restore,'replayed-run'),decisions=path.join(runPath,'decisions.csv');
+      const exit_code=await runCli(['resolve',runPath,'--decisions',decisions,'--out',replay],invoke,paths.restore);
+      const expected=await fs.readFile(path.join(runPath,'report.json'));
+      const replayed=await fs.readFile(path.join(replay,'report.json'));
+      if(!expected.equals(replayed))throw failure('replay_mismatch','Replayed report does not match the archived report',422,'restoring');
+      const left=await executeTask({kind:'import',payload:{side:'left',offset:0,limit:20},paths:{csv:path.join(runPath,'input','left.csv')}},{invoke,signal});
+      const right=await executeTask({kind:'import',payload:{side:'right',offset:0,limit:20},paths:{csv:path.join(runPath,'input','right.csv')}},{invoke,signal});
+      return {run_path:replay,source_run_path:runPath,sidecar,exit_code,left_preview:left.preview,right_preview:right.preview};
     }
     if(task.kind==='example') {
       const left=await executeTask({kind:'import',payload:{side:'left'},paths:{csv:paths.left}},{invoke,signal});

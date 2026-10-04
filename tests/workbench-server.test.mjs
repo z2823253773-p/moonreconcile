@@ -123,7 +123,7 @@ test('private runtime permissions, strict schemas/queries and unsupported routes
   for(const [route,body] of [['/api/imports',{asset_id:'bad',side:'left'}],['/api/config/check',{left_import_id:'bad',right_import_id:'bad',config:{},config_asset_id:'bad'}],['/api/sessions/reset',{confirm:false}]])assert.equal((await c.request(route,body)).status,400);
   assert.equal((await c.request('/api/capabilities?path=x')).status,400);assert.equal((await c.request('/api/jobs/bad')).status,400);
   assert.equal((await c.request('/api/jobs/00000000-0000-4000-8000-000000000000')).status,404);
-  assert.equal((await c.request('/api/restores',{})).status,404);assert.equal((await c.request('/api/runs/00000000-0000-4000-8000-000000000000/bundle',{})).status,404);
+  assert.equal((await c.request('/api/restores',{})).status,400);assert.equal((await c.request('/api/runs/00000000-0000-4000-8000-000000000000/bundle',{})).status,404);
   const site=await fetch(app.origin+'/api/capabilities',{headers:{authorization:`Bearer ${app.token}`,origin:app.origin,'sec-fetch-site':'cross-site'}});assert.equal(site.status,403);
   const upload=await fetch(app.origin+'/api/assets?kind=xlsx',{method:'POST',headers:{authorization:`Bearer ${app.token}`,'content-type':'application/octet-stream'},body:'x'});assert.equal(upload.status,422);
 });
@@ -157,5 +157,17 @@ test('close aborts unfinished JSON readers and prevents late job/reset work',asy
     const closing=app.close();const result=await Promise.race([closing.then(()=>true),new Promise(r=>setTimeout(()=>r(false),250))]);
     req.end(suffix);req.destroy();await closing;
     assert.equal(result,true,route+' unfinished body blocked close');assert.equal(app.jobs.jobs.size,0);assert.equal(app.session.generation,1);await assert.rejects(fs.stat(root),e=>e.code==='ENOENT');
+  }
+});
+
+test('chunked oversized JSON returns its 413 DTO and leaves the next request usable',async t=>{
+  const app=await startWorkbench({limits:{request_bytes:64}});t.after(()=>app.close());const url=new URL(app.origin),agent=new http.Agent({keepAlive:true,maxSockets:1});t.after(()=>agent.destroy());
+  for(let i=0;i<3;i++){
+    const rejected=await new Promise((resolve,reject)=>{
+      const request=http.request({hostname:url.hostname,port:url.port,path:'/api/config/check',method:'POST',agent,headers:{authorization:`Bearer ${app.token}`,'content-type':'application/json'}},response=>{const chunks=[];response.on('data',chunk=>chunks.push(chunk));response.on('end',()=>resolve({status:response.statusCode,body:JSON.parse(Buffer.concat(chunks))}));response.on('error',reject);});request.on('error',reject);
+      request.write('{"padding":"'+'x'.repeat(128));setTimeout(()=>request.end('x'.repeat(128)+'"}'),10);
+    });
+    assert.equal(rejected.status,413);assert.equal(rejected.body.error.code,'request_too_large');
+    const healthy=await new Promise((resolve,reject)=>http.get({hostname:url.hostname,port:url.port,path:'/api/capabilities',agent,headers:{authorization:`Bearer ${app.token}`}},response=>{response.resume();response.on('end',()=>resolve(response.statusCode));}).on('error',reject));assert.equal(healthy,200);
   }
 });

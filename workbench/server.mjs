@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createSession } from './session.mjs';
 import { createJobManager } from './jobs.mjs';
 import { assertCumulativeDecisions } from './public/review-model.mjs';
+import { RUN_BUNDLE_FILES } from './archive.mjs';
 import { APP_VERSION, API_VERSION, HOST_LIMITS, errorDto, failure, exact, isId, integer, project, sanitizeError, jsonBytes, normalizeLimits } from './contracts.mjs';
 const ROOT=fileURLToPath(new URL('..',import.meta.url));
 const HEADERS={
@@ -22,6 +23,7 @@ const STATIC_FILES=new Map([
   ['/public/dom.mjs','dom.mjs'],['/public/import-view.mjs','import-view.mjs'],
   ['/public/config-view.mjs','config-view.mjs'],['/public/config-model.mjs','config-model.mjs'],
   ['/public/result-view.mjs','result-view.mjs'],['/public/review-view.mjs','review-view.mjs'],['/public/review-model.mjs','review-model.mjs'],
+  ['/public/export-view.mjs','export-view.mjs'],
   ['/public/styles.css','styles.css'],
   ['/cli/render.mjs','../../cli/render.mjs'],
 ]);
@@ -30,10 +32,10 @@ function ids(value,keys) {for(const k of keys)if(!isId(value[k]))throw failure('
 function page(value) {exact(value,['offset','limit']);if(!integer(value.offset)||!integer(value.limit,1,100))throw failure('invalid_request','Invalid pagination');}
 function cell(value,withSide=false) {exact(value,withSide?['side','record','column']:['record','column']);if(!integer(value.record,1,100000)||typeof value.column!=='string'||(withSide&&!['left','right'].includes(value.side)))throw failure('invalid_request','Invalid cell request');}
 function importEntry(asset,side,preview) {return {import_id:randomUUID(),asset_id:asset.asset_id,side,format:'csv',status:'ready',headers:preview.headers,row_count:preview.row_count,column_count:preview.column_count,sha256:asset.sha256,path:asset.path};}
-export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}={}) {
+export async function startWorkbench({bridgePath,workerPath,rootParent,limits:overrides={}}={}) {
   const limits=normalizeLimits(overrides),session=await createSession({rootParent,limits:overrides});
-  const jobs=await createJobManager({session,bridgePath,limits:overrides}),token=randomBytes(32).toString('hex');
-  const uploads=new Set(),requests=new Set();let origin,closing=false;
+  const jobs=await createJobManager({session,bridgePath,workerPath,limits:overrides}),token=randomBytes(32).toString('hex');
+  const uploads=new Set(),requests=new Set(),bundles=new Set();let origin,closing=false;
   function startJob(kind,payload){
     if(closing)throw failure('session_closed','Session is closing',409);
     return jobs.start(kind,payload);
@@ -55,7 +57,9 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
   }
   async function readJson(req) {
     if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']??''))throw failure('invalid_request','application/json required');
-    let size=0;const chunks=[];for await(const c of req){if(closing)throw failure('session_closed','Session is closing',409);size+=c.length;if(size>limits.request_bytes)throw failure('request_too_large','JSON orchestration limit exceeded',413);chunks.push(c);}
+    // Returning the default async iterator destroys an unfinished request and
+    // can reset a keep-alive socket before its bounded error response arrives.
+    let size=0;const chunks=[];for await(const c of req.iterator({destroyOnReturn:false})){if(closing)throw failure('session_closed','Session is closing',409);size+=c.length;if(size>limits.request_bytes)throw failure('request_too_large','JSON orchestration limit exceeded',413);chunks.push(c);}
     if(closing)throw failure('session_closed','Session is closing',409);
     let value;try{value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks)));}catch{throw failure('invalid_request','Invalid UTF-8 JSON body');}
     if(value===null||typeof value!=='object'||Array.isArray(value))throw failure('invalid_request','JSON object required');return value;
@@ -177,6 +181,51 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
           }};
         }}));
       }
+      const bundleCreate=route.match(/^\/api\/runs\/([^/]+)\/bundle$/);
+      if(req.method==='POST'&&bundleCreate) {
+        noQuery();exact(await readJson(req),[]);const revision=session.getRevision(bundleCreate[1]);
+        const metadata=[];let reservation=0;
+        for(const name of RUN_BUNDLE_FILES) {
+          const file=path.join(revision.path,name),stat=await fs.stat(file);reservation+=stat.size;
+          metadata.push({path:`run/${name}`,bytes:stat.size,sha256:await session.hashFile(file)});
+        }
+        const sidecar={schema_version:1,app_version:APP_VERSION,engine_version:'0.1.0',revision:{revision_id:revision.revision_id,parent_revision_id:revision.parent_revision_id,baseline_revision_id:revision.baseline_revision_id,run_id:revision.run_id,report_sha256:revision.report_sha256,decisions_sha256:revision.decisions_sha256},files:metadata};
+        return accepted(startJob('bundle',{reservation,prepare:async({staging})=>{
+          const sidecarPath=path.join(staging,'workbench.json'),bundlePath=path.join(staging,'bundle.zip');
+          await fs.writeFile(sidecarPath,JSON.stringify(sidecar)+'\n',{mode:0o600,flag:'wx'});
+          return {task:{payload:{limits:{zip_bytes:limits.zip_bytes,unzip_bytes:limits.unzip_bytes,zip_entries:limits.zip_entries}},paths:{run:revision.path,sidecar:sidecarPath,bundle:bundlePath}},prepareOutput:async result=>{
+            if(result.bundle_path!==bundlePath||!Number.isSafeInteger(result.bytes)||result.bytes<1||! /^[0-9a-f]{64}$/.test(result.sha256))throw failure('invalid_worker_output','Invalid bundle candidate');
+            const asset=await session.prepareAsset('run','moonreconcile-bundle.zip',bundlePath);
+            if(asset.bytes!==result.bytes||asset.sha256!==result.sha256)throw failure('invalid_worker_output','Bundle hash or byte count changed');
+            return {output:{bundle_asset_id:asset.asset_id},commit:()=>{session.commitAsset(asset);bundles.add(asset.asset_id);}};
+          }};
+        }}));
+      }
+      const bundleExport=route.match(/^\/api\/bundles\/([^/]+)\/export$/);
+      if(req.method==='GET'&&bundleExport) {
+        noQuery();const asset=session.getAsset(bundleExport[1]);if(asset.kind!=='run'||!bundles.has(asset.asset_id))throw failure('not_found','Completed bundle not found',404);
+        return await stream(asset.path,'application/zip','moonreconcile-bundle.zip');
+      }
+      if(req.method==='POST'&&route==='/api/restores') {
+        noQuery();const body=await readJson(req);exact(body,['asset_id']);ids(body,['asset_id']);const source=session.getAsset(body.asset_id);
+        if(source.kind!=='run')throw failure('invalid_request','Run ZIP asset required');
+        return accepted(startJob('restore',{reservation:source.bytes,prepare:async({staging})=>{
+          const restorePath=path.join(staging,'restore');
+          return {task:{payload:{limits:{zip_bytes:limits.zip_bytes,unzip_bytes:limits.unzip_bytes,zip_entries:limits.zip_entries}},paths:{bundle:source.path,restore:restorePath}},prepareOutput:async result=>{
+            const replayPath=path.join(restorePath,'replayed-run');
+            if(result.run_path!==replayPath||![0,1,3].includes(result.exit_code)||!result.left_preview||!result.right_preview)throw failure('invalid_worker_output','Invalid restore candidate');
+            const leftAsset=await session.prepareAsset('csv','restored-left.csv',path.join(replayPath,'input/left.csv'));
+            const rightAsset=await session.prepareAsset('csv','restored-right.csv',path.join(replayPath,'input/right.csv'));
+            const configAsset=await session.prepareAsset('config','restored-config.json',path.join(replayPath,'config.json'));
+            const left=importEntry(leftAsset,'left',result.left_preview),right=importEntry(rightAsset,'right',result.right_preview);
+            const newAssets=[leftAsset,rightAsset,configAsset],newImports=[left,right];
+            const revision=await session.prepareRevision({runPath:replayPath,left_import_id:left.import_id,right_import_id:right.import_id,config_asset_id:configAsset.asset_id,prospectiveAssets:newAssets,prospectiveImports:newImports});
+            if(revision.exit_code!==result.exit_code)throw failure('invalid_worker_output','Restored result exit code mismatch');
+            session.checkRestoreCapacity({newAssets,newImports,revision});
+            return {output:{revision:project('revision',revision)},commit:()=>session.commitRestored({newAssets,newImports,configAssetId:configAsset.asset_id,revision})};
+          }};
+        }}));
+      }
       const reviews=route.match(/^\/api\/runs\/([^/]+)\/reviews$/);
       if(req.method==='POST'&&reviews) {
         noQuery();const b=await readJson(req);exact(b,['base_revision','decisions_asset_id']);ids(b,['base_revision','decisions_asset_id']);
@@ -260,10 +309,17 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
         noQuery();const b=await readJson(req);exact(b,['confirm']);if(b.confirm!==true)throw failure('invalid_request','Explicit reset confirmation required');
         if(jobs.active||uploads.size)throw failure('session_busy','Active uploads or tasks prevent reset',409);
         if(closing)throw failure('session_closed','Session is closing',409);
-        await jobs.reset();return reply(200,{ok:true});
+        await jobs.reset();bundles.clear();return reply(200,{ok:true});
       }
       return reply(404,{ok:false,error:errorDto('not_found','Route not found')});
-    }catch(e){reply(e.status??400,{ok:false,error:sanitizeError(e,[session.root])});}
+    }catch(e){
+      if(e.code==='request_too_large'){
+        // Discard, never buffer, the remainder while the 413 is flushed. The
+        // response closes this connection; shutdown still aborts all sockets.
+        req.resume();res.setHeader('Connection','close');
+      }
+      reply(e.status??400,{ok:false,error:sanitizeError(e,[session.root])});
+    }
     finally{requests.delete(state);finish();}
   });
   try{await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});}catch(e){await jobs.close();await session.close();throw e;}

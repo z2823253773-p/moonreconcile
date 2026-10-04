@@ -1,0 +1,120 @@
+
+> moonreconcile@0.1.0 test:workbench
+> node --test tests/workbench-*.test.mjs
+
+✔ bundle export, reset, upload, CLI replay restore, and fresh local registration are atomic (536.567125ms)
+✔ restore asset quota precheck preserves every old registry entry and report (418.937333ms)
+✔ restore import quota precheck preserves every old registry entry and report (468.028ms)
+✔ restore revision quota precheck preserves every old registry entry and report (379.237375ms)
+✔ final no-await restore latch rechecks asset capacity after a concurrent upload (5371.948458ms)
+✔ self-consistent forged report fails HTTP restore without publishing any partial registry entries (331.753625ms)
+✔ reviewed ZIP restore creates a self-baseline retaining applied actions, and branch really re-compares (666.800459ms)
+✔ cancel actual bundle waits for child exit before owned cleanup and preserves old reports (274.211709ms)
+✔ cancel actual restore waits for child exit before owned cleanup and preserves old reports (295.547375ms)
+✔ writes the exact twelve-file whitelist and restores verified bytes (91.683917ms)
+✔ rejects duplicate, unsafe, aliased, unknown, directory, and non-file ZIP entries (622.204666ms)
+✔ rejects missing entries, schema/hash/size mismatch, encryption, corruption, and truncation (335.805292ms)
+✔ counts real decompressed bytes and enforces raw archive and per-entry caps (9.760833ms)
+✔ writer enforces compressed and decompressed caps and removes a partial archive (14.293334ms)
+✔ yauzl size validation does not replace the required streamed CRC comparison (85.364041ms)
+✔ bundle_roundtrip_cli_report_equal: CLI replay is byte-identical and self-consistent forged reports fail replay (294.439166ms)
+✔ all_config_v1_properties_round_trip (4.707792ms)
+✔ duplicate mapping keys are rejected without losing special keys (0.177583ms)
+✔ unknown core config keys remain core errors (0.143333ms)
+✔ changing a field type or deleting a field preserves tolerance text and references (0.195083ms)
+✔ strict integer controls do not reinterpret decimal notation (0.130209ms)
+✔ static app is fixed-whitelist and imports expose safe asset metadata (123.111334ms)
+✔ session token is removed from fragment and client rejects cross-origin destinations (0.8425ms)
+✔ edits stale old revisions, recheck keeps stale, and only compare clears it (0.18275ms)
+✔ strict DTO validation rejects field types, paths and malformed identifiers (0.441833ms)
+✔ orders_api_report_equals_cli; draft remains explicit and non-runnable (144.179459ms)
+✔ exit2 preserves six-field machine error and sanitizes paths and stacks (1.609ms)
+✔ unknown task kinds cannot invoke engine (0.094ms)
+✔ config asset matches CLI with leading document BOM (2.523334ms)
+✔ config asset matches CLI with interior mapping U+FEFF (1.929708ms)
+✔ malformed config asset retains invalid_json ErrorDTO code (2.736917ms)
+✔ cancel_ignores_late_worker_result and cleans only after SIGKILL exit (128.746917ms)
+✔ cancellation during async publication cannot register a late candidate (42.4725ms)
+✔ timeout_and_quota_preserve_previous_revision (350.519416ms)
+✔ cleanup_refuses_foreign_or_symlink_root (16.084833ms)
+✔ shared reservations reject upload/job overcommit and reset active writes (12.327667ms)
+✔ worker preview output cannot leak internal paths or omit the DTO (36.500541ms)
+✔ ownership marker symlink is never followed for cleanup (1.91925ms)
+✔ manager reset refuses active jobs and clears metadata only after owned reset (6.141666ms)
+✔ cumulative decision CSV preserves four columns, reason text and exact tuple order (0.591708ms)
+✔ decision subset identity is collision free for delimiter-containing tuple values (0.377583ms)
+✔ orders_review_preserves_differences and revision_id differs while run_id stays (399.384ms)
+✔ catalog_can_reject_top_and_accept_competitor without accepting highest score by default (316.841792ms)
+✔ imported_decisions_are_append_only uses complete tuples and detects noncumulative input (425.777209ms)
+✔ whole conflict batch publishes no revision and stale base is rejected (396.615792ms)
+✔ branch recomputes original baseline into a distinct revision and clears decisions (400.223875ms)
+✔ exact key pairs stay locked by the core and manual outside-candidate accept needs a reason (489.552125ms)
+✔ 101 by 101 incomplete review stays exit 3 (559.984875ms)
+✔ cumulative decisions export reimports to byte-identical report (355.224958ms)
+✔ cancelling a real resolve preserves the old revision hash and registry (3152.766666ms)
+✔ server exposes capability and enforces token/origin/host (31.430042ms)
+✔ asset upload enforces raw byte limit before publishing (23.783042ms)
+✔ real examples, draft/check binding, exports, summary, collections, cells and reset (342.767709ms)
+✔ rejects_stream_over_limit_without_length and disconnect_leaves_no_asset (149.229916ms)
+✔ 0/1/3 have Result revisions; exit2 never publishes and previous hash remains (771.991166ms)
+✔ wide preview shrinks whole rows before Job publication; no half import fits (174.245417ms)
+✔ oversize evidence item exposes full same-origin export and summary points to report (322.74575ms)
+✖ large config asset bypasses orchestration cap and exports canonical bytes (6108.949041ms)
+✔ upload timeout and close abort writers before owned cleanup (144.792416ms)
+✔ health stays responsive during synchronous child work; job busy and cancellation are real (81.486083ms)
+✔ private runtime permissions, strict schemas/queries and unsupported routes (256.8335ms)
+✔ anonymous fixed static navigation accepts none but API and cross-site checks stay strict (6.8525ms)
+✔ successful reset clears old jobs and replenishes metadata quota (96.732417ms)
+✔ failed owned reset preserves old job metadata (60.72725ms)
+✔ close aborts unfinished JSON readers and prevents late job/reset work (46.437667ms)
+✔ candidate scoring and the 49-to-50 mapping boundary remain reachable (30.390291ms)
+✔ validated rules list unmapped columns and transformations, then hide binding on edit (0.72675ms)
+✔ late compare and summary responses cannot clear stale edits (34.308166ms)
+✔ replacing an example side displays the uploaded filename and clears the blanket example label (2.584084ms)
+✔ a delayed canonical-config download cannot validate a rule edited while waiting (3.170875ms)
+✔ drag and drop cannot replace a source during a global job (0.169542ms)
+✔ blank missing markers remain editable and clearing ignore lists creates empty arrays (0.769708ms)
+✔ draft download stores canonical Config while the form keeps editable mapping rows locally (0.677542ms)
+✔ successful check stores canonical mappings and unrelated edits recheck to the same core result (13.059ms)
+✔ successful raw Config JSON import keeps canonical special mappings and blank missing marker (2.585833ms)
+✔ invalid duplicate mapping stays local and can be fixed before lossless recheck (5.801125ms)
+✔ result evidence reads source cells for paired records and keeps exact-pair locks across collection pages (1.712958ms)
+✔ short API pages advance by next_offset and previous returns to the recorded offset (1.324209ms)
+✔ source generation clears only unapplied review drafts and a stale current head can branch back to its bound inputs (1.290375ms)
+✔ successful review registers its head even if history selection changes while waiting (6.309417ms)
+✔ successful branch registers its head even if history selection changes while waiting (3.632292ms)
+✔ uploaded invalid decision CSV displays structured location and keeps the pending draft and parent revision (6.450125ms)
+✔ uploaded invalid_row_width preserves core record numbering without assuming decision data rows (4.17975ms)
+✔ uploaded invalid_header preserves core record numbering without assuming decision data rows (2.438125ms)
+✔ uploaded input_limit_exceeded preserves core record numbering without assuming decision data rows (6.604042ms)
+✔ uploaded future_decision_failure preserves core record numbering without assuming decision data rows (3.562167ms)
+✔ cancelled review and failed branch display their safe structured job details (3.271958ms)
+✔ result rerenders preserve active-job disabling for unlocked review actions (3.081333ms)
+✔ exact-pair accept/reject remain locked through unrelated updates and a failed review cleanup (3.278416ms)
+✔ exact-pair review actions stay disabled while lock loading fails (2.469792ms)
+✔ removing a pending action immediately updates the immutable-export notice state (0.935541ms)
+✔ revision input binding normalizes empty selection and keeps the outer lock through visible binding (2.001958ms)
+✔ revision input binding normalizes empty selection and preserves a late history choice (0.652459ms)
+✔ ZIP export owns the shared lock through download and reports pending drafts without bundling them (3.623958ms)
+✔ cancelled compare restores the previous visible summary and keeps its download revision (9.7405ms)
+ℹ tests 95
+ℹ suites 0
+ℹ pass 94
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8944.055416
+
+✖ failing tests:
+
+test at tests/workbench-server.test.mjs:95:1
+✖ large config asset bypasses orchestration cap and exports canonical bytes (6108.949041ms)
+  [TypeError: fetch failed] {
+    [cause]: Error: read ECONNRESET
+        at TCP.onStreamRead (node:internal/stream_base_commons:216:20) {
+      errno: -54,
+      code: 'ECONNRESET',
+      syscall: 'read'
+    }
+  }

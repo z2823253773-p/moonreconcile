@@ -8,11 +8,11 @@ const FILTERS = {
   records: [['side', '侧别 left/right'], ['status', '状态']],
 };
 
-export function renderResultView({ root, store, api, summary, onPublished, onSucceeded = () => {}, history = [], onSelectHistory, isCurrentHead = () => true }) {
+export function renderResultView({ root, store, api, summary, onPublished, onSucceeded = () => {}, onPendingChange = () => {}, history = [], onSelectHistory, isCurrentHead = () => true }) {
   let disposed = false, activeJob = null, loading = false, collectionRoot, notice = '', evidenceExport = null, reviewActionControls = [];
   const revision = summary.revision, startGeneration = store.generation();
   const pages = new Map(COLLECTIONS.map(name => [name, { offset: 0, nextOffset: 0, hasMore: false, previousOffsets: [], limit: 20, filters: {}, items: [], total: 0, loaded: false, busy: false }]));
-  let applied = [], pending = [], lockedPairs = new Set(), pairLockLoaded = false, imported = { left: null, right: null };
+  let applied = [], pending = store.get().revision?.revision_id===revision.revision_id?(store.get().pending_decisions??[]).map(item=>({...item})):[], lockedPairs = new Set(), pairLockLoaded = false, imported = { left: null, right: null };
   const selected = () => !disposed && store.get().revision?.revision_id === revision.revision_id;
   const current = () => selected() && store.generation() === startGeneration;
   const headCurrent = () => typeof isCurrentHead === 'function' ? isCurrentHead(revision) : Boolean(isCurrentHead);
@@ -23,6 +23,7 @@ export function renderResultView({ root, store, api, summary, onPublished, onSuc
     for (const control of root.querySelectorAll('.review-editor button,.review-editor input')) control.disabled = commonDisabled || !pairLockLoaded;
     for (const control of reviewActionControls) control.node.disabled = commonDisabled || (control.requiresLocks && !pairLockLoaded) || control.locked;
   };
+  const syncPending=()=>{store.update({pending_decisions:pending.map(item=>({...item}))});onPendingChange(pending.map(item=>({...item})));};
 
   const render = () => {
     if (disposed) return;
@@ -49,9 +50,6 @@ export function renderResultView({ root, store, api, summary, onPublished, onSuc
       element('dt', { text: 'computation.issues' }), element('dd', { text: JSON.stringify(c.issues ?? []) }),
     ]));
     root.append(element('div', { className: 'toolbar' }, [
-      button('下载 report.json', () => void download(`/api/runs/${revision.revision_id}/export?kind=report`, 'report.json')),
-      button('下载 summary.md', () => void download(`/api/runs/${revision.revision_id}/export?kind=summary`, 'summary.md'), { className: 'secondary' }),
-      button('下载 decisions.csv', () => void download(`/api/runs/${revision.revision_id}/export?kind=decisions`, 'decisions.csv'), { className: 'secondary' }),
       button('从原始比较新建分支', () => void branch(), { className: 'secondary', disabled: !headCurrent() || loading || Boolean(store.get().active_job) }),
     ]));
     collectionRoot = element('div', { className: 'result-collections' });
@@ -111,14 +109,14 @@ export function renderResultView({ root, store, api, summary, onPublished, onSuc
   }
 
   function renderReview() {
-    return renderReviewView({ pending, stale: stale(), busy: loading || Boolean(store.get().active_job) || !pairLockLoaded, onAdd: addPending, onApply: apply, refresh: render });
+    return renderReviewView({ pending, stale: stale(), busy: loading || Boolean(store.get().active_job) || !pairLockLoaded, onAdd: addPending, onApply: apply, refresh: () => { syncPending(); render(); } });
   }
 
   function addPending(action, left_id, right_id, reason) {
-    if (stale()) { notice = '来源或规则已变化，不能向此旧版本应用决定。'; render(); return; }
+    if (stale() || loading || store.get().active_job) { notice = '来源或规则已变化，或任务尚未结束，不能向此版本添加决定。'; render(); return; }
     if (action === 'accept' && lockedPairs.has(JSON.stringify([left_id, right_id]))) { notice = '精确键配对已锁定。'; render(); return; }
     if (action === 'reject' && lockedPairs.has(JSON.stringify([left_id, right_id]))) { notice = '精确键配对已锁定。'; render(); return; }
-    pending.push({ action, left_id: left_id || null, right_id: right_id || null, reason: reason ?? '' }); notice = ''; render();
+    pending.push({ action, left_id: left_id || null, right_id: right_id || null, reason: reason ?? '' });syncPending(); notice = ''; render();
   }
 
   async function loadCollection(name) {
@@ -193,7 +191,7 @@ export function renderResultView({ root, store, api, summary, onPublished, onSuc
       onSucceeded(revision, job.output.revision);
       successRegistered = true;
       if (generation !== store.generation() || !current()) throw new Error('复核已完成；新版本已登记到历史记录，但当前选择或输入已变化，未覆盖当前工作台。');
-      pending = []; await onPublished(job.output.revision);
+      pending = [];syncPending(); await onPublished(job.output.revision);
     } catch (error) { notice = formatTaskFailure(successRegistered ? '复核已成功，新版本已登记到历史；未覆盖当前选择或输入。' : '复核未发布；原报告与待应用动作保留。', error); }
     finally { loading = false; activeJob = null;if(store.get().active_job)store.update({active_job:null});render(); }
   }
@@ -209,19 +207,24 @@ export function renderResultView({ root, store, api, summary, onPublished, onSuc
       onSucceeded(revision, job.output.revision);
       successRegistered = true;
       if (generation !== store.generation() || !selected()) throw new Error('分支比较已完成；新版本已登记到历史记录，但当前选择或输入已变化，未覆盖当前工作台。');
-      pending = []; await onPublished(job.output.revision, { branch: true });
+      pending = [];syncPending(); await onPublished(job.output.revision, { branch: true });
     } catch (error) { notice = formatTaskFailure(successRegistered ? '分支比较成功，新版本已登记到历史；未覆盖当前选择或输入。' : '分支未发布；原报告保留。', error); }
     finally { loading = false; activeJob = null;if(store.get().active_job)store.update({active_job:null}); render(); }
   }
 
   async function showCell(side, record, column) {
+    if (loading || store.get().active_job) return;
     const generation = store.generation();
+    const reservation = { job_id:null, phase:'读取来源格值', state:'running' };
+    store.update({active_job:reservation});
     try {
       const accepted = await api.request(`/api/runs/${revision.revision_id}/cell`, { method: 'POST', body: { side, record, column } });
+      reservation.job_id=accepted.job_id;
       const job = await api.waitJob(accepted.job_id);
       if (!selected() || generation !== store.generation()) return;
       const dialog = element('dialog'); dialog.append(element('h3', { text: `${side} · 数据记录 ${record} · ${column}` }), element('pre', { text: job.output.cell.value }), button('关闭', () => dialog.close())); document.body.append(dialog); dialog.showModal();
     } catch (error) { notice = `单元格读取失败：${error.message}`; render(); }
+    finally { if(store.get().active_job===reservation)store.update({active_job:null}); }
   }
 
   async function download(path, name) { try { const blob = await api.download(path), url = URL.createObjectURL(blob), a = element('a', { href: url, download: name }); a.click(); setTimeout(() => URL.revokeObjectURL(url), 0); } catch (error) { notice = error.message; render(); } }
@@ -236,7 +239,8 @@ export function renderResultView({ root, store, api, summary, onPublished, onSuc
     } catch (error) { notice = `原始导入信息不可读：${error.message}`; render(); }
   }
   let observedGeneration = startGeneration;
-  const disposeSubscription = store.subscribe(() => { if (!disposed) { const generation=store.generation();if(generation!==observedGeneration){observedGeneration=generation;pending=[];render();}refreshReviewControls(); } });
+  let observedJob = store.get().active_job;
+  const disposeSubscription = store.subscribe(() => { if (!disposed) { const generation=store.generation(),job=store.get().active_job,jobChanged=job!==observedJob;observedJob=job;if(generation!==observedGeneration){observedGeneration=generation;pending=[];syncPending();render();}else if(jobChanged)render();refreshReviewControls(); } });
   render();
   void bindImports();
   void loadReviewLocks();
@@ -246,7 +250,7 @@ export function renderResultView({ root, store, api, summary, onPublished, onSuc
   return dispose;
 }
 
-function formatTaskFailure(prefix, error) {
+export function formatTaskFailure(prefix, error) {
   const details = [];
   const code = typeof error?.code === 'string' ? error.code : error?.cancelled ? 'job_cancelled' : null;
   const phase = typeof error?.phase === 'string' ? error.phase : error?.job?.phase;

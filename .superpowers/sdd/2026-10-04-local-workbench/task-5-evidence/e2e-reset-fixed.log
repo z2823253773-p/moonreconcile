@@ -1,0 +1,42 @@
+
+> moonreconcile@0.1.0 test:workbench:e2e
+> playwright test
+
+Finished. moon: no work to do
+
+Running 5 tests using 1 worker
+
+(node:31947) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✘  1 tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes (18.6s)
+(node:31988) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✓  2 tests/e2e/workbench.spec.mjs:148:1 › catalog form threshold, core manual reason rejection, competing reject/accept/unmatched, conflict preservation and CSV replay (5.9s)
+  ✓  3 tests/e2e/workbench.spec.mjs:172:1 › HTML and long Chinese are text; malformed CSV and invalid config preserve precise locations (2.3s)
+  ✓  4 tests/e2e/workbench.spec.mjs:185:1 › real core compare cancellation preserves the last published report and releases all controls (1.8s)
+  ✓  5 tests/e2e/workbench.spec.mjs:196:1 › resource-limited comparison stays incomplete and exit 3 after UI review (3.8s)
+
+
+  1) tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes
+
+    TimeoutError: locator.setInputFiles: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for getByLabel('ZIP 工作包', { exact: true })
+
+
+      134 |   page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'重置本机工作台',exact:true}).click();
+      135 |   await expect(panel(page)).toContainText('本机工作台已重置');await expect(page.locator('#imports .source-meta')).toHaveCount(0);
+    > 136 |   await page.getByLabel('ZIP 工作包',{exact:true}).setInputFiles(bundle);await page.getByRole('button',{name:'恢复 ZIP 工作包',exact:true}).click();
+          |   ^
+      137 |   await expect(panel(page)).toContainText('ZIP 已重放验证并恢复');await expect(page.locator('#imports')).toContainText('完整校验 3 行');await expect(page.locator('#imports')).toContainText('完整校验 2 行');
+      138 |   await expect(page.locator('.notice.success.validation-summary')).toBeVisible();await expect(section(page,'已应用决定（只读）')).toContainText('left_unmatched');
+      139 |   await expect(panel(page)).toContainText('待应用决定：0 项');const restored=await downloadEvidence(page,root,'restored');expect(await fs.readFile(restored.report)).toEqual(reportBytes);
+        at /Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/e2e/workbench.spec.mjs:136:3
+
+    Error Context: test-results/workbench-orders-blank-for-fa9f6-file-replay-match-CLI-bytes/error-context.md
+
+  1 failed
+    tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes
+  4 passed (33.9s)

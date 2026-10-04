@@ -1,0 +1,106 @@
+[
+  {
+    "name": "core-check",
+    "command": [
+      "moon",
+      "check",
+      "--target",
+      "js"
+    ],
+    "started": "2026-10-04T20:44:22.794Z",
+    "finished": "2026-10-04T20:44:22.942Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-default/core-check.log"
+  },
+  {
+    "name": "core-info",
+    "command": [
+      "moon",
+      "info"
+    ],
+    "started": "2026-10-04T20:44:22.942Z",
+    "finished": "2026-10-04T20:44:23.552Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-default/core-info.log"
+  },
+  {
+    "name": "core-format",
+    "command": [
+      "moon",
+      "fmt",
+      "--check"
+    ],
+    "started": "2026-10-04T20:44:23.553Z",
+    "finished": "2026-10-04T20:44:24.124Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-default/core-format.log"
+  },
+  {
+    "name": "core-test",
+    "command": [
+      "moon",
+      "test",
+      "--target",
+      "js"
+    ],
+    "started": "2026-10-04T20:44:24.124Z",
+    "finished": "2026-10-04T20:44:24.618Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-default/core-test.log"
+  },
+  {
+    "name": "npm-test",
+    "command": [
+      "npm",
+      "test"
+    ],
+    "started": "2026-10-04T20:44:24.618Z",
+    "finished": "2026-10-04T20:44:32.549Z",
+    "exit_code": 1,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-default/npm-test.log"
+  },
+  {
+    "name": "workbench",
+    "command": [
+      "npm",
+      "run",
+      "test:workbench"
+    ],
+    "started": "2026-10-04T20:44:32.549Z",
+    "finished": "2026-10-04T20:44:33.500Z",
+    "exit_code": 1,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-default/workbench.log"
+  },
+  {
+    "name": "workflows",
+    "command": [
+      "npm",
+      "run",
+      "test:workflows"
+    ],
+    "started": "2026-10-04T20:44:33.500Z",
+    "finished": "2026-10-04T20:44:34.346Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-default/workflows.log"
+  },
+  {
+    "name": "public-data",
+    "command": [
+      "npm",
+      "run",
+      "test:public-data"
+    ],
+    "started": "2026-10-04T20:44:34.347Z",
+    "finished": "2026-10-04T20:44:36.621Z",
+    "exit_code": 0,
+    "signal": null,
+    "log": "/private/tmp/task5-sol-gates-default/public-data.log"
+  }
+]

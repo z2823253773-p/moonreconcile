@@ -68,6 +68,12 @@ jobs:
           uname -a
           shasum -a 256 "$HOME/.moon/bin/moon" "$HOME/.moon/bin/moonc"
 
+      - name: Install locked host and browser test dependencies
+        run: npm ci
+
+      - name: Install the pinned Playwright Chromium runtime
+        run: npx playwright install --with-deps chromium
+
       - name: Build and check core
         run: |
           moon check --target js
@@ -79,6 +85,9 @@ jobs:
 
       - name: Build bridge and run host integration tests
         run: npm test
+
+      - name: Local workbench browser workflows
+        run: npm run test:workbench:e2e
 
       - name: Synthetic workflow end-to-end chains
         run: npm run test:workflows

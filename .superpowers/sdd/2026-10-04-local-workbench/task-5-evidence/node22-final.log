@@ -1,0 +1,256 @@
+TAP version 13
+# Subtest: writes the exact twelve-file whitelist and restores verified bytes
+ok 1 - writes the exact twelve-file whitelist and restores verified bytes
+  ---
+  duration_ms: 23.615416
+  type: 'test'
+  ...
+# Subtest: rejects duplicate, unsafe, aliased, unknown, directory, and non-file ZIP entries
+ok 2 - rejects duplicate, unsafe, aliased, unknown, directory, and non-file ZIP entries
+  ---
+  duration_ms: 333.846208
+  type: 'test'
+  ...
+# Subtest: rejects missing entries, schema/hash/size mismatch, encryption, corruption, and truncation
+ok 3 - rejects missing entries, schema/hash/size mismatch, encryption, corruption, and truncation
+  ---
+  duration_ms: 209.450708
+  type: 'test'
+  ...
+# Subtest: counts real decompressed bytes and enforces raw archive and per-entry caps
+ok 4 - counts real decompressed bytes and enforces raw archive and per-entry caps
+  ---
+  duration_ms: 7.344375
+  type: 'test'
+  ...
+# Subtest: writer enforces compressed and decompressed caps and removes a partial archive
+ok 5 - writer enforces compressed and decompressed caps and removes a partial archive
+  ---
+  duration_ms: 4.311583
+  type: 'test'
+  ...
+# Subtest: yauzl size validation does not replace the required streamed CRC comparison
+ok 6 - yauzl size validation does not replace the required streamed CRC comparison
+  ---
+  duration_ms: 26.513666
+  type: 'test'
+  ...
+# Subtest: bundle_roundtrip_cli_report_equal: CLI replay is byte-identical and self-consistent forged reports fail replay
+ok 7 - bundle_roundtrip_cli_report_equal: CLI replay is byte-identical and self-consistent forged reports fail replay
+  ---
+  duration_ms: 174.881709
+  type: 'test'
+  ...
+# Subtest: cumulative decision CSV preserves four columns, reason text and exact tuple order
+ok 8 - cumulative decision CSV preserves four columns, reason text and exact tuple order
+  ---
+  duration_ms: 0.325
+  type: 'test'
+  ...
+# Subtest: decision subset identity is collision free for delimiter-containing tuple values
+ok 9 - decision subset identity is collision free for delimiter-containing tuple values
+  ---
+  duration_ms: 0.221708
+  type: 'test'
+  ...
+# Subtest: candidate scoring and the 49-to-50 mapping boundary remain reachable
+ok 10 - candidate scoring and the 49-to-50 mapping boundary remain reachable
+  ---
+  duration_ms: 27.166125
+  type: 'test'
+  ...
+# Subtest: validated rules list unmapped columns and transformations, then hide binding on edit
+ok 11 - validated rules list unmapped columns and transformations, then hide binding on edit
+  ---
+  duration_ms: 2.038458
+  type: 'test'
+  ...
+# Subtest: late compare and summary responses cannot clear stale edits
+ok 12 - late compare and summary responses cannot clear stale edits
+  ---
+  duration_ms: 29.39325
+  type: 'test'
+  ...
+# Subtest: replacing an example side displays the uploaded filename and clears the blanket example label
+ok 13 - replacing an example side displays the uploaded filename and clears the blanket example label
+  ---
+  duration_ms: 1.839542
+  type: 'test'
+  ...
+# Subtest: a delayed canonical-config download cannot validate a rule edited while waiting
+ok 14 - a delayed canonical-config download cannot validate a rule edited while waiting
+  ---
+  duration_ms: 2.688209
+  type: 'test'
+  ...
+# Subtest: drag and drop cannot replace a source during a global job
+ok 15 - drag and drop cannot replace a source during a global job
+  ---
+  duration_ms: 0.154333
+  type: 'test'
+  ...
+# Subtest: blank missing markers remain editable and clearing ignore lists creates empty arrays
+ok 16 - blank missing markers remain editable and clearing ignore lists creates empty arrays
+  ---
+  duration_ms: 0.805166
+  type: 'test'
+  ...
+# Subtest: draft download stores canonical Config while the form keeps editable mapping rows locally
+ok 17 - draft download stores canonical Config while the form keeps editable mapping rows locally
+  ---
+  duration_ms: 0.927375
+  type: 'test'
+  ...
+# Subtest: successful check stores canonical mappings and unrelated edits recheck to the same core result
+ok 18 - successful check stores canonical mappings and unrelated edits recheck to the same core result
+  ---
+  duration_ms: 8.396584
+  type: 'test'
+  ...
+# Subtest: successful raw Config JSON import keeps canonical special mappings and blank missing marker
+ok 19 - successful raw Config JSON import keeps canonical special mappings and blank missing marker
+  ---
+  duration_ms: 1.266583
+  type: 'test'
+  ...
+# Subtest: invalid duplicate mapping stays local and can be fixed before lossless recheck
+ok 20 - invalid duplicate mapping stays local and can be fixed before lossless recheck
+  ---
+  duration_ms: 4.998958
+  type: 'test'
+  ...
+# Subtest: result evidence reads source cells for paired records and keeps exact-pair locks across collection pages
+ok 21 - result evidence reads source cells for paired records and keeps exact-pair locks across collection pages
+  ---
+  duration_ms: 3.361208
+  type: 'test'
+  ...
+# Subtest: short API pages advance by next_offset and previous returns to the recorded offset
+ok 22 - short API pages advance by next_offset and previous returns to the recorded offset
+  ---
+  duration_ms: 0.964625
+  type: 'test'
+  ...
+# Subtest: source generation clears only unapplied review drafts and a stale current head can branch back to its bound inputs
+ok 23 - source generation clears only unapplied review drafts and a stale current head can branch back to its bound inputs
+  ---
+  duration_ms: 1.023875
+  type: 'test'
+  ...
+# Subtest: successful review registers its head even if history selection changes while waiting
+ok 24 - successful review registers its head even if history selection changes while waiting
+  ---
+  duration_ms: 4.626625
+  type: 'test'
+  ...
+# Subtest: successful branch registers its head even if history selection changes while waiting
+ok 25 - successful branch registers its head even if history selection changes while waiting
+  ---
+  duration_ms: 1.166667
+  type: 'test'
+  ...
+# Subtest: uploaded invalid decision CSV displays structured location and keeps the pending draft and parent revision
+ok 26 - uploaded invalid decision CSV displays structured location and keeps the pending draft and parent revision
+  ---
+  duration_ms: 3.916209
+  type: 'test'
+  ...
+# Subtest: uploaded invalid_row_width preserves core record numbering without assuming decision data rows
+ok 27 - uploaded invalid_row_width preserves core record numbering without assuming decision data rows
+  ---
+  duration_ms: 2.79975
+  type: 'test'
+  ...
+# Subtest: uploaded invalid_header preserves core record numbering without assuming decision data rows
+ok 28 - uploaded invalid_header preserves core record numbering without assuming decision data rows
+  ---
+  duration_ms: 2.266125
+  type: 'test'
+  ...
+# Subtest: uploaded input_limit_exceeded preserves core record numbering without assuming decision data rows
+ok 29 - uploaded input_limit_exceeded preserves core record numbering without assuming decision data rows
+  ---
+  duration_ms: 8.644042
+  type: 'test'
+  ...
+# Subtest: uploaded future_decision_failure preserves core record numbering without assuming decision data rows
+ok 30 - uploaded future_decision_failure preserves core record numbering without assuming decision data rows
+  ---
+  duration_ms: 2.179542
+  type: 'test'
+  ...
+# Subtest: cancelled review and failed branch display their safe structured job details
+ok 31 - cancelled review and failed branch display their safe structured job details
+  ---
+  duration_ms: 3.879084
+  type: 'test'
+  ...
+# Subtest: result rerenders preserve active-job disabling for unlocked review actions
+ok 32 - result rerenders preserve active-job disabling for unlocked review actions
+  ---
+  duration_ms: 4.03375
+  type: 'test'
+  ...
+# Subtest: exact-pair accept/reject remain locked through unrelated updates and a failed review cleanup
+ok 33 - exact-pair accept/reject remain locked through unrelated updates and a failed review cleanup
+  ---
+  duration_ms: 3.890708
+  type: 'test'
+  ...
+# Subtest: exact-pair review actions stay disabled while lock loading fails
+ok 34 - exact-pair review actions stay disabled while lock loading fails
+  ---
+  duration_ms: 2.011958
+  type: 'test'
+  ...
+# Subtest: removing a pending action immediately updates the immutable-export notice state
+ok 35 - removing a pending action immediately updates the immutable-export notice state
+  ---
+  duration_ms: 1.361792
+  type: 'test'
+  ...
+# Subtest: revision input binding normalizes empty selection and keeps the outer lock through visible binding
+ok 36 - revision input binding normalizes empty selection and keeps the outer lock through visible binding
+  ---
+  duration_ms: 1.041542
+  type: 'test'
+  ...
+# Subtest: revision input binding normalizes empty selection and preserves a late history choice
+ok 37 - revision input binding normalizes empty selection and preserves a late history choice
+  ---
+  duration_ms: 2.053333
+  type: 'test'
+  ...
+# Subtest: ZIP export owns the shared lock through download and reports pending drafts without bundling them
+ok 38 - ZIP export owns the shared lock through download and reports pending drafts without bundling them
+  ---
+  duration_ms: 2.902708
+  type: 'test'
+  ...
+# Subtest: cancelled compare restores the previous visible summary and keeps its download revision
+ok 39 - cancelled compare restores the previous visible summary and keeps its download revision
+  ---
+  duration_ms: 4.820417
+  type: 'test'
+  ...
+# Subtest: source transition clears the task label when the global job finishes while review stays stale
+ok 40 - source transition clears the task label when the global job finishes while review stays stale
+  ---
+  duration_ms: 2.197375
+  type: 'test'
+  ...
+# Subtest: rebuilding the selected revision preserves its pending draft and keeps removal synchronized
+ok 41 - rebuilding the selected revision preserves its pending draft and keeps removal synchronized
+  ---
+  duration_ms: 3.91775
+  type: 'test'
+  ...
+1..41
+# tests 41
+# suites 0
+# pass 41
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 825.389125

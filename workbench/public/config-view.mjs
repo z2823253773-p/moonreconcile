@@ -9,6 +9,7 @@ const checkbox = (checked) => element('input', { type: 'checkbox', checked });
 const select = (values, value) => element('select', {}, optionList(values, value));
 const pageSize = 50;
 const FIELD_LABELS = { name:'逻辑字段名', left:'左侧来源列', right:'右侧来源列', abs_tol:'绝对容差（十进制字符串）', rel_tol:'相对容差（十进制字符串）' };
+function taskErrorText(error){const bits=[];for(const [key,label] of [['code','错误码'],['phase','阶段'],['side','侧别'],['record','记录号'],['field','字段']])if(error?.[key]!=null&&error[key]!=='')bits.push(`${label} ${error[key]}`);return `${error?.message??'任务失败'}${bits.length?`（${bits.join('；')}）`:''}`;}
 
 function rowEditor({ title, rows, renderRow, add, page, setPage, root }) {
   const section = element('section', { className: 'editor-block' }); section.append(element('h4', { text: `${title}（${rows.length}）` }));
@@ -67,7 +68,7 @@ export function renderConfigView({ root, store, api }) {
       const accepted = await start(); activeJob = accepted.job_id; store.update({ active_job: { job_id: activeJob, phase: 'validating', state: 'running' }, error: null }); render();
       const job = await api.waitJob(activeJob);
       activeJob = null; return job.output;
-    } catch (error) { activeJob = null; store.update({ error: error.message, active_job: null }); throw error; }
+    } catch (error) { activeJob = null; store.update({ error: taskErrorText(error), active_job: null }); throw error; }
     finally { activeJob=null;busy=outerBusy;if(!outerBusy)store.update({active_job:null});render(); }
   };
   const invalidateRules = () => { if (model) updateDraft(); };
@@ -80,14 +81,17 @@ export function renderConfigView({ root, store, api }) {
     const controls = element('div', { className: 'toolbar' });
     const globallyBusy = busy || Boolean(store.get().active_job);
     controls.append(button('从当前列生成空白草稿', async () => {
+      if(busy||store.get().active_job)return;
       const current = store.get(); if (!current.left_import_id || !current.right_import_id) { store.update({ error: '请先分别导入左右 CSV。' }); render(); return; }
       const context = captureContext();
+      busy=true;store.update({active_job:{job_id:null,phase:'生成规则草稿',state:'running'}});render();
       try {
         const out = await runJob(() => api.request('/api/config/draft', { method: 'POST', body: { left_import_id: current.left_import_id, right_import_id: current.right_import_id } }));
         const blob = await api.download(`/api/configs/${out.config_asset_id}/export`), text = await blob.text();
         if (!contextMatches(context)) throw new Error('草稿生成期间来源或规则已变化；保留当前表单，请重新生成。');
         const draftConfig=JSON.parse(text);model = configToForm(draftConfig);resetPages();store.update({ config: draftConfig, config_asset_id: null, draft_dirty: true, error: null }); render();
       } catch(error) {store.update({error:error.message});render();}
+      finally{busy=false;store.update({active_job:null});render();}
     }, { disabled: globallyBusy }));
     const configFile = element('input', { type: 'file', accept: '.json,application/json', disabled: globallyBusy });
     configFile.addEventListener('change', async () => {
@@ -101,7 +105,7 @@ export function renderConfigView({ root, store, api }) {
         const blob=await api.download(`/api/configs/${checked.config_asset_id}/export`),text=await blob.text();
         if(!contextMatches(context))throw new Error('校验期间来源或规则已变化；保留当前表单，请重新校验。');
         const normalized=JSON.parse(text);model=configToForm(normalized);resetPages();store.update({config:normalized,config_asset_id:checked.config_asset_id,draft_dirty:false,error:null});render();
-      }catch(error){store.update({error:error.message});render();/* Keep the current form and validated binding on import/check failure. */}
+      }catch(error){store.update({error:taskErrorText(error)});render();/* Keep the current form and validated binding on import/check failure. */}
       finally{busy=false;store.update({active_job:null});render();}
     });
     exportButton = button('导出已校验配置', async () => {
@@ -162,9 +166,9 @@ export function renderConfigView({ root, store, api }) {
         if(!contextMatches(context))throw new Error('校验期间来源或规则已变化；保留当前表单，请重新校验。');
         const normalized=JSON.parse(canonicalText);model=configToForm(normalized);resetPages();
         store.update({config:normalized,config_asset_id:out.config_asset_id,draft_dirty:false,error:null});render();
-      } catch(error) {store.update({error:error.message});render(); /* error remains visible */}
+      } catch(error) {store.update({error:taskErrorText(error)});render(); /* error remains visible */}
       finally{busy=false;store.update({active_job:null});render();}
-    },{disabled:busy||!model}));
+    },{disabled:globallyBusy||!model}));
     if (activeJob) actions.append(button('取消当前任务',async()=>{try{await api.request(`/api/jobs/${activeJob}`,{method:'DELETE'});}catch(error){store.update({error:error.message});render();}},{className:'danger'}));
     root.append(actions);
     validationNote=element('section',{className:'notice success validation-summary',role:'status',hidden:true});

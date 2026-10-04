@@ -21,6 +21,7 @@ export function createWorkbenchState() {
       value = { ...value, ...patch, draft_dirty: true, config_asset_id: null, stale: true, pending_decisions: [] };
       for (const listener of listeners) listener(value);
     },
+    reset() { value = initial(); sourceRuleGeneration++; for (const listener of listeners) listener(value); },
     generation: () => sourceRuleGeneration,
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   };

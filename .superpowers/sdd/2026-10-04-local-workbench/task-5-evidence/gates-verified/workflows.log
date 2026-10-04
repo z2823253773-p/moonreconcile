@@ -1,0 +1,15 @@
+
+> moonreconcile@0.1.0 test:workflows
+> node scripts/workflows.mjs
+
+mutation rejected: missing-record
+mutation rejected: pairs-csv-id
+mutation rejected: same-length-snapshot
+mutation rejected: config-json
+mutation rejected: markdown-summary
+mutation rejected: phantom-review-row
+orders: compare/resolve/replay passed with fixture identities, complete exports and conservation
+migration: compare/resolve/replay passed with fixture identities, complete exports and conservation
+mutation rejected: extra-applied-decision
+catalog: compare/resolve/replay passed with fixture identities, complete exports and conservation
+Synthetic workflows and seven mutation checks passed. Temporary outputs: /var/folders/l0/z510jl1d0rxc2cpk2jkvmks80000gn/T/moonreconcile-workflows-j1FDuF

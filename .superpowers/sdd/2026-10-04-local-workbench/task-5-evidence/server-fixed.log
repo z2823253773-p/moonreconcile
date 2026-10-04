@@ -1,0 +1,24 @@
+✔ server exposes capability and enforces token/origin/host (18.153917ms)
+✔ asset upload enforces raw byte limit before publishing (5.148459ms)
+✔ real examples, draft/check binding, exports, summary, collections, cells and reset (270.774209ms)
+✔ rejects_stream_over_limit_without_length and disconnect_leaves_no_asset (138.664291ms)
+✔ 0/1/3 have Result revisions; exit2 never publishes and previous hash remains (691.87375ms)
+✔ wide preview shrinks whole rows before Job publication; no half import fits (151.068125ms)
+✔ oversize evidence item exposes full same-origin export and summary points to report (242.954333ms)
+✔ large config asset bypasses orchestration cap and exports canonical bytes (170.14125ms)
+✔ upload timeout and close abort writers before owned cleanup (142.119ms)
+✔ health stays responsive during synchronous child work; job busy and cancellation are real (81.933166ms)
+✔ private runtime permissions, strict schemas/queries and unsupported routes (241.87425ms)
+✔ anonymous fixed static navigation accepts none but API and cross-site checks stay strict (3.301708ms)
+✔ successful reset clears old jobs and replenishes metadata quota (101.298583ms)
+✔ failed owned reset preserves old job metadata (49.69775ms)
+✔ close aborts unfinished JSON readers and prevents late job/reset work (43.96825ms)
+✔ chunked oversized JSON returns its 413 DTO and leaves the next request usable (3.151875ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2665.416125

@@ -1,0 +1,5 @@
+
+> moonreconcile@0.1.0 test:public-data
+> node scripts/check-ourairports.mjs
+
+Public OurAirports CN/FR snapshots: 2558/2569 records,2558 exact pairs,11 additions,18 changed fields; compare→review→replay and byte snapshots verified
