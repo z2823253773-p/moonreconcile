@@ -58,3 +58,29 @@ Specific evidence: orders host/CLI `report.json` bytes match exactly; real API e
 Limits/timeouts were fault-injected downward where needed (including quota polling/kill delay) for reproducible tests. These tests do not claim full 1GiB/max-core-input throughput or instantaneous zero disk overshoot; production supervision is every 250ms. Node used here: v24.15.0. Loopback tests required the explicitly authorized local-only sandbox escalation; no external network was used.
 
 Remaining scope belongs to later tasks: Task3 GUI, Task4 review/branch actions, Task5 ZIP bundle/restore success routes, Task6 Node22 relocated/offline packaging and browser gates. Those routes remain 404 and capabilities remains CSV-only. No known unimplemented Task2 interface/gate remains in this local implementation; independent review has not yet run.
+
+## Fix round 1/5 — 2026-10-05 independent-review findings
+
+Base: `79db6b1f1d573cbc8784605254dc3f9347a1a35b`. Fix implementation HEAD: `65b0c7dc5ebe0fba93fbbc85c9d31a5b338fda30` (`fix: coordinate workbench reset shutdown and config parsing`). Independent re-review is pending; this section does not claim Task2 acceptance.
+
+| Finding | Fix and regression | Actual verification |
+| --- | --- | --- |
+| P1 static navigation | Only fixed anonymous GET `/` and `/index.html` with no query accept Fetch Metadata `none` or `same-origin`; exact Host, wrong Origin and every API Bearer/site check remain. P0/§6 synchronized with the controller's narrow clarification. | RED server 403 vs expected200; GREEN browser-shaped static requests plus wrong-Origin/cross-site/API/unknown-path negative cases. Real browser startup was not tested. |
+| P2 job reset/quota | `jobs.reset()` blocks active/resetting work, awaits successful owned `session.reset()` and only then clears job metadata. Failed owned reset retains old jobs; successful reset makes old job IDs404 and allows a fresh job under injected jobs:1. | RED old job200 vs404; manager reset missing. GREEN active refusal, ownership failure preservation and renewed quota. |
+| P2 config BOM compatibility | Host reuses CLI `decodeUtf8Fatal(...allowInteriorBom:true)` and `parseJsonText`; normalized config still comes from core. | RED leading BOM, interior U+FEFF and invalid_json code all failed; GREEN same actual bridge/CLI normalization for both valid cases, stable invalid_json for malformed asset. |
+| P2 unfinished JSON shutdown | Track handler completion, stop accepting/destroy active connections/readers at close, await handlers before jobs/session cleanup; check closing during/after JSON reading and immediately before every task start/reset. | RED open chunked JSON delayed close beyond250ms. GREEN unfinished example/reset bodies close within the injected test deadline, no job or extra generation created, owned root gone. |
+
+| Command | Exit / count |
+| --- | --- |
+| RED `node --test --test-name-pattern='config asset\|malformed config' tests/workbench-host.test.mjs` | exit1; 3/3 failed for the expected compatibility/code differences |
+| RED `node --test --test-name-pattern='manager reset' tests/workbench-jobs.test.mjs` | exit1; 1 failed for missing reset interface |
+| RED `node --test --test-name-pattern='anonymous fixed\|successful reset\|failed owned reset\|close aborts unfinished' tests/workbench-server.test.mjs` | exit1; 3 failed, 1 passed; completed normally |
+| GREEN `node --test tests/workbench-host.test.mjs tests/workbench-jobs.test.mjs` | exit0; 15/15 |
+| GREEN `node --test tests/workbench-server.test.mjs` | exit0; 15/15 |
+| `MOON_HOME=MOONBIT_HOME=/private/tmp/moonreconcile-task8-toolchain PATH=/private/tmp/moonreconcile-task8-toolchain/bin:$PATH npm test` | **exit255 in build**, before full Node tests; Cannot inject standard library moonbitlang/core / Cannot load the core file |
+| `node --test tests/*.test.mjs` using the existing compiled bridge | exit0; 92/92; full Node/CLI/workbench regression |
+| `git diff --check` | exit0 before source commit |
+
+The isolated toolchain still reports moon0.1.20260920/moonc0.10.14, but its lib/core directory contains empty package directories and no moon.mod/moon.mod.json or standard-library source files; lib/runtime is also empty (observed 2026-10-05). No toolchain installation/restoration or global environment change was attempted. Thus the current full Node suite passed against the existing bridge, while the build gate genuinely failed and is not relabeled as green. MoonBit/build/start-entry/browser/package gates were not rerun successfully in this fix round. Loopback tests used the previously authorized local-only escalation; no external network, push, main-checkout edit, dependency addition or child agent.
+
+Only the four review findings and their directly related contract clarification/regressions changed. Task1 P3 remains for the final fix scope; Task3 GUI, Task4 review/branch and Task5 ZIP are unchanged. Current HEAD after this report-only evidence commit is available with `git rev-parse HEAD`.
