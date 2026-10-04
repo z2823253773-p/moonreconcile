@@ -130,6 +130,9 @@ test('private runtime permissions, strict schemas/queries and unsupported routes
 test('anonymous fixed static navigation accepts none but API and cross-site checks stay strict',async t=>{
   const app=await startWorkbench();t.after(()=>app.close());
   for(const route of ['/','/index.html'])for(const site of ['none','same-origin'])assert.equal((await fetch(app.origin+route,{headers:{'sec-fetch-site':site,'sec-fetch-mode':'navigate','sec-fetch-dest':'document'}})).status,200);
+  const csvRenderer=await fetch(app.origin+'/cli/render.mjs',{headers:{'sec-fetch-site':'none'}});assert.equal(csvRenderer.status,200);assert.match(await csvRenderer.text(),/export function renderCsv/);
+  assert.equal((await fetch(app.origin+'/cli/render.mjs?extra=1',{headers:{'sec-fetch-site':'same-origin'}})).status,404);
+  assert.equal((await fetch(app.origin+'/cli/render.mjs',{headers:{'sec-fetch-site':'cross-site'}})).status,403);
   assert.equal((await fetch(app.origin+'/',{headers:{'sec-fetch-site':'cross-site'}})).status,403);
   assert.equal((await fetch(app.origin+'/',{headers:{'sec-fetch-site':'none',origin:'http://evil.example'}})).status,403);
   assert.equal((await fetch(app.origin+'/api/capabilities',{headers:{authorization:`Bearer ${app.token}`,'sec-fetch-site':'none'}})).status,403);

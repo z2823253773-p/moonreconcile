@@ -6,6 +6,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createSession } from './session.mjs';
 import { createJobManager } from './jobs.mjs';
+import { assertCumulativeDecisions } from './public/review-model.mjs';
 import { APP_VERSION, API_VERSION, HOST_LIMITS, errorDto, failure, exact, isId, integer, project, sanitizeError, jsonBytes, normalizeLimits } from './contracts.mjs';
 const ROOT=fileURLToPath(new URL('..',import.meta.url));
 const HEADERS={
@@ -20,7 +21,9 @@ const STATIC_FILES=new Map([
   ['/public/app.mjs','app.mjs'],['/public/api.mjs','api.mjs'],['/public/state.mjs','state.mjs'],
   ['/public/dom.mjs','dom.mjs'],['/public/import-view.mjs','import-view.mjs'],
   ['/public/config-view.mjs','config-view.mjs'],['/public/config-model.mjs','config-model.mjs'],
+  ['/public/result-view.mjs','result-view.mjs'],['/public/review-view.mjs','review-view.mjs'],['/public/review-model.mjs','review-model.mjs'],
   ['/public/styles.css','styles.css'],
+  ['/cli/render.mjs','../../cli/render.mjs'],
 ]);
 const STATIC_TYPES={html:'text/html; charset=utf-8',mjs:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8'};
 function ids(value,keys) {for(const k of keys)if(!isId(value[k]))throw failure('invalid_request','Invalid identifier');}
@@ -174,12 +177,48 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
           }};
         }}));
       }
+      const reviews=route.match(/^\/api\/runs\/([^/]+)\/reviews$/);
+      if(req.method==='POST'&&reviews) {
+        noQuery();const b=await readJson(req);exact(b,['base_revision','decisions_asset_id']);ids(b,['base_revision','decisions_asset_id']);
+        const parent=session.getRevision(reviews[1]);
+        if(b.base_revision!==parent.revision_id||session.heads.get(parent.baseline_revision_id)!==parent.revision_id)throw failure('stale_revision','Review base is not the current branch head',409);
+        const decisionAsset=session.getAsset(b.decisions_asset_id);if(decisionAsset.kind!=='decisions')throw failure('invalid_request','Decision asset required');
+        const baseline=session.getRevision(parent.baseline_revision_id);
+        const left=session.getImport(baseline.left_import_id),right=session.getImport(baseline.right_import_id),config=session.getAsset(baseline.config_asset_id);
+        const reservation=session.getAsset(left.asset_id).bytes+session.getAsset(right.asset_id).bytes+config.bytes+decisionAsset.bytes;
+        return accepted(startJob('review',{reservation,prepare:async({staging})=>{
+          const run=path.join(staging,'run');return {task:{payload:{},paths:{baseline:baseline.path,decisions:decisionAsset.path,run}},prepareOutput:async o=>{
+            if(o.run_path!==run||![0,1,3].includes(o.exit_code))throw failure('invalid_worker_output','Invalid review candidate');
+            const parentResult=JSON.parse(await fs.readFile(path.join(parent.path,'report.json'),'utf8'));
+            const candidate=JSON.parse(await fs.readFile(path.join(run,'report.json'),'utf8'));
+            assertCumulativeDecisions(parentResult.decisions,candidate.decisions);
+            const revision=await session.prepareRevision({runPath:run,left_import_id:baseline.left_import_id,right_import_id:baseline.right_import_id,config_asset_id:baseline.config_asset_id,parent_revision_id:parent.revision_id,baseline_revision_id:baseline.revision_id});
+            if(revision.exit_code!==o.exit_code)throw failure('invalid_worker_output','Result exit code mismatch');
+            return {output:{revision:project('revision',revision)},commit:()=>session.commitRevision(revision)};
+          }};
+        }}));
+      }
+      const branch=route.match(/^\/api\/runs\/([^/]+)\/branch$/);
+      if(req.method==='POST'&&branch) {
+        noQuery();exact(await readJson(req),[]);const parent=session.getRevision(branch[1]);
+        if(session.heads.get(parent.baseline_revision_id)!==parent.revision_id)throw failure('stale_revision','Branch source is not the current branch head',409);
+        const baseline=session.getRevision(parent.baseline_revision_id),left=session.getImport(baseline.left_import_id),right=session.getImport(baseline.right_import_id),config=session.getAsset(baseline.config_asset_id);
+        const reservation=session.getAsset(left.asset_id).bytes+session.getAsset(right.asset_id).bytes+config.bytes;
+        return accepted(startJob('branch',{reservation,prepare:async({staging})=>{
+          const run=path.join(staging,'run');return {task:{payload:{},paths:{left:path.join(baseline.path,'input/left.csv'),right:path.join(baseline.path,'input/right.csv'),config:path.join(baseline.path,'config.json'),run}},prepareOutput:async o=>{
+            if(o.run_path!==run||![0,1,3].includes(o.exit_code))throw failure('invalid_worker_output','Invalid branch candidate');
+            const revision=await session.prepareRevision({runPath:run,left_import_id:baseline.left_import_id,right_import_id:baseline.right_import_id,config_asset_id:baseline.config_asset_id});
+            if(revision.exit_code!==o.exit_code)throw failure('invalid_worker_output','Result exit code mismatch');
+            return {output:{revision:project('revision',revision)},commit:()=>{if(session.heads.get(parent.baseline_revision_id)!==parent.revision_id)throw failure('stale_revision','Branch source head changed',409);session.commitRevision(revision);}};
+          }};
+        }}));
+      }
       const jm=route.match(/^\/api\/jobs\/([^/]+)$/);
       if(jm&&['GET','DELETE'].includes(req.method)) {noQuery();if(!isId(jm[1]))throw failure('invalid_request','Invalid identifier');return reply(200,{ok:true,job:project('job',req.method==='DELETE'?await jobs.cancel(jm[1]):jobs.get(jm[1]))});}
       const summary=route.match(/^\/api\/runs\/([^/]+)\/summary$/);
       if(req.method==='GET'&&summary) {
         noQuery();const revision=session.getRevision(summary[1]);const result=JSON.parse(await fs.readFile(path.join(revision.path,'report.json'),'utf8'));
-        const output={ok:true,revision:project('revision',revision),computation:result.computation,summary:result.summary,structure:result.structure};
+        const output={ok:true,revision:project('revision',revision),computation:result.computation,summary:result.summary,structure:result.structure,issues:result.key_issues};
         if(jsonBytes(output)>limits.response_bytes)throw failure('response_limit_exceeded',`Summary exceeds display limit; export /api/runs/${revision.revision_id}/export?kind=report`,413);
         return reply(200,output);
       }

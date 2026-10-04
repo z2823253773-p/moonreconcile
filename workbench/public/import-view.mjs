@@ -77,6 +77,33 @@ export function renderImportView({ root, store, api }) {
     } catch(error){notice=`示例载入失败：${error.message}`;store.update({error:error.message});}
     finally{busy=false;render();}
   }
+  async function bindRevision(revision, expectedRevisionId = store.get().revision?.revision_id) {
+    const generation = store.generation(), old = store.get();
+    const stillSelected = () => generation === store.generation() && store.get().revision?.revision_id === expectedRevisionId && (!store.get().active_job || store.get().active_job.phase === 'comparing');
+    const [leftMeta, rightMeta] = await Promise.all([
+      api.request(`/api/imports/${revision.left_import_id}`),
+      api.request(`/api/imports/${revision.right_import_id}`),
+    ]);
+    const configBlobPromise = api.download(`/api/configs/${revision.config_asset_id}/export`);
+    const leftPage = await waitFor(`/api/imports/${revision.left_import_id}/preview`, { offset: 0, limit: LIMIT });
+    const rightPage = await waitFor(`/api/imports/${revision.right_import_id}/preview`, { offset: 0, limit: LIMIT });
+    const configBlob = await configBlobPromise;
+    const config = JSON.parse(await configBlob.text());
+    if (!stillSelected()) throw new Error('选择的版本或当前来源已变化；没有替换工作台绑定。');
+    sources.left = { ...leftMeta.asset, label: '当前分支原始快照', preview: leftPage.preview, import: leftMeta.import };
+    sources.right = { ...rightMeta.asset, label: '当前分支原始快照', preview: rightPage.preview, import: rightMeta.import };
+    exampleLabel = '当前分支原始快照';
+    store.update({
+      left_import_id: revision.left_import_id, right_import_id: revision.right_import_id,
+      left_headers: leftPage.preview.headers, right_headers: rightPage.preview.headers,
+      config_asset_id: revision.config_asset_id, config, draft_dirty: false, pending_decisions: [], error: null,
+    });
+    // Input/config generation changes mark the old report stale. Publish this
+    // new revision separately, only after both snapshot bindings are visible.
+    store.update({ revision, stale: false, pending_decisions: [], error: null });
+    busy = false; notice = ''; render();
+    return { prior: old };
+  }
   async function cancel(){if(!activeJob)return;try{await api.request(`/api/jobs/${activeJob.job_id}`,{method:'DELETE'});notice='已请求取消，等待服务确认任务结束。';}catch(error){notice=error.message;}render();}
   async function swapSides(){
     if(!sources.left||!sources.right||!globalThis.confirm('交换左右来源会用已有 CSV 资产重新导入两侧，清除规则和待应用决定，并将当前报告标记为旧版本。继续？'))return;
@@ -96,5 +123,5 @@ export function renderImportView({ root, store, api }) {
   async function fullCell(side,record,column){try{const out=await waitFor(`/api/imports/${sources[side].import.import_id}/cell`,{record,column});const dialog=element('dialog');dialog.append(element('h3',{text:`完整单元格：${column} · 数据记录 ${record}`}),element('pre',{text:out.cell.value}),button('关闭',()=>dialog.close()));document.body.append(dialog);dialog.showModal();}catch(error){notice=`读取完整单元格失败：${error.message}`;render();}}
   let lastJob=store.get().active_job;
   const dispose=store.subscribe((next)=>{if(next.active_job!==lastJob){lastJob=next.active_job;if(!busy)render();}});
-  render();return()=>{dispose();root.replaceChildren();};
+  render();return { dispose:()=>{dispose();root.replaceChildren();}, bindRevision };
 }

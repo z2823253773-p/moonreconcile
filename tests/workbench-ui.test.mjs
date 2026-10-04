@@ -4,9 +4,10 @@ import { invoke_bridge as invoke } from '../_build/js/debug/build/cmd/bridge/bri
 import { createWorkbenchState } from '../workbench/public/state.mjs';
 import { renderConfigView } from '../workbench/public/config-view.mjs';
 import { renderImportView } from '../workbench/public/import-view.mjs';
+import { renderResultView } from '../workbench/public/result-view.mjs';
 
 class FakeNode {
-  constructor(tag) { this.tag=tag;this.children=[];this.listeners={};this.attrs={};this.value='';this.disabled=false;this.nodeType=1;this._text='';this.classList={add:()=>{},remove:()=>{}}; }
+  constructor(tag) { this.tag=tag;this.children=[];this.listeners={};this.attrs={};this.value='';this.disabled=false;this.nodeType=1;this._text='';const self=this;this.classList={add:()=>{},remove:()=>{},contains:(name)=>self.className?.split(' ').includes(name)??false}; }
   set textContent(value) { this._text=String(value);this.children=[]; }
   get textContent() { return this._text+this.children.map((child)=>child.textContent).join(''); }
   setAttribute(key,value) { this.attrs[key]=String(value);if(key==='id')this.id=String(value); }
@@ -17,6 +18,8 @@ class FakeNode {
   querySelector(selector) { return this.querySelectorAll(selector)[0]??null; }
   after(node) { const siblings=this.parent.children;siblings.splice(siblings.indexOf(this)+1,0,node);node.parent=this.parent; }
   remove() { if(this.parent)this.parent.children.splice(this.parent.children.indexOf(this),1); }
+  showModal() { this.open=true; }
+  close() { this.open=false; }
   fire(type,details={}) { return Promise.all((this.listeners[type]??[]).map((fn)=>fn({preventDefault(){},dataTransfer:{dropEffect:'none',files:[]},...details}))); }
 }
 
@@ -268,6 +271,66 @@ test('invalid duplicate mapping stays local and can be fixed before lossless rec
   const csv='id,status,memo\n1,__proto__,same\n2,2,same\n';
   const compared=JSON.parse(invoke(JSON.stringify({op:'compare',left_csv:csv,right_csv:csv,config:store.get().config})));
   assert.equal(compared.ok,true,JSON.stringify(compared.error));assert.equal(compared.result.exit_code,0);assert.equal(compared.result.summary.unresolved_count,0);
+});
+
+test('result evidence reads source cells for paired records and keeps exact-pair locks across collection pages', async () => {
+  const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState();
+  const revision={revision_id:'rev-ui',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};store.update({revision,stale:false,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'});
+  const summary={revision,computation:{status:'complete',issues:[]},summary:{per_side:{left:{paired:1}},fields:{different:1}},structure:{left:{columns:1}},issues:[]};
+  const requests=[];
+  const api={request:async(path,{method='GET',body}={})=>{
+    requests.push({path,method,body});
+    if(path==='/api/imports/li')return{import:{import_id:'li',headers:['id']}};
+    if(path==='/api/imports/ri')return{import:{import_id:'ri',headers:['id']}};
+    if(path==='/api/runs/rev-ui/pairs?offset=0&limit=100')return{items:[{source_index:0,item:{left_id:'L1',right_id:'R1',source:'exact_key'}}],total:1,offset:0,next_offset:1,has_more:false};
+    if(path==='/api/runs/rev-ui/pairs?offset=0&limit=20')return{items:[],total:1,offset:0,next_offset:0,has_more:true};
+    if(path.startsWith('/api/runs/rev-ui/candidates?'))return{items:[{source_index:0,item:{left_id:'L1',right_id:'R1',score:10000,suggested:true}}],total:1,offset:0,next_offset:1,has_more:false};
+    if(path.startsWith('/api/runs/rev-ui/records?'))return{items:[{source_index:0,item:{id:'L1',side:'left',record:1,status:'paired',reason:'matched'}}],total:1,offset:0,next_offset:1,has_more:false};
+    if(path.startsWith('/api/runs/rev-ui/fields?'))return{items:[],total:0,offset:0,next_offset:0,has_more:false};
+    if(path.startsWith('/api/runs/rev-ui/issues?')||path.startsWith('/api/runs/rev-ui/decisions?'))return{items:[],total:0,offset:0,next_offset:0,has_more:false};
+    if(path==='/api/runs/rev-ui/cell')return{job_id:'cell-job'};
+    throw new Error(`Unexpected request ${path}`);
+  },waitJob:async()=>({output:{cell:{value:'snapshot L1',truncated:false}}}),download:async()=>new Blob(['{}']),upload:async()=>({asset_id:'asset'})};
+  const dispose=renderResultView({root,store,api,summary,onPublished:async()=>{}});
+  await waitFor(()=>root.textContent.includes('精确键配对已锁定')&&buttonBy(root,'查看 id 原值'));
+  const accept=buttonBy(root,'accept 此配对');assert.equal(accept.disabled,true);
+  await buttonBy(root,'查看 id 原值').fire('click');
+  await waitFor(()=>document.body.querySelector('dialog')?.textContent.includes('snapshot L1'));
+  assert.ok(requests.some(item=>item.path==='/api/runs/rev-ui/cell'&&item.body.side==='left'));
+  dispose();
+});
+
+test('short API pages advance by next_offset and previous returns to the recorded offset', async () => {
+  const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState();
+  const revision={revision_id:'rev-pages',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};store.update({revision,stale:false});
+  const offsets=[];const api={request:async path=>{
+    if(path.startsWith('/api/imports/'))return{import:{import_id:path.split('/').at(-1),headers:[]}};
+    if(path.startsWith('/api/runs/rev-pages/pairs?offset=')&&path.endsWith('limit=100'))return{items:[],total:0,offset:0,next_offset:0,has_more:false};
+    const match=path.match(/\/fields\?offset=(\d+)&limit=(\d+)/);if(match){const offset=Number(match[1]);offsets.push(offset);return{items:Array.from({length:2},(_,i)=>({source_index:offset+i,item:{field:`f${offset+i}`}})),total:5,offset,next_offset:Math.min(offset+2,5),has_more:offset+2<5};}
+    if(path.includes('/candidates?')||path.includes('/records?')||path.includes('/issues?')||path.includes('/pairs?')||path.includes('/decisions?'))return{items:[],total:0,offset:0,next_offset:0,has_more:false};
+    throw new Error(`Unexpected request ${path}`);
+  },download:async()=>new Blob(['{}']),upload:async()=>({asset_id:'asset'}),waitJob:async()=>({output:{}})};
+  const dispose=renderResultView({root,store,api,summary:{revision,computation:{},summary:{},structure:{},issues:[]},onPublished:async()=>{}});
+  await waitFor(()=>walk(root).some(node=>node.tag==='button'&&node.textContent==='下一页'&&!node.disabled));
+  await buttonBy(root,'下一页').fire('click');await waitFor(()=>offsets.includes(2));
+  await buttonBy(root,'上一页').fire('click');await waitFor(()=>offsets.at(-1)===0);
+  assert.deepEqual(offsets.slice(0,3),[0,2,0]);dispose();
+});
+
+test('source generation clears only unapplied review drafts and a stale current head can branch back to its bound inputs', async () => {
+  const document=makeDocument();globalThis.document=document;globalThis.confirm=message=>{assert.match(message,/切回该版本输入/);return true;};
+  const root=new FakeNode('main'),store=createWorkbenchState();
+  const revision={revision_id:'rev-head',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};store.update({revision,stale:false});
+  const requests=[];let published=null;
+  const api={request:async(path)=>{requests.push(path);if(path.startsWith('/api/imports/'))return{import:{import_id:path.split('/').at(-1),headers:[]}};if(path==='/api/runs/rev-head/branch')return{job_id:'branch-job'};if(path.startsWith('/api/runs/rev-head/'))return{items:[],total:0,offset:0,next_offset:0,has_more:false};throw new Error(`Unexpected request ${path}`);},waitJob:async()=>({output:{revision:{revision_id:'rev-branch',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'}}}),download:async()=>new Blob(['{}']),upload:async()=>({asset_id:'asset'})};
+  const dispose=renderResultView({root,store,api,summary:{revision,computation:{},summary:{},structure:{},issues:[]},isCurrentHead:true,onPublished:async value=>{published=value;}});
+  await waitFor(()=>root.textContent.includes('手工决定'));
+  const action=walk(root).find(node=>node.tag==='select');action.value='left_unmatched';await buttonBy(root,'添加手工决定').fire('click');
+  assert.match(root.textContent,/待应用（1）/);
+  store.update({left_import_id:'edited-import'});
+  assert.match(root.textContent,/待应用（0）/);
+  const branch=buttonBy(root,'从原始比较新建分支');assert.equal(branch.disabled,false);await branch.fire('click');
+  await waitFor(()=>published?.revision_id==='rev-branch');assert.ok(requests.includes('/api/runs/rev-head/branch'));dispose();
 });
 
 async function waitFor(predicate) { for(let i=0;i<100;i++){if(predicate())return;await new Promise((resolve)=>setTimeout(resolve,0));}throw new Error('Timed out waiting for UI state'); }

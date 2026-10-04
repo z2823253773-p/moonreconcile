@@ -24,7 +24,7 @@ async function runCli(argv,invoke,cwd) {
   }
   throw engineError(error??errorDto('cli_failure','CLI failed without a valid machine error'),[cwd,...argv.filter(x=>path.isAbsolute(x))]);
 }
-const kinds=new Set(['import','preview','cell','draft','check','compare','example']);
+const kinds=new Set(['import','preview','cell','draft','check','compare','example','review','branch']);
 export async function executeTask(task,{invoke,signal}={}) {
   if(!kinds.has(task.kind))throw failure('invalid_task',`unknown task kind: ${task.kind}`);
   if(signal?.aborted)throw failure('cancelled','Task cancelled');
@@ -44,6 +44,14 @@ export async function executeTask(task,{invoke,signal}={}) {
       await fs.writeFile(paths.config,canonicalJsonStringify(result.config),{mode:0o600,flag:'wx'});return {config_path:paths.config,draft:false};
     }
     if(task.kind==='compare') {
+      const exit_code=await runCli(['compare',paths.left,paths.right,'--config',paths.config,'--out',paths.run],invoke,path.dirname(paths.run));
+      return {run_path:paths.run,exit_code};
+    }
+    if(task.kind==='review') {
+      const exit_code=await runCli(['resolve',paths.baseline,'--decisions',paths.decisions,'--out',paths.run],invoke,path.dirname(paths.run));
+      return {run_path:paths.run,exit_code};
+    }
+    if(task.kind==='branch') {
       const exit_code=await runCli(['compare',paths.left,paths.right,'--config',paths.config,'--out',paths.run],invoke,path.dirname(paths.run));
       return {run_path:paths.run,exit_code};
     }
