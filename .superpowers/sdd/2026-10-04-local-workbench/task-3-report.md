@@ -30,5 +30,18 @@
 - `workbench/public/{index.html,styles.css}`
 - `workbench/server.mjs`
 - `tests/workbench-config.test.mjs`
+- `tests/workbench-ui.test.mjs`
 - `docs/superpowers/specs/2026-10-04-quarter-workbench-design.md`
 - `docs/superpowers/plans/2026-10-04-local-workbench.md`
+
+## 审查修复：Round 1
+
+- 引入共享来源/规则代次；比较只在输入代次未改变时清除 stale。比较期间的旧 revision 仍发布并保持只读 stale。空白草稿、原始配置导入、编辑后校验和示例加载都在最后一次下载文本完成后再次核对来源/规则代次，再发布到界面；来源任务期间的文件拖放会被拒绝。全局 job 会锁住规则编辑，取消和已校验配置、report 下载仍可用。
+- 补齐候选评分字段分页；增加/删除候选、字段、映射及替换配置时重置或钳制页码。修复 49→50 映射项时跳到空白页的问题。
+- 核心校验成功时展示 Config v1 字段、来源列、类型、比较开关、双方缺失策略、规范化、映射、缺失标记、容差、key/ignore 和候选规则摘要；分别列出每侧未映射且未忽略的表头，不自动忽略。编辑后即时隐藏校验摘要并禁用配置导出，不重建正在输入的字段控件。
+- 缺失标记改为逐项输入，可分别编辑、添加和删除；空字符串是独立项目，不再与空数组混淆。清空主键/忽略列文本框得到空数组，仍保留非空引用供用户处理。
+- 上传新文件显示其实际文件名并清除当前示例来源总标签；保留另一侧各自准确的来源标签。
+- RED：新增 `tests/workbench-ui.test.mjs` 后，候选/映射分页边界、缺失项与 ignore 空数组、未映射列和校验摘要、延迟比较 stale 竞态、规范配置下载等待期间的编辑、文件替换来源标识均按相应旧行为失败；修正夹具后，回归断言基于可观察界面状态验证。
+- Focused GREEN：`node --test tests/workbench-ui.test.mjs`，7/7 通过；`git diff --check` 通过。
+- 最终完整门禁：在本轮全部源码下执行 `MOON_HOME='<worktree>/.superpowers/sdd/2026-10-04-local-workbench/toolchain' MOONBIT_HOME='<worktree>/.superpowers/sdd/2026-10-04-local-workbench/toolchain' PATH="/bin:$PATH" npm test`，build 成功，Node 测试 107/107 通过，退出 0。HTTP server tests 需要绑定 127.0.0.1，因此用已授权的本机 loopback 权限运行。
+- 最终 SHA 的浏览器重验仍由控制器执行；上一轮 orders/CLI 字节一致、390px 键盘和布局截图属于诊断 SHA，本轮不把它们声明为最终 SHA 验收。

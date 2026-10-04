@@ -18,7 +18,7 @@ else {
   function renderRun(){
     runRoot.replaceChildren(element('h2',{text:'校验、运行与结果'}));
     const s=store.get();
-    if(s.revision&&s.stale)runRoot.append(element('p',{className:'notice warning',role:'status',text:`旧版本 ${s.revision.revision_id} 保留为只读。变更来源或规则后，须完成新校验再运行。`}));
+    if(s.revision&&s.stale)runRoot.append(element('p',{className:'notice warning',role:'status',text:`旧版本 ${s.revision.revision_id} 保留为只读。${s.config_asset_id&&!s.draft_dirty?'当前规则已校验，可运行新比较更新结果。':'校验当前规则后可运行新比较。'}`}));
     if(s.active_job)runRoot.append(element('p',{className:'notice',role:'status',text:`任务处理中：${s.active_job.phase??'读取或校验'}。不显示估算百分比。`}));
     const enabled=Boolean(s.left_import_id&&s.right_import_id&&s.config_asset_id&&!s.draft_dirty&&!s.active_job&&!busy);
     runRoot.append(button(busy?'比较处理中…':'运行核心比较',()=>void compare(),{disabled:!enabled}));
@@ -34,14 +34,16 @@ else {
     }
   }
   async function compare(){
-    const s=store.get();if(!s.config_asset_id||s.draft_dirty)return;
+    const s=store.get();if(!s.config_asset_id||s.draft_dirty||s.active_job)return;
+    const generation=store.generation();
     busy=true;renderRun();
     try{
       const accepted=await api.request('/api/runs',{method:'POST',body:{left_import_id:s.left_import_id,right_import_id:s.right_import_id,config_asset_id:s.config_asset_id}});
       jobId=accepted.job_id;store.update({active_job:{job_id:jobId,phase:'comparing',state:'running'},error:null});renderRun();
       const job=await api.waitJob(jobId);const revision=job.output.revision;
-      store.update({revision,stale:false,pending_decisions:[],active_job:null,error:null});
-      try{summary=await api.request(`/api/runs/${revision.revision_id}/summary`);}
+      const stillCurrent=generation===store.generation();
+      store.update({revision,...(stillCurrent?{stale:false,pending_decisions:[]}:{}),active_job:null,error:null});
+      try{const loaded=await api.request(`/api/runs/${revision.revision_id}/summary`);summary=loaded;}
       catch(error){summary={revision,display_error:`比较已完成，但摘要超过显示预算或暂时不可读：${error.message}`};store.update({error:error.message});}
     }catch(error){store.update({active_job:null,error:error.message});}
     finally{jobId=null;busy=false;renderRun();}

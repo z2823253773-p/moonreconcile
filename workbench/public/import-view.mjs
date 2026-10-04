@@ -17,8 +17,8 @@ export function renderImportView({ root, store, api }) {
       const file=element('input',{type:'file',accept:'.csv',disabled:busy||Boolean(store.get().active_job)});file.setAttribute('aria-label',`${title} CSV 文件`);
       file.addEventListener('change',()=>{const picked=file.files?.[0];if(picked)void loadFile(side,picked);});
       const drop=element('div',{className:'drop-zone',tabindex:'0',role:'group','aria-label':`${title} 拖放区域`,text:'选择 CSV，或将文件拖放到这里'});
-      drop.addEventListener('dragover',(event)=>{event.preventDefault();drop.classList.add('dragging');});drop.addEventListener('dragleave',()=>drop.classList.remove('dragging'));
-      drop.addEventListener('drop',(event)=>{event.preventDefault();drop.classList.remove('dragging');const picked=event.dataTransfer?.files?.[0];if(picked)void loadFile(side,picked);});
+      drop.addEventListener('dragover',(event)=>{event.preventDefault();if(busy||store.get().active_job){drop.classList.remove('dragging');return;}drop.classList.add('dragging');});drop.addEventListener('dragleave',()=>drop.classList.remove('dragging'));
+      drop.addEventListener('drop',(event)=>{event.preventDefault();drop.classList.remove('dragging');if(busy||store.get().active_job){notice='任务进行中，完成或取消后再替换来源。';render();return;}const picked=event.dataTransfer?.files?.[0];if(picked)void loadFile(side,picked);});
       drop.addEventListener('keydown',(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();file.click();}});
       box.append(label(`${title} CSV`,file),drop);
       const source=sources[side];if(source){const perPage=element('select',{disabled:busy||Boolean(store.get().active_job)},[5,10,20].map((size)=>element('option',{value:size,selected:pageLimit[side]===size,text:`${size} 行`})));perPage.addEventListener('change',()=>{pageLimit[side]=Number(perPage.value);void page(side,source.preview.offset);});box.append(label('每页预览行数（可缩小显示）',perPage));box.append(element('div',{className:'source-meta'},[
@@ -42,10 +42,13 @@ export function renderImportView({ root, store, api }) {
     finally {activeJob=null;store.update({active_job:null});}
   }
   async function loadFile(side,file) {
+    if(busy||store.get().active_job){notice='任务进行中，完成或取消后再替换来源。';render();return;}
+    const generation=store.generation(),left=store.get().left_import_id,right=store.get().right_import_id;
     busy=true;notice='';errors[side]=null;render();
     try {
       const asset=await api.upload('csv',file);const out=await waitFor('/api/imports',{asset_id:asset.asset_id,side});
-      sources[side]={...asset,label:exampleLabel||file.name,preview:out.preview,import:out.import};
+      if(generation!==store.generation()||left!==store.get().left_import_id||right!==store.get().right_import_id)throw new Error('来源在上传期间已变化；本次文件未替换当前来源。');
+      sources[side]={...asset,label:file.name,preview:out.preview,import:out.import};exampleLabel='';
       store.update({[`${side}_import_id`]:out.import.import_id,[`${side}_headers`]:out.preview.headers,error:null});
     } catch(error) {errors[side]=error;notice=`${side==='left'?'左侧':'右侧'}文件未导入：${error.message}`;store.update({error:error.message});}
     finally{busy=false;render();}
@@ -55,16 +58,21 @@ export function renderImportView({ root, store, api }) {
     catch(error){notice=`预览失败（${error.code??'错误'}）：${error.message}。可将每页行数调到 5 后重试；若单行或表头仍超出显示预算，请缩短/拆分源表列后重新导入。`}finally{busy=false;render();}
   }
   async function loadExample(name) {
+    if(busy||store.get().active_job)return;
+    const generation=store.generation(),left=store.get().left_import_id,right=store.get().right_import_id;
     busy=true;notice='';render();
     try {
-      const result=await waitFor(`/api/examples/${name}`,{});exampleLabel=result.source_label;
+      const result=await waitFor(`/api/examples/${name}`,{});
       const leftMeta=await api.request(`/api/imports/${result.left_import_id}`),rightMeta=await api.request(`/api/imports/${result.right_import_id}`);
       const leftPreview=await waitFor(`/api/imports/${result.left_import_id}/preview`,{offset:0,limit:LIMIT});
       const rightPreview=await waitFor(`/api/imports/${result.right_import_id}/preview`,{offset:0,limit:LIMIT});
       const configBlob=await api.download(`/api/configs/${result.config_asset_id}/export`);
+      const configText=await configBlob.text();
+      if(generation!==store.generation()||left!==store.get().left_import_id||right!==store.get().right_import_id)throw new Error('来源在示例载入期间已变化；当前来源未替换。');
+      exampleLabel=result.source_label;
       sources.left={...leftMeta.asset,name:`${name} 左侧`,label:result.source_label,preview:leftPreview.preview,import:leftMeta.import};
       sources.right={...rightMeta.asset,name:`${name} 右侧`,label:result.source_label,preview:rightPreview.preview,import:rightMeta.import};
-      const config=JSON.parse(await configBlob.text());
+      const config=JSON.parse(configText);pageLimit.left=LIMIT;pageLimit.right=LIMIT;
       store.update({left_import_id:result.left_import_id,right_import_id:result.right_import_id,left_headers:leftPreview.preview.headers,right_headers:rightPreview.preview.headers,config_asset_id:result.config_asset_id,config,draft_dirty:false,error:null,pending_decisions:[]});
     } catch(error){notice=`示例载入失败：${error.message}`;store.update({error:error.message});}
     finally{busy=false;render();}
@@ -72,10 +80,11 @@ export function renderImportView({ root, store, api }) {
   async function cancel(){if(!activeJob)return;try{await api.request(`/api/jobs/${activeJob.job_id}`,{method:'DELETE'});notice='已请求取消，等待服务确认任务结束。';}catch(error){notice=error.message;}render();}
   async function swapSides(){
     if(!sources.left||!sources.right||!globalThis.confirm('交换左右来源会用已有 CSV 资产重新导入两侧，清除规则和待应用决定，并将当前报告标记为旧版本。继续？'))return;
-    const oldLeft=sources.left,oldRight=sources.right;busy=true;notice='正在用已有文件重新导入左右两侧…';render();
+    const oldLeft=sources.left,oldRight=sources.right,generation=store.generation(),left=store.get().left_import_id,right=store.get().right_import_id;busy=true;notice='正在用已有文件重新导入左右两侧…';render();
     try{
       const newLeft=await waitFor('/api/imports',{asset_id:oldRight.asset_id,side:'left'});
       const newRight=await waitFor('/api/imports',{asset_id:oldLeft.asset_id,side:'right'});
+      if(generation!==store.generation()||left!==store.get().left_import_id||right!==store.get().right_import_id)throw new Error('来源在交换期间已变化；当前来源未替换。');
       sources.left={...oldRight,import:newLeft.import,preview:newLeft.preview};sources.right={...oldLeft,import:newRight.import,preview:newRight.preview};errors.left=null;errors.right=null;
       store.update({left_import_id:newLeft.import.import_id,right_import_id:newRight.import.import_id,left_headers:newLeft.preview.headers,right_headers:newRight.preview.headers,config_asset_id:null,config:null,draft_dirty:false,pending_decisions:[],error:null});
       notice='左右 CSV 已交换并重新导入。请重新设置并校验规则；旧报告仍可只读查看。';
