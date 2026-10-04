@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { run } from '../cli/main.mjs';
-import { canonicalJsonStringify, decodeUtf8Fatal } from '../cli/io.mjs';
+import { canonicalJsonStringify, decodeUtf8Fatal, parseJsonText } from '../cli/io.mjs';
 import { assertDto, exact, failure, sanitizeError, errorDto } from './contracts.mjs';
 
 function engineError(error,paths=[]) {const safe=sanitizeError(error,paths);return Object.assign(new Error(safe.message),{code:safe.code,error:safe});}
@@ -39,7 +39,7 @@ export async function executeTask(task,{invoke,signal}={}) {
       await runCli(['init-config',paths.left,paths.right,'--out',paths.config],invoke,path.dirname(paths.config));return {config_path:paths.config,draft:true};
     }
     if(task.kind==='check') {
-      const config=JSON.parse(decodeUtf8Fatal(await fs.readFile(paths.configInput),{phase:'input'}));
+      const config=parseJsonText(decodeUtf8Fatal(await fs.readFile(paths.configInput),{phase:'input',allowInteriorBom:true}),{phase:'input',what:'configuration'});
       const result=callEngine({op:'check_config',config},invoke);
       await fs.writeFile(paths.config,canonicalJsonStringify(result.config),{mode:0o600,flag:'wx'});return {config_path:paths.config,draft:false};
     }

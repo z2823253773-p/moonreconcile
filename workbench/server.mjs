@@ -23,13 +23,17 @@ function importEntry(asset,side,preview) {return {import_id:randomUUID(),asset_i
 export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}={}) {
   const limits=normalizeLimits(overrides),session=await createSession({rootParent,limits:overrides});
   const jobs=await createJobManager({session,bridgePath,limits:overrides}),token=randomBytes(32).toString('hex');
-  const uploads=new Set();let origin,closing=false;
+  const uploads=new Set(),requests=new Set();let origin,closing=false;
+  function startJob(kind,payload){
+    if(closing)throw failure('session_closed','Session is closing',409);
+    return jobs.start(kind,payload);
+  }
   function imports(body) {
     ids(body,['left_import_id','right_import_id']);const left=session.getImport(body.left_import_id),right=session.getImport(body.right_import_id);
     if(left.side!=='left'||right.side!=='right')throw failure('invalid_request','Import sides must be left/right');return {left,right};
   }
   function configJob(kind,body,left,right,source) {
-    return jobs.start(kind,{reservation:source?.bytes??0,prepare:async({staging})=>{
+    return startJob(kind,{reservation:source?.bytes??0,prepare:async({staging})=>{
       const config=path.join(staging,'config.json');let configInput=source?.path;
       if(kind==='check'&&!source){configInput=path.join(staging,'input.json');await fs.writeFile(configInput,JSON.stringify(body.config),{mode:0o600,flag:'wx'});}
       return {task:{payload:{},paths:{left:left.path,right:right.path,config,configInput}},prepareOutput:async o=>{
@@ -41,7 +45,8 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
   }
   async function readJson(req) {
     if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']??''))throw failure('invalid_request','application/json required');
-    let size=0;const chunks=[];for await(const c of req){size+=c.length;if(size>limits.request_bytes)throw failure('request_too_large','JSON orchestration limit exceeded',413);chunks.push(c);}
+    let size=0;const chunks=[];for await(const c of req){if(closing)throw failure('session_closed','Session is closing',409);size+=c.length;if(size>limits.request_bytes)throw failure('request_too_large','JSON orchestration limit exceeded',413);chunks.push(c);}
+    if(closing)throw failure('session_closed','Session is closing',409);
     let value;try{value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks)));}catch{throw failure('invalid_request','Invalid UTF-8 JSON body');}
     if(value===null||typeof value!=='object'||Array.isArray(value))throw failure('invalid_request','JSON object required');return value;
   }
@@ -78,6 +83,7 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
     finally{clearTimeout(timer);await file?.close();if(dir)await session.remove(dir);session.release(key);uploads.delete(state);finish();}
   }
   const server=http.createServer(async(req,res)=>{
+    let finish;const state={req,done:new Promise(resolve=>finish=resolve)};requests.add(state);
     const reply=(status,body)=>{
       if(res.destroyed||res.headersSent)return;
       if(jsonBytes(body)>limits.response_bytes){status=413;body={ok:false,error:errorDto('response_limit_exceeded','Response display limit exceeded; use the evidence export route')};}
@@ -94,9 +100,11 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
       if(req.headers.host!==new URL(origin).host)throw failure('forbidden','Invalid Host',403);
       const url=new URL(req.url,origin),route=url.pathname;
       const fetchSite=req.headers['sec-fetch-site'];
-      if((req.headers.origin&&req.headers.origin!==origin)||(fetchSite&&fetchSite!=='same-origin'))throw failure('forbidden','Cross-site request rejected',403);
+      const staticEntry=req.method==='GET'&&['/','/index.html'].includes(route)&&url.searchParams.size===0;
+      const permittedSite=fetchSite==='same-origin'||(staticEntry&&fetchSite==='none');
+      if((req.headers.origin&&req.headers.origin!==origin)||(fetchSite&&!permittedSite))throw failure('forbidden','Cross-site request rejected',403);
       if(!route.startsWith('/api/')) {
-        if(req.method==='GET'&&['/','/index.html'].includes(route)&&url.searchParams.size===0){res.writeHead(200,{...HEADERS,'Content-Type':'text/html; charset=utf-8'});res.end(STATIC_PAGE);return;}
+        if(staticEntry){res.writeHead(200,{...HEADERS,'Content-Type':'text/html; charset=utf-8'});res.end(STATIC_PAGE);return;}
         return reply(404,{ok:false,error:errorDto('not_found','Route not found')});
       }
       if(req.headers.authorization!==`Bearer ${token}`)throw failure('unauthorized','Bearer token required',401);
@@ -106,7 +114,7 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
       if(req.method==='POST'&&route==='/api/imports') {
         noQuery();const b=await readJson(req);exact(b,['asset_id','side']);ids(b,['asset_id']);if(!['left','right'].includes(b.side))throw failure('invalid_request','Invalid side');
         const asset=session.getAsset(b.asset_id);if(asset.kind!=='csv')throw failure('unsupported_format','CSV asset required',422);
-        return accepted(jobs.start('import',{prepare:async()=>({task:{payload:{side:b.side,offset:0,limit:20},paths:{csv:asset.path}},prepareOutput:async o=>{
+        return accepted(startJob('import',{prepare:async()=>({task:{payload:{side:b.side,offset:0,limit:20},paths:{csv:asset.path}},prepareOutput:async o=>{
           const entry=importEntry(asset,b.side,o.preview);if(session.imports.size>=limits.imports)throw failure('quota_exceeded','Import count quota exceeded',413);
           return {output:{import:project('import',entry),preview:o.preview},commit:()=>session.commitImport(entry)};
         }})}));
@@ -114,7 +122,7 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
       const im=route.match(/^\/api\/imports\/([^/]+)\/(preview|cell)$/);
       if(req.method==='POST'&&im) {
         noQuery();const imp=session.getImport(im[1]),b=await readJson(req);if(im[2]==='preview')page(b);else cell(b);
-        return accepted(jobs.start(im[2],{task:{payload:{side:imp.side,...b},paths:{csv:imp.path}}}));
+        return accepted(startJob(im[2],{task:{payload:{side:imp.side,...b},paths:{csv:imp.path}}}));
       }
       if(req.method==='POST'&&route==='/api/config/draft') {
         noQuery();const b=await readJson(req);exact(b,['left_import_id','right_import_id']);const {left,right}=imports(b);return accepted(configJob('draft',b,left,right));
@@ -131,7 +139,7 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
       if(req.method==='POST'&&example) {
         noQuery();exact(await readJson(req),[]);const name=example[1];if(!Object.hasOwn(EXAMPLES,name))throw failure('not_found','Example not found',404);
         const base=path.join(ROOT,'examples',name),sourceFiles=['left.csv','right.csv','rules.json'];let reserve=0;for(const f of sourceFiles)reserve+=(await fs.stat(path.join(base,f))).size;
-        return accepted(jobs.start('example',{reservation:reserve*2,prepare:async({staging})=>{
+        return accepted(startJob('example',{reservation:reserve*2,prepare:async({staging})=>{
           const left=path.join(staging,'left.csv'),right=path.join(staging,'right.csv'),configInput=path.join(staging,'rules.json'),config=path.join(staging,'config.json');
           for(const [source,dest] of [['left.csv',left],['right.csv',right],['rules.json',configInput]]){await fs.copyFile(path.join(base,source),dest);await fs.chmod(dest,0o600);}
           return {task:{payload:{},paths:{left,right,configInput,config,staging}},prepareOutput:async o=>{
@@ -148,7 +156,7 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
         noQuery();const b=await readJson(req);exact(b,['left_import_id','right_import_id','config_asset_id']);ids(b,['config_asset_id']);const {left,right}=imports(b),config=session.getAsset(b.config_asset_id);
         const binding=session.bindings.get(config.asset_id);if(config.kind!=='config'||binding?.[0]!==left.import_id||binding?.[1]!==right.import_id)throw failure('config_binding_mismatch','Validated config is not bound to these imports',409);
         const reserve=session.getAsset(left.asset_id).bytes+session.getAsset(right.asset_id).bytes+config.bytes;
-        return accepted(jobs.start('compare',{reservation:reserve,prepare:async({staging})=>{
+        return accepted(startJob('compare',{reservation:reserve,prepare:async({staging})=>{
           const run=path.join(staging,'run');return {task:{payload:{},paths:{left:left.path,right:right.path,config:config.path,run}},prepareOutput:async o=>{
             if(o.run_path!==run||![0,1,3].includes(o.exit_code))throw failure('invalid_worker_output','Invalid comparison candidate');
             const revision=await session.prepareRevision({runPath:run,left_import_id:left.import_id,right_import_id:right.import_id,config_asset_id:config.asset_id});
@@ -198,24 +206,30 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
       }
       const runCell=route.match(/^\/api\/runs\/([^/]+)\/cell$/);
       if(req.method==='POST'&&runCell) {
-        noQuery();const revision=session.getRevision(runCell[1]),b=await readJson(req);cell(b,true);const csv=path.join(revision.path,'input',b.side+'.csv');return accepted(jobs.start('cell',{task:{payload:b,paths:{csv}}}));
+        noQuery();const revision=session.getRevision(runCell[1]),b=await readJson(req);cell(b,true);const csv=path.join(revision.path,'input',b.side+'.csv');return accepted(startJob('cell',{task:{payload:b,paths:{csv}}}));
       }
       if(req.method==='POST'&&route==='/api/sessions/reset') {
         noQuery();const b=await readJson(req);exact(b,['confirm']);if(b.confirm!==true)throw failure('invalid_request','Explicit reset confirmation required');
         if(jobs.active||uploads.size)throw failure('session_busy','Active uploads or tasks prevent reset',409);
-        await session.reset();return reply(200,{ok:true});
+        if(closing)throw failure('session_closed','Session is closing',409);
+        await jobs.reset();return reply(200,{ok:true});
       }
       return reply(404,{ok:false,error:errorDto('not_found','Route not found')});
     }catch(e){reply(e.status??400,{ok:false,error:sanitizeError(e,[session.root])});}
+    finally{requests.delete(state);finish();}
   });
   try{await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});}catch(e){await jobs.close();await session.close();throw e;}
   origin=`http://127.0.0.1:${server.address().port}`;
   let closePromise;
   const close=()=>closePromise??=(async()=>{
     closing=true;
+    const stopped=new Promise(resolve=>server.close(resolve));
+    server.closeAllConnections();
+    for(const request of requests)request.req.destroy();
     for(const u of uploads){u.cause=failure('upload_aborted','Server is closing',409);u.req.destroy();}
+    await Promise.all([...requests].map(request=>request.done));
     await Promise.all([...uploads].map(u=>u.done));await jobs.close();
-    await new Promise(resolve=>{server.close(resolve);server.closeIdleConnections();});await session.close();
+    await stopped;await session.close();
   })();
   return {origin,token,session,jobs,close};
 }

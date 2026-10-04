@@ -62,3 +62,9 @@ test('ownership marker symlink is never followed for cleanup',async()=>{
   const s=await createSession(),root=s.root,marker=path.join(root,'.owner'),external=root+'-owner';await fs.copyFile(marker,external);await fs.unlink(marker);await fs.symlink(external,marker);
   await assert.rejects(s.close(),/ownership|marker/);assert.ok(await fs.stat(external));await fs.rm(root,{recursive:true});await fs.unlink(external);
 });
+test('manager reset refuses active jobs and clears metadata only after owned reset',async t=>{
+  const {session,jobs}=await setup(t,`process.on('message',m=>setInterval(()=>{},20));`);
+  const j=jobs.start('compare',{task:{payload:{},paths:{}}});await assert.rejects(jobs.reset(),e=>e.status===409);await jobs.cancel(j.job_id);
+  const marker=path.join(session.root,'.owner'),owner=await fs.readFile(marker);await fs.writeFile(marker,'foreign');try{await assert.rejects(jobs.reset());assert.equal(jobs.get(j.job_id).state,'cancelled');}finally{await fs.writeFile(marker,owner);}
+  await jobs.reset();assert.throws(()=>jobs.get(j.job_id),e=>e.status===404);
+});

@@ -4,6 +4,7 @@
 
 ### 实施前接口裁决（2026-10-04，优先于下文同名旧表述）
 
+- 匿名静态导航窄澄清（2026-10-05）：仅固定白名单的匿名 GET 静态入口允许 Sec-Fetch-Site:none 或 same-origin；exact Host 与错误 Origin 拒绝保持。所有 /api 请求仍须 Bearer，且 Sec-Fetch-Site 存在时只允许 same-origin，不扩大跨站访问。
 - CSV 校验失败沿用核心 record：含表头的逻辑记录 1 基编号；Preview/Cell 的 record 是数据记录 1 基编号。界面明确区分，不改核心错误。
 - inspect 请求的 offset 与 cell.record 先按 JSON 数值有限、整数、范围校验，再转换为 MoonBit Int；offset 范围为 0..2147483647，cell.record 转换后还须位于 1..row_count。拒绝2147483648等越界值，不允许饱和转换后误报成功。
 - Job.kind 补齐 example、branch。summary 返回原 Result 的 structure；issues 集合精确映射 Result.key_issues，计算问题由 computation.issues 展示。分页 items 为 `{source_index,item}`，index 始终是原数组下标，原引擎对象不变。
@@ -125,7 +126,7 @@ JSON 编排 <=1048576 字节；普通 API JSON 响应 <=2097152 字节，分页 
 
 仅 listen(127.0.0.1,0)，不开放LAN/可配置host。Host必须精确`127.0.0.1:<实际端口>`；不采信Forwarded/X-Forwarded-*。启动URL为`http://127.0.0.1:<port>/#token=<32随机字节hex>`，UI读取后立即history.replaceState清除fragment，令牌只存在内存。所有 /api 请求（含GET）使用Authorization: Bearer；没有换取令牌接口。
 
-所有POST/DELETE：若有Origin，必须精确等于本次http origin；无Origin仅允许有正确令牌的非浏览器调用（Sec-Fetch-Site存在且不是same-origin则拒绝）。GET也拒绝错误Origin/Sec-Fetch-Site；CORS不开放。仅静态白名单文件可匿名读取，静态页不可获得令牌。无token401；错误Host或跨站403；错误都no-store。
+所有POST/DELETE：若有Origin，必须精确等于本次http origin；无Origin仅允许有正确令牌的非浏览器调用（Sec-Fetch-Site存在且不是same-origin则拒绝）。GET也拒绝错误Origin/Sec-Fetch-Site；仅固定白名单匿名GET静态入口允许Sec-Fetch-Site:none或same-origin，仍核对exact Host并拒绝错误Origin；所有/api请求的Bearer与same-origin检查不变。CORS不开放。仅静态白名单文件可匿名读取，静态页不可获得令牌。无token401；错误Host或跨站403；错误都no-store。
 
 CSP：`default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`。另发X-Content-Type-Options:nosniff、Referrer-Policy:no-referrer。禁止内联脚本、eval、innerHTML拼接用户值、用户HTML和外链资源。API/报告Cache-Control:no-store。日志只记录job类别、状态和耗时，不记录正文、字段值、令牌或用户文件名。
 

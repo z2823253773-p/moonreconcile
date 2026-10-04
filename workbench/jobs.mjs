@@ -17,9 +17,10 @@ function fitOutput(job,output,budget) {
   return output;
 }
 export async function createJobManager({session,workerPath=DEFAULT_WORKER,bridgePath,limits:overrides={}}={}) {
-  const limits=normalizeLimits(overrides),jobs=new Map();let active=null,closed=false;
+  const limits=normalizeLimits(overrides),jobs=new Map();let active=null,closed=false,resetting=false;
   function start(kind,payload={}) {
     if(closed)throw failure('session_closed','Session is closing',409);
+    if(resetting)throw failure('session_busy','Session is resetting',409);
     if(active)throw failure('job_busy','A task is already active',409);
     if(jobs.size>=limits.jobs)throw failure('quota_exceeded','Job metadata quota exceeded',413);
     if(!['import','preview','cell','draft','check','compare','example'].includes(kind))throw failure('invalid_task','Unsupported task kind');
@@ -86,6 +87,12 @@ export async function createJobManager({session,workerPath=DEFAULT_WORKER,bridge
   }
   function get(id){const job=jobs.get(id);if(!job)throw failure('not_found','Job not found',404);return job;}
   async function cancel(id){const job=get(id);if(active?.job===job){const r=active;r.stop();await r.done;}return job;}
+  async function reset(){
+    if(closed)throw failure('session_closed','Session is closing',409);
+    if(active||resetting)throw failure('session_busy','Active task or reset prevents reset',409);
+    resetting=true;
+    try{await session.reset();jobs.clear();}finally{resetting=false;}
+  }
   async function close(){closed=true;if(active){const r=active;r.stop();await r.done;}}
-  return {start,get,cancel,close,jobs,get active(){return active?.job.job_id??null;}};
+  return {start,get,cancel,reset,close,jobs,get active(){return active?.job.job_id??null;}};
 }

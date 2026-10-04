@@ -127,3 +127,32 @@ test('private runtime permissions, strict schemas/queries and unsupported routes
   const site=await fetch(app.origin+'/api/capabilities',{headers:{authorization:`Bearer ${app.token}`,origin:app.origin,'sec-fetch-site':'cross-site'}});assert.equal(site.status,403);
   const upload=await fetch(app.origin+'/api/assets?kind=xlsx',{method:'POST',headers:{authorization:`Bearer ${app.token}`,'content-type':'application/octet-stream'},body:'x'});assert.equal(upload.status,422);
 });
+test('anonymous fixed static navigation accepts none but API and cross-site checks stay strict',async t=>{
+  const app=await startWorkbench();t.after(()=>app.close());
+  for(const route of ['/','/index.html'])for(const site of ['none','same-origin'])assert.equal((await fetch(app.origin+route,{headers:{'sec-fetch-site':site,'sec-fetch-mode':'navigate','sec-fetch-dest':'document'}})).status,200);
+  assert.equal((await fetch(app.origin+'/',{headers:{'sec-fetch-site':'cross-site'}})).status,403);
+  assert.equal((await fetch(app.origin+'/',{headers:{'sec-fetch-site':'none',origin:'http://evil.example'}})).status,403);
+  assert.equal((await fetch(app.origin+'/api/capabilities',{headers:{authorization:`Bearer ${app.token}`,'sec-fetch-site':'none'}})).status,403);
+  assert.equal((await fetch(app.origin+'/api/capabilities',{headers:{'sec-fetch-site':'same-origin'}})).status,401);
+  assert.equal((await fetch(app.origin+'/package.json',{headers:{'sec-fetch-site':'none'}})).status,403);
+});
+test('successful reset clears old jobs and replenishes metadata quota',async t=>{
+  const app=await startWorkbench({limits:{jobs:1}});t.after(()=>app.close());const c=await apiClient(app);
+  const old=await c.start('/api/examples/orders',{});assert.equal(old.state,'succeeded');assert.equal((await c.request('/api/sessions/reset',{confirm:true})).status,200);
+  assert.equal((await c.request('/api/jobs/'+old.job_id)).status,404);assert.equal(app.jobs.jobs.size,0);
+  const next=await c.start('/api/examples/orders',{});assert.equal(next.state,'succeeded');assert.notEqual(next.job_id,old.job_id);
+});
+test('failed owned reset preserves old job metadata',async t=>{
+  const fs=await import('node:fs/promises'),path=await import('node:path');const app=await startWorkbench();t.after(()=>app.close());const c=await apiClient(app),old=await c.start('/api/examples/orders',{}),marker=path.join(app.session.root,'.owner');
+  const owned=await fs.readFile(marker);await fs.writeFile(marker,'foreign');try{assert.notEqual((await c.request('/api/sessions/reset',{confirm:true})).status,200);assert.equal((await c.request('/api/jobs/'+old.job_id)).body.job.state,'succeeded');}finally{await fs.writeFile(marker,owned);}
+});
+test('close aborts unfinished JSON readers and prevents late job/reset work',async()=>{
+  const fs=await import('node:fs/promises');
+  for(const [route,prefix,suffix] of [['/api/examples/orders','{','}'],['/api/sessions/reset','{"confirm":','true}']]){
+    const app=await startWorkbench(),u=new URL(app.origin),root=app.session.root;
+    const req=http.request({hostname:u.hostname,port:u.port,path:route,method:'POST',headers:{authorization:`Bearer ${app.token}`,'content-type':'application/json'}});req.on('error',()=>{});req.write(prefix);await new Promise(r=>setTimeout(r,20));
+    const closing=app.close();const result=await Promise.race([closing.then(()=>true),new Promise(r=>setTimeout(()=>r(false),250))]);
+    req.end(suffix);req.destroy();await closing;
+    assert.equal(result,true,route+' unfinished body blocked close');assert.equal(app.jobs.jobs.size,0);assert.equal(app.session.generation,1);await assert.rejects(fs.stat(root),e=>e.code==='ENOENT');
+  }
+});
