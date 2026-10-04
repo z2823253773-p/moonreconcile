@@ -2,6 +2,18 @@
 
 日期：2026-10-04。状态：待实现规格；当前已交付能力仍以 README 与现有验证记录为准。本文件不证明 XLSX 支持、真实用户收益、赛事资格或新版本通过测试。
 
+### 实施前接口裁决（2026-10-04，优先于下文同名旧表述）
+
+- CSV 校验失败沿用核心 record：含表头的逻辑记录 1 基编号；Preview/Cell 的 record 是数据记录 1 基编号。界面明确区分，不改核心错误。
+- Job.kind 补齐 example、branch。summary 返回原 Result 的 structure；issues 集合精确映射 Result.key_issues，计算问题由 computation.issues 展示。分页 items 为 `{source_index,item}`，index 始终是原数组下标，原引擎对象不变。
+- 配额由父进程每 250ms 异步监管 owned 用量，child 写入时仍精确计数；同步 bridge 不能依赖自身 timer。上传与任务共用预留账本。reset 在上传或 child 活跃时均 409，close 等写入终止再清理，generation 拒绝旧回调。监管间隔不保证磁盘瞬时零超量。
+- IPC result 只是候选；child 退出后才准备发布。hash/quota/head 等异步校验后，最终 running/generation/head 检查、注册表/head 更新与 succeeded 转换须在无 await 的提交段完成。取消/超时/超限共用禁止发布门闩；exit 后才清 staging；提交后取消幂等。
+- review 的父动作按完整 action/left_id/right_id/reason 元组检查子集，不能用易碰撞分隔符编码。UI 应取得全部 applied 分页才能构建累计 CSV。恢复重新注册 imports/config、生成本地基线并保留动作；branch 总用原快照/config 重跑 compare 清空决定，不复制已复核 baseline 的报告。
+- 核心 inspect 预算按完整 envelope 的 UTF-8 JSON（含转义）计算；HTTP 再按最终 job envelope 预算。初始 import/preview 发布前可缩减完整行并更新 next_offset/has_more；一行或 headers 无法容纳则失败且不注册半导入。succeeded output 必须始终可轮询，不到 GET 时才发现溢出。大型表单配置也经资产文件上传，保留 64MiB 通道。
+- CLI exit2 的机器错误从 reportFailure 的 JSON行取得，warning 行单独过滤；禁止解析人类摘要。ErrorDTO 保留稳定字段并移除内部路径/堆栈。包桥显式路径优先，再 runtime/bridge.js，再开发路径，解析保持惰性且 bridgeModulePath 同步；坏包不回退。
+
+这些是实施接口澄清，不是测试通过或产品完成证据。
+
 ## 1. 产品方向与分阶段交付
 
 把 MoonReconcile 扩展为“两个导出表的本地对账工作台”：浏览器选文件，明确设置列、类型、主键和规则，查看差异与候选，积累人工决定，保存可恢复、可用 CLI 重放的报告包。中文优先，数据只在本机服务处理并暂存到本机；启动后没有外网请求、账号或云端存储。

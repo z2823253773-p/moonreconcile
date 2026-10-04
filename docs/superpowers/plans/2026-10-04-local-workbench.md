@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-04-quarter-workbench-design.md`。执行者先读该规格、AGENTS.md、docs/configuration.md、docs/review-workflow.md、docs/dependency-audit.md；本计划的 DTO 名均指规格 §4–7 的精确字段。
 
+**P0 接口预检：** 已完成源码/架构核对，采用规格开头“实施前接口裁决”。实现与审查均以该段为准；尤其父进程监管配额、exit后原子发布、Job补example/branch、issues=key_issues、summary.structure、完整累计分页、恢复分支重compare及双层响应预算。新执行台账位于 `.superpowers/sdd/2026-10-04-local-workbench/progress.md`，旧 CLI 计划不重新执行。
+
 **交接状态（2026-10-04）：** 规格和六项任务草案已写出，Task 1–6 均未开始。Sol 在收尾时遇到额度限制，未完成交付提交；主控制器仅修正文档文件名与运行包验证表述。下一个对话须先完成跨任务接口预检，建立新的执行台账，再开始 Task 1。以下自检是设计意图，不是实现或测试通过记录。
 
 ## Global Constraints
