@@ -15,7 +15,14 @@ const HEADERS={
 const COLLECTIONS={fields:'fields',candidates:'candidates',records:'records',issues:'key_issues',pairs:'pairs',decisions:'decisions'};
 const FILTERS={fields:['status','field','left_id','right_id'],candidates:['left_id','right_id','suggested'],records:['side','status'],issues:[],pairs:[],decisions:[]};
 const EXAMPLES={orders:'合成 orders 示例',migration:'合成 migration 示例',catalog:'合成 catalog 示例',ourairports:'OurAirports 公开快照 CN/FR（2026-09-01 / 2026-10-01），来源见 examples/ourairports/provenance.json'};
-const STATIC_PAGE='<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>MoonReconcile 本地工作台</title><h1>MoonReconcile 本地 CSV 服务</h1><p>API v1 已提供 CSV 导入、规则草稿与校验、比较、只读证据和取消。图形规则编辑器将在下一任务实现。数据仅暂存在本机；退出服务会清理当前会话。</p></html>';
+const STATIC_FILES=new Map([
+  ['/','index.html'],['/index.html','index.html'],
+  ['/public/app.mjs','app.mjs'],['/public/api.mjs','api.mjs'],['/public/state.mjs','state.mjs'],
+  ['/public/dom.mjs','dom.mjs'],['/public/import-view.mjs','import-view.mjs'],
+  ['/public/config-view.mjs','config-view.mjs'],['/public/config-model.mjs','config-model.mjs'],
+  ['/public/styles.css','styles.css'],
+]);
+const STATIC_TYPES={html:'text/html; charset=utf-8',mjs:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8'};
 function ids(value,keys) {for(const k of keys)if(!isId(value[k]))throw failure('invalid_request','Invalid identifier');}
 function page(value) {exact(value,['offset','limit']);if(!integer(value.offset)||!integer(value.limit,1,100))throw failure('invalid_request','Invalid pagination');}
 function cell(value,withSide=false) {exact(value,withSide?['side','record','column']:['record','column']);if(!integer(value.record,1,100000)||typeof value.column!=='string'||(withSide&&!['left','right'].includes(value.side)))throw failure('invalid_request','Invalid cell request');}
@@ -100,11 +107,11 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
       if(req.headers.host!==new URL(origin).host)throw failure('forbidden','Invalid Host',403);
       const url=new URL(req.url,origin),route=url.pathname;
       const fetchSite=req.headers['sec-fetch-site'];
-      const staticEntry=req.method==='GET'&&['/','/index.html'].includes(route)&&url.searchParams.size===0;
+      const staticEntry=req.method==='GET'&&STATIC_FILES.has(route)&&url.searchParams.size===0;
       const permittedSite=fetchSite==='same-origin'||(staticEntry&&fetchSite==='none');
       if((req.headers.origin&&req.headers.origin!==origin)||(fetchSite&&!permittedSite))throw failure('forbidden','Cross-site request rejected',403);
       if(!route.startsWith('/api/')) {
-        if(staticEntry){res.writeHead(200,{...HEADERS,'Content-Type':'text/html; charset=utf-8'});res.end(STATIC_PAGE);return;}
+        if(staticEntry){const file=STATIC_FILES.get(route),type=STATIC_TYPES[file.split('.').at(-1)];const body=await fs.readFile(path.join(ROOT,'workbench','public',file));res.writeHead(200,{...HEADERS,'Content-Type':type,'Content-Length':body.length});res.end(body);return;}
         return reply(404,{ok:false,error:errorDto('not_found','Route not found')});
       }
       if(req.headers.authorization!==`Bearer ${token}`)throw failure('unauthorized','Bearer token required',401);
@@ -119,6 +126,8 @@ export async function startWorkbench({bridgePath,rootParent,limits:overrides={}}
           return {output:{import:project('import',entry),preview:o.preview},commit:()=>session.commitImport(entry)};
         }})}));
       }
+      const importMetadata=route.match(/^\/api\/imports\/([^/]+)$/);
+      if(req.method==='GET'&&importMetadata){noQuery();const entry=session.getImport(importMetadata[1]);return reply(200,{ok:true,import:project('import',entry),asset:project('asset',session.getAsset(entry.asset_id))});}
       const im=route.match(/^\/api\/imports\/([^/]+)\/(preview|cell)$/);
       if(req.method==='POST'&&im) {
         noQuery();const imp=session.getImport(im[1]),b=await readJson(req);if(im[2]==='preview')page(b);else cell(b);

@@ -1,0 +1,147 @@
+import { configToForm, formToConfig } from './config-model.mjs';
+import { button, element, label, optionList } from './dom.mjs';
+
+const TYPES = [['', '请选择类型'], ['text', '文本'], ['decimal', '金额/小数'], ['date', '日期']];
+const METRICS = [['', '请选择指标'], ['exact', '完全一致'], ['edit', '编辑距离'], ['decimal', '小数差异'], ['date', '日期差异']];
+const textInput = (value, { placeholder = '', className = '' } = {}) => element('input', { type: 'text', value, placeholder, className, autocomplete: 'off' });
+const area = (value) => element('textarea', { rows: 3, value });
+const checkbox = (checked) => element('input', { type: 'checkbox', checked });
+const select = (values, value) => element('select', {}, optionList(values, value));
+const pageSize = 50;
+const FIELD_LABELS = { name:'逻辑字段名', left:'左侧来源列', right:'右侧来源列', abs_tol:'绝对容差（十进制字符串）', rel_tol:'相对容差（十进制字符串）' };
+
+function rowEditor({ title, rows, renderRow, add, page, setPage, root }) {
+  const section = element('section', { className: 'editor-block' }); section.append(element('h4', { text: `${title}（${rows.length}）` }));
+  const from = page * pageSize; rows.slice(from, from + pageSize).forEach((row, index) => section.append(renderRow(row, from + index)));
+  const nav = element('div', { className: 'pager' });
+  nav.append(button('上一页', () => { if (page > 0) { setPage(page - 1); root(); } }, { disabled: page <= 0 }));
+  nav.append(element('span', { text: rows.length ? `${from + 1}–${Math.min(from + pageSize, rows.length)} / ${rows.length}` : '暂无项目' }));
+  nav.append(button('下一页', () => { if (from + pageSize < rows.length) { setPage(page + 1); root(); } }, { disabled: from + pageSize >= rows.length }));
+  section.append(nav, button('添加', () => { add(); setPage(Math.floor((rows.length) / pageSize)); root(); }, { className: 'secondary' }));
+  return section;
+}
+
+export function renderConfigView({ root, store, api }) {
+  let model = null, fieldPage = 0, leftMapPage = {}, rightMapPage = {}, editGeneration = 0;
+  let busy = false, activeJob = null, sourceHeaders = { left: [], right: [] };
+  const updateDraft = () => {
+    editGeneration++;
+    try { store.update({ config: formToConfig(model), draft_dirty: true, error: null }); }
+    catch { store.update({ config: structuredClone(model), draft_dirty: true, error: null }); }
+  };
+  const inputFor = (text, node, key, convert = (v) => v) => {
+    node.addEventListener('input', () => { text[key] = convert(node.value); updateDraft(); }); return label(FIELD_LABELS[key] ?? key, node);
+  };
+  const runJob = async (start) => {
+    const outerBusy=busy;busy = true;store.update({active_job:{job_id:null,phase:'正在提交任务',state:'running'}});render();
+    try {
+      const accepted = await start(); activeJob = accepted.job_id; store.update({ active_job: { job_id: activeJob, phase: 'validating', state: 'running' }, error: null }); render();
+      const job = await api.waitJob(activeJob);
+      activeJob = null; return job.output;
+    } catch (error) { activeJob = null; store.update({ error: error.message, active_job: null }); throw error; }
+    finally { activeJob=null;busy=outerBusy;if(!outerBusy)store.update({active_job:null});render(); }
+  };
+  const invalidateRules = () => { if (model) updateDraft(); };
+  const render = () => {
+    sourceHeaders={left:store.get().left_headers??[],right:store.get().right_headers??[]};
+    root.replaceChildren();
+    root.append(element('h2', { text: '核对规则' }));
+    if (store.get().stale) root.append(element('p', { className: 'notice warning stale-notice', role: 'status', text: '规则或来源已变化，当前结果为旧版本。请重新校验后运行。' }));
+    if (store.get().error) root.append(element('p', { className: 'notice error', role: 'alert', text: store.get().error }));
+    const controls = element('div', { className: 'toolbar' });
+    controls.append(button('从当前列生成空白草稿', async () => {
+      const current = store.get(); if (!current.left_import_id || !current.right_import_id) { store.update({ error: '请先分别导入左右 CSV。' }); render(); return; }
+      try {
+        const out = await runJob(() => api.request('/api/config/draft', { method: 'POST', body: { left_import_id: current.left_import_id, right_import_id: current.right_import_id } }));
+        const blob = await api.download(`/api/configs/${out.config_asset_id}/export`); model = configToForm(JSON.parse(await blob.text())); model.draft = true; store.update({ config: model, config_asset_id: null, draft_dirty: true, error: null }); render();
+      } catch(error) {store.update({error:error.message});render();}
+    }, { disabled: busy }));
+    const configFile = element('input', { type: 'file', accept: '.json,application/json' });
+    configFile.addEventListener('change', async () => {
+      const file=configFile.files?.[0];if(!file)return;const current=store.get();
+      if(!current.left_import_id||!current.right_import_id){store.update({error:'导入配置前，请先导入左右 CSV，以便由核心校验配置。'});render();return;}
+      const generation=editGeneration;busy=true;store.update({active_job:{job_id:null,phase:'正在上传并校验配置',state:'running'}});render();
+      try {
+        const uploaded=await api.upload('config',file);
+        const checked=await runJob(()=>api.request('/api/config/check',{method:'POST',body:{left_import_id:current.left_import_id,right_import_id:current.right_import_id,config_asset_id:uploaded.asset_id}}));
+        if(store.get().left_import_id!==current.left_import_id||store.get().right_import_id!==current.right_import_id||editGeneration!==generation)throw new Error('校验期间来源或规则已变化；保留当前表单，请重新校验。');
+        const blob=await api.download(`/api/configs/${checked.config_asset_id}/export`),next=configToForm(JSON.parse(await blob.text()));
+        model=next;store.update({config:model,config_asset_id:checked.config_asset_id,draft_dirty:false,error:null});render();
+      }catch(error){store.update({error:error.message});render();/* Keep the current form and validated binding on import/check failure. */}
+      finally{busy=false;store.update({active_job:null});render();}
+    });
+    controls.append(label('导入配置 JSON', configFile), button('导出已校验配置', async () => {
+      const id = store.get().config_asset_id; if (!id) return; try { const blob = await api.download(`/api/configs/${id}/export`); downloadBlob(blob, 'moonreconcile-config.json'); } catch (error) { store.update({ error: error.message }); render(); }
+    }, { disabled: !store.get().config_asset_id }));
+    root.append(controls);
+    if (!model) { root.append(element('p', { text: '导入左右文件后，可以从空白列草稿开始，也可以编辑后导入 Config v1 配置。所有字段类型都需明确选择。' })); return; }
+    const global = element('details', { open: true, className: 'config-group' }); global.append(element('summary', { text: '字段、主键与忽略列' }));
+    global.append(rowEditor({ title: '逻辑字段', rows: model.fields, page: fieldPage, setPage: (n) => fieldPage = n, root: render, add: () => {model.fields.push({ name: '', left: '', right: '', type: '', compare: true, trim_ascii: false, lower_ascii: false, left_values: [], right_values: [], missing: [], both_missing: 'equal', abs_tol: '0', rel_tol: '0', days_tol: 0 });invalidateRules();}, renderRow: (field, index) => {
+      const card = element('article', { className: 'field-card' }); card.append(element('h3', { text: `字段 ${index + 1}: ${field.name || '未命名'}` }));
+      const grid = element('div', { className: 'form-grid' });
+      for (const key of ['name', 'left', 'right']) {
+        const src = key === 'left' ? sourceHeaders.left : key === 'right' ? sourceHeaders.right : [];
+        const control = src.length ? select([['', '请选择来源列'], ...src.map((value) => [value, value])], field[key]) : textInput(field[key], { placeholder: key === 'name' ? '逻辑字段名' : '导入后可从表头选择，也可输入列名' });
+        grid.append(inputFor(field, control, key));
+      }
+      const typeControl = select(TYPES, field.type); typeControl.addEventListener('change', () => { field.type = typeControl.value; updateDraft(); }); grid.append(label('类型（必选）', typeControl));
+      const toggles = element('div', { className: 'check-row' });
+      for (const [key, caption] of [['compare', '参与逐行比较'], ['trim_ascii', '去除 ASCII 首尾空白'], ['lower_ascii', 'ASCII 转小写']]) { const control=checkbox(field[key]);control.addEventListener('change',()=>{field[key]=control.checked;updateDraft();});toggles.append(label(caption,control)); }
+      const both = select([['equal', '双方缺失视为相等'], ['issue', '双方缺失生成问题']], field.both_missing); both.addEventListener('change', () => { field.both_missing = both.value; updateDraft(); }); grid.append(label('双方缺失', both));
+      for (const key of ['abs_tol', 'rel_tol']) { const control=textInput(field[key], { placeholder: '例如 0.02' });control.inputMode='decimal';grid.append(inputFor(field,control,key)); }
+      const days=textInput(String(field.days_tol));days.inputMode='numeric';days.pattern='[0-9]+';days.addEventListener('input',()=>{field.days_tol=days.value===''?'':(/^[0-9]+$/.test(days.value)?Number(days.value):days.value);updateDraft();});grid.append(label('日期容差（严格整数）',days));
+      card.append(grid, toggles);
+      for (const [key, caption] of [['left_values', '左侧值映射'], ['right_values', '右侧值映射']]) {
+        const mapRows=field[key]; const pageKey=`${index}:${key}`; const pages=key==='left_values'?leftMapPage:rightMapPage;
+        card.append(rowEditor({ title: caption, rows: mapRows, page: pages[pageKey] ?? 0, setPage: (n)=>pages[pageKey]=n, root: render, add: ()=>{mapRows.push({key:'',value:''});invalidateRules();}, renderRow: (entry, mapIndex) => {
+          const row=element('div',{className:'map-row'});const k=textInput(entry.key),v=textInput(entry.value);k.addEventListener('input',()=>{entry.key=k.value;updateDraft();});v.addEventListener('input',()=>{entry.value=v.value;updateDraft();});row.append(label('原值',k),label('映射为',v),button('删除映射',()=>{mapRows.splice(mapIndex,1);invalidateRules();render();},{className:'danger'}));return row;
+        }}));
+      }
+      const missingEditor=element('div',{className:'editor-block'});missingEditor.append(element('h4',{text:'缺失标记（每行一项；空行代表空字符串）'}));const missing=area(field.missing.join('\n'));missing.addEventListener('input',()=>{field.missing=missing.value.split('\n');updateDraft();});missingEditor.append(label('缺失值列表',missing));card.append(missingEditor);
+      card.append(button('删除字段',()=>{model.fields.splice(index,1);fieldPage=Math.min(fieldPage,Math.max(0,Math.ceil(model.fields.length/pageSize)-1));invalidateRules();render();},{className:'danger'}));
+      return card;
+    }}));
+    for (const [key, title] of [['key','主键字段（每行一项）'],['ignore_left','忽略左侧列（每行一项）'],['ignore_right','忽略右侧列（每行一项）']]) { const input=area(model[key].join('\n'));input.addEventListener('input',()=>{model[key]=input.value.split('\n').filter((v)=>v!==''||key!=='key');updateDraft();});global.append(label(title,input)); }
+    root.append(global);
+    const candidates = element('details', { className: 'config-group' }); candidates.append(element('summary', { text: '候选匹配（可选）' }));
+    const candidateOn=checkbox(model.candidates!==null);candidateOn.addEventListener('change',()=>{model.candidates=candidateOn.checked?{fields:[],threshold:1,blocking:[]}:null;invalidateRules();render();});candidates.append(label('启用候选规则',candidateOn));
+    if (model.candidates) {
+      const c=model.candidates,threshold=textInput(String(c.threshold));threshold.inputMode='numeric';threshold.pattern='[0-9]+';threshold.addEventListener('input',()=>{c.threshold=threshold.value===''?'':(/^[0-9]+$/.test(threshold.value)?Number(threshold.value):threshold.value);updateDraft();});candidates.append(label('候选阈值（1–10000 严格整数）',threshold));
+      candidates.append(rowEditor({title:'候选评分字段',rows:c.fields,page:0,setPage:()=>{},root:render,add:()=>{c.fields.push({field:'',metric:'',weight:1});invalidateRules();},renderRow:(item,index)=>{const row=element('div',{className:'form-grid'});const field=textInput(item.field);field.addEventListener('input',()=>{item.field=field.value;updateDraft();});const metric=select(METRICS,item.metric);metric.addEventListener('change',()=>{item.metric=metric.value;updateDraft();});const weight=textInput(String(item.weight));weight.inputMode='numeric';weight.pattern='[0-9]+';weight.addEventListener('input',()=>{item.weight=weight.value===''?'':(/^[0-9]+$/.test(weight.value)?Number(weight.value):weight.value);updateDraft();});row.append(label('评分逻辑字段',field),label('指标',metric),label('权重（1–10000 严格整数）',weight),button('删除评分字段',()=>{c.fields.splice(index,1);invalidateRules();render();},{className:'danger'}));return row;}}));
+      const blocking=element('section',{className:'editor-block'});blocking.append(element('h4',{text:'Blocking 分组（组间 OR，组内 AND）'}));c.blocking.forEach((group,index)=>{const row=element('div',{className:'map-row'}),g=area(group.join('\n'));g.addEventListener('input',()=>{c.blocking[index]=g.value.split('\n');updateDraft();});row.append(label(`分组 ${index+1} 字段`,g),button('删除分组',()=>{c.blocking.splice(index,1);invalidateRules();render();},{className:'danger'}));blocking.append(row);});blocking.append(button('添加 Blocking 分组',()=>{c.blocking.push([]);invalidateRules();render();},{className:'secondary'}));candidates.append(blocking);
+    }
+    root.append(candidates);
+    const actions=element('div',{className:'toolbar'});
+    actions.append(button(busy?'处理中…':'校验并保存规则',async()=>{
+      const current=store.get();if(!current.left_import_id||!current.right_import_id){store.update({error:'请先导入左右 CSV。'});render();return;}
+      let config;try{config=formToConfig(model);}catch(error){store.update({error:error.message});render();return;}
+      const generation=editGeneration;busy=true;store.update({active_job:{job_id:null,phase:'正在上传规则配置',state:'running'}});render();
+      try {
+        const blob=new Blob([JSON.stringify(config)],{type:'application/json'});Object.defineProperty(blob,'name',{value:'config.json'});
+        const asset=await api.upload('config',blob);
+        const out=await runJob(()=>api.request('/api/config/check',{method:'POST',body:{left_import_id:current.left_import_id,right_import_id:current.right_import_id,config_asset_id:asset.asset_id}}));
+        if(store.get().left_import_id!==current.left_import_id||store.get().right_import_id!==current.right_import_id||editGeneration!==generation)throw new Error('校验期间来源或规则已变化；保留当前表单，请重新校验。');
+        const canonicalBlob=await api.download(`/api/configs/${out.config_asset_id}/export`);model=configToForm(JSON.parse(await canonicalBlob.text()));sourceHeaders={left:sourceHeaders.left,right:sourceHeaders.right};
+        store.update({config:model,config_asset_id:out.config_asset_id,draft_dirty:false,error:null});render();
+      } catch(error) {store.update({error:error.message});render(); /* error remains visible */}
+      finally{busy=false;store.update({active_job:null});render();}
+    },{disabled:busy||!model}));
+    if (activeJob) actions.append(button('取消当前任务',async()=>{try{await api.request(`/api/jobs/${activeJob}`,{method:'DELETE'});}catch(error){store.update({error:error.message});render();}},{className:'danger'}));
+    root.append(actions);
+    if (store.get().config_asset_id) root.append(element('p',{className:'notice success',role:'status',text:'规则已由核心校验并绑定到当前左右导入。配置可下载；编辑任意规则后需重新校验。'}));
+    if(busy)for(const control of root.querySelectorAll('input,select,textarea,button'))if(!control.textContent?.includes('取消'))control.disabled=true;
+  };
+  let lastLeft=store.get().left_import_id,lastRight=store.get().right_import_id,lastConfig=store.get().config,lastStale=store.get().stale;
+  const syncStaleNotice=()=>{const existing=root.querySelector('.stale-notice');if(store.get().stale&&!existing){root.querySelector('h2')?.after(element('p',{className:'notice warning stale-notice',role:'status',text:'规则或来源已变化，当前结果为旧版本。请重新校验后运行。'}));}else if(!store.get().stale)existing?.remove();};
+  const dispose = store.subscribe((next) => {
+    const sourceChanged=next.left_import_id!==lastLeft||next.right_import_id!==lastRight;
+    const configChanged=next.config!==lastConfig;
+    if(sourceChanged){lastLeft=next.left_import_id;lastRight=next.right_import_id;if(configChanged)model=next.config?configToForm(next.config):null;render();}
+    else if(lastStale!==next.stale)syncStaleNotice();
+    lastConfig=next.config;lastStale=next.stale;
+  });
+  render();
+  return () => { dispose(); root.replaceChildren(); };
+}
+
+function downloadBlob(blob,name){const url=URL.createObjectURL(blob),a=element('a',{href:url,download:name});a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}

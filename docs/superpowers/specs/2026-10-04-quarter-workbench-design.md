@@ -99,6 +99,7 @@ A+C 的实施计划为 `docs/superpowers/plans/2026-10-04-local-workbench.md`。
 | GET /api/capabilities | `{ok:true,app_version,api_version,engine_version,formats:["csv"],limits}`；B 才加入 xlsx/profile |
 | POST /api/assets?kind=csv\|config\|decisions\|run | application/octet-stream 原始正文；X-Filename 为 encodeURIComponent 的显示名，解码后<=255码点；不解析 multipart；返回 `{ok:true,asset:Asset}` |
 | POST /api/imports | `{asset_id,side}`；job.output=`{import:Import,preview:Preview}`；第一预览offset0/limit20 |
+| GET /api/imports/:id | 无query；返回 `{ok:true,import:Import,asset:Asset}` 供工作台展示来源字节数/SHA并用已有CSV资产交换side；DTO投影不含内部路径，仍要求Bearer并执行现有Host/Origin/Sec-Fetch-Site校验 |
 | POST /api/imports/:id/preview | `{offset,limit}`；job.output=`{preview:Preview}`（同步 parser 只在 child） |
 | POST /api/imports/:id/cell | `{record,column}`；job.output=`{cell:Cell}` |
 | POST /api/config/draft | `{left_import_id,right_import_id}`；job.output=`{config_asset_id,draft:true}`，调用 init_config |

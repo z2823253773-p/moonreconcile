@@ -100,6 +100,8 @@
 - [ ] **Step 1:** 写失败测试 `all_config_v1_properties_round_trip`：orders/catalog加trim/lower、左右映射含`__proto__`/`10`/`2`、missing空串、both_missing=issue、compare=false、三种容差、key/ignore与多blocking；经core check→表单→config→core check canonicalJson逐字节相等。重复mapping键表单报错而不是覆盖；未知配置核心拒绝；改type不清容差、删field不清引用。
 - [ ] **Step 2:** 运行 `node --test tests/workbench-config.test.mjs` 确认失败；实现config model和完整表单，所有规格§3字段可访问，advanced折叠不丢值。空白规则有显式类型选择，decimal普通text输入，day/weight/threshold仅严格整数，已验证norm config可下载导入。
 - [ ] **Step 3:** 实现APIclient与状态、安全DOM及import view：文件选择/拖放、双方预览分页、sha/完整校验计数、截断完整单格、错误定位、四示例来源标签、左右交换确认。token不进storage/query/log。超过JSON显示预算显示可执行的缩页/文件导出路径，不能称已显示全部证据。
+- [ ] **Step 3a:** 为恢复示例资产元数据、显示准确文件大小与哈希并交换已选文件，增加只读 `GET /api/imports/:id`，返回 `{ok:true,import:Import,asset:Asset}`，投影DTO不泄露内部路径。浏览器只能匿名GET固定静态白名单；此API仍须Bearer和现有Host/Origin/Sec-Fetch-Site校验。
+- [ ] **Step 3b:** 配置文件必须先按原始字节上传并交给 `check_config`；只有核心成功后才下载规范配置并替换表单，核心拒绝的未知字段不可由表单导入静默丢弃。改变来源/规则清空绑定并清待应用决定，成功校验恢复当前绑定但旧revision仍stale；仅新compare成功清stale。确认交换时使用已上传CSV资产分别重新以相反side导入，成功后清空规则与待应用决定，失败保留旧选择和报告。
 - [ ] **Step 4:** 实现app主步骤与规则摘要/运行按钮：check成功config_asset_id绑定当前两个imports；再次编辑使运行禁用直到check；运行真正compare job，取消按钮用DELETEjob；新文件/规则后旧revision只读而stale=true。界面映射列表50条/页，记录预览20条/页。
 - [ ] **Step 5:** `node --test tests/workbench-config.test.mjs` 与Task2测试通过；浏览器实际手动从空白orders选择每列/类型、主键、status映射及amount0.02，不编辑JSON完成compare；记实际操作与截图（正式自动E2E Task5补齐）。键盘能到所有控件且label关联，HTML字符串原样显示。提交Task3文件，message=`feat: add complete CSV import and rules forms`。
 
