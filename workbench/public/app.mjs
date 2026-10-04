@@ -15,9 +15,12 @@ else {
   const importRoot=element('section',{className:'panel',id:'imports'}),configRoot=element('section',{className:'panel',id:'config'}),runRoot=element('section',{className:'panel',id:'run'});
   appRoot.replaceChildren(top,importRoot,configRoot,runRoot);
   const importView=renderImportView({root:importRoot,store,api});renderConfigView({root:configRoot,store,api});
-  let busy=false,jobId=null,summary=null,resultDispose=null,resultRevisionId=null,latestRevisionId=null;
+  let busy=false,jobId=null,summary=null,resultDispose=null,resultRefresh=null,resultRevisionId=null,latestRevisionId=null;
   const history=[];
   const remember=revision=>{if(revision&&!history.some(saved=>saved.revision_id===revision.revision_id))history.push(revision);};
+  const registerHead=revision=>{if(revision)latestRevisionId=revision.revision_id;};
+  const isCurrentHead=revision=>revision?.revision_id===latestRevisionId;
+  function registerSucceededRevision(parent,revision){remember(parent);remember(revision);registerHead(revision);resultRefresh?.();}
   const resultHost=element('div',{className:'result-host'});
   function renderRun(){
     runRoot.replaceChildren(element('h2',{text:'校验、运行与结果'}));
@@ -29,19 +32,19 @@ else {
     if(jobId)runRoot.append(button('取消当前任务',()=>void cancel(),{className:'danger'}));
     if(s.error)runRoot.append(element('p',{className:'notice error',role:'alert',text:s.error}));
     if(summary){
-      if(resultRevisionId!==summary.revision.revision_id){resultDispose?.();resultRevisionId=summary.revision.revision_id;resultHost.replaceChildren();resultDispose=renderResultView({root:resultHost,store,api,summary,onPublished:publishRevision,history,onSelectHistory:selectHistory,isCurrentHead:summary.revision.revision_id===latestRevisionId});}
+      if(resultRevisionId!==summary.revision.revision_id){resultDispose?.();resultRefresh=null;resultRevisionId=summary.revision.revision_id;resultHost.replaceChildren();resultDispose=renderResultView({root:resultHost,store,api,summary,onPublished:publishRevision,onSucceeded:registerSucceededRevision,history,onSelectHistory:selectHistory,isCurrentHead});resultRefresh=resultDispose.refresh;}
       runRoot.append(resultHost);
     }
   }
   async function compare(){
     const s=store.get();if(!s.config_asset_id||s.draft_dirty||s.active_job)return;
     const generation=store.generation();
-    busy=true;summary=null;resultDispose?.();resultDispose=null;resultRevisionId=null;resultHost.replaceChildren();renderRun();
+    busy=true;summary=null;resultDispose?.();resultDispose=null;resultRefresh=null;resultRevisionId=null;resultHost.replaceChildren();renderRun();
     try{
       const accepted=await api.request('/api/runs',{method:'POST',body:{left_import_id:s.left_import_id,right_import_id:s.right_import_id,config_asset_id:s.config_asset_id}});
       jobId=accepted.job_id;store.update({active_job:{job_id:jobId,phase:'comparing',state:'running'},error:null});renderRun();
       const job=await api.waitJob(jobId);const revision=job.output.revision;
-      remember(store.get().revision);remember(revision);latestRevisionId=revision.revision_id;
+      remember(store.get().revision);remember(revision);registerHead(revision);
       const stillCurrent=generation===store.generation();
       store.update({revision,...(stillCurrent?{stale:false,pending_decisions:[]}:{stale:true}),active_job:null,error:null});
       const summaryGeneration=store.generation();
@@ -54,13 +57,13 @@ else {
     catch(error){if(generation!==store.generation()||store.get().revision?.revision_id!==revision.revision_id)return;summary={revision,display_error:`比较已完成，但摘要超过显示预算或暂时不可读：${error.message}`};store.update({error:error.message});}
   }
   async function publishRevision(revision,{branch=false}={}){
-    remember(store.get().revision);remember(revision);latestRevisionId=revision.revision_id;
+    remember(store.get().revision);remember(revision);registerHead(revision);
     if(branch)await importView.bindRevision(revision,store.get().revision?.revision_id);
     else store.update({revision,stale:false,pending_decisions:[],active_job:null,error:null});
     const generation=store.generation();await loadSummary(revision,generation);
   }
   async function selectHistory(revision){
-    const current=revision.revision_id===latestRevisionId&&store.get().left_import_id===revision.left_import_id&&store.get().right_import_id===revision.right_import_id&&store.get().config_asset_id===revision.config_asset_id&&!store.get().draft_dirty;
+    const current=isCurrentHead(revision)&&store.get().left_import_id===revision.left_import_id&&store.get().right_import_id===revision.right_import_id&&store.get().config_asset_id===revision.config_asset_id&&!store.get().draft_dirty;
     store.update({revision,stale:!current,error:null});
     const generation=store.generation();await loadSummary(revision,generation);
   }

@@ -333,4 +333,99 @@ test('source generation clears only unapplied review drafts and a stale current 
   await waitFor(()=>published?.revision_id==='rev-branch');assert.ok(requests.includes('/api/runs/rev-head/branch'));dispose();
 });
 
+for (const operation of ['review','branch']) test(`successful ${operation} registers its head even if history selection changes while waiting`, async () => {
+  const document=makeDocument();globalThis.document=document;globalThis.confirm=()=>true;
+  const root=new FakeNode('main'),store=createWorkbenchState();
+  const revision={revision_id:`${operation}-parent`,exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};
+  const selectedHistory={revision_id:`${operation}-history`,exit_code:1,left_import_id:'old-li',right_import_id:'old-ri',config_asset_id:'old-cfg'};
+  store.update({left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg',config:{schema_version:1},draft_dirty:false});store.update({revision,stale:false});
+  let finishJob,waitStarted=false,latestKnown=revision.revision_id;const jobResult=new Promise(resolve=>{finishJob=resolve;});const registered=[];let published=0,refreshView;const history=[revision,selectedHistory];
+  const api={request:async(path)=>{if(path.startsWith('/api/imports/'))return{import:{import_id:path.split('/').at(-1),headers:[]}};if(path===`/api/runs/${revision.revision_id}/pairs?offset=0&limit=100`)return{items:[],total:0,offset:0,next_offset:0,has_more:false};if(path===`/api/runs/${revision.revision_id}/decisions?offset=0&limit=100`)return{items:[],total:0,offset:0,next_offset:0,has_more:false};if(path===`/api/runs/${revision.revision_id}/reviews`||path===`/api/runs/${revision.revision_id}/branch`)return{job_id:`${operation}-job`};if(path.startsWith(`/api/runs/${revision.revision_id}/`))return{items:[],total:0,offset:0,next_offset:0,has_more:false};throw new Error(`Unexpected request ${path}`);},waitJob:()=>{waitStarted=true;return jobResult;},download:async()=>new Blob(['{}']),upload:async()=>({asset_id:'decisions'})};
+  const dispose=renderResultView({root,store,api,summary:{revision,computation:{},summary:{},structure:{},issues:[]},history,isCurrentHead:value=>value.revision_id===latestKnown,onSucceeded:(parent,child)=>{registered.push({parent,child});latestKnown=child.revision_id;if(!history.some(saved=>saved.revision_id===child.revision_id))history.push(child);refreshView?.();},onPublished:async()=>{published++;},onSelectHistory:async chosen=>store.update({revision:chosen,stale:false})});refreshView=dispose.refresh;
+  if(operation==='review'){await waitFor(()=>root.textContent.includes('手工决定'));const action=walk(root).find(node=>node.tag==='select');action.value='left_unmatched';await buttonBy(root,'添加手工决定').fire('click');await buttonBy(root,'应用待处理决定').fire('click');}
+  else await buttonBy(root,'从原始比较新建分支').fire('click');
+  await waitFor(()=>waitStarted);await buttonBy(root,`${selectedHistory.revision_id.slice(0,8)} · exit ${selectedHistory.exit_code}`).fire('click');assert.equal(store.get().revision.revision_id,selectedHistory.revision_id);
+  finishJob({output:{revision:{revision_id:`${operation}-child`,exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'}}});
+  await waitFor(()=>registered.length===1);
+  assert.equal(registered[0].parent.revision_id,revision.revision_id);assert.equal(registered[0].child.revision_id,`${operation}-child`);
+  assert.equal(published,0);assert.equal(store.get().revision.revision_id,selectedHistory.revision_id);assert.equal(store.get().left_import_id,'li');
+  const childId=`${operation}-child`;const childChoice=walk(root).find(node=>node.tag==='button'&&node.textContent.startsWith(childId.slice(0,8))&&node.textContent.includes('exit 1'));assert.ok(childChoice,'successful revision appears as a history choice');await childChoice.fire('click');assert.equal(store.get().revision.revision_id,childId);
+  store.update({revision,stale:false});refreshView();assert.equal(buttonBy(root,'从原始比较新建分支').disabled,true,'previous parent remains read-only after its child becomes head');assert.equal(buttonBy(root,'添加手工决定').disabled,true,'previous parent cannot accept another review');dispose();
+});
+
+test('uploaded invalid decision CSV displays structured location and keeps the pending draft and parent revision', async () => {
+  const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState();
+  const revision={revision_id:'rev-error',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};store.update({revision,stale:false});
+  let uploaded=0,currentFailure={message:'Decision action is invalid',code:'invalid_decision_action',phase:'decisions',side:null,record:1,field:null};const api={request:async path=>{if(path.startsWith('/api/imports/'))return{import:{import_id:path.split('/').at(-1),headers:[]}};if(path==='/api/runs/rev-error/pairs?offset=0&limit=100')return{items:[],total:0,offset:0,next_offset:0,has_more:false};if(path==='/api/runs/rev-error/decisions?offset=0&limit=100')return{items:[],total:0,offset:0,next_offset:0,has_more:false};if(path==='/api/runs/rev-error/reviews')return{job_id:'failed-review'};if(path.startsWith('/api/runs/rev-error/'))return{items:[],total:0,offset:0,next_offset:0,has_more:false};throw new Error(`Unexpected request ${path}`);},waitJob:async()=>{throw Object.assign(new Error(currentFailure.message),currentFailure);},download:async()=>new Blob(['{}']),upload:async()=>{uploaded++;return{asset_id:'decisions'};}};
+  const dispose=renderResultView({root,store,api,summary:{revision,computation:{},summary:{},structure:{},issues:[]},onSucceeded:()=>assert.fail('failed resolve cannot register a revision'),onPublished:async()=>assert.fail('failed resolve cannot publish')});
+  await waitFor(()=>root.textContent.includes('手工决定'));walk(root).find(node=>node.tag==='select').value='left_unmatched';await buttonBy(root,'添加手工决定').fire('click');const file=inputByLabel(root,'上传累计决定 CSV');file.files=[{name:'invalid.csv',size:12}];await file.fire('change');
+  await waitFor(()=>root.textContent.includes('invalid_decision_action'));
+  assert.equal(uploaded,1);assert.match(root.textContent,/阶段 decisions/);assert.match(root.textContent,/决定数据行 1/);assert.match(root.textContent,/待应用（1）/);assert.equal(store.get().revision,revision);
+  currentFailure={message:'Manual override requires a reason',code:'manual_override_needs_reason',phase:'decisions',side:null,record:27,field:null};await file.fire('change');await waitFor(()=>root.textContent.includes('决定数据行 27'));assert.equal(uploaded,2);assert.match(root.textContent,/待应用（1）/);
+  currentFailure={message:'Malformed quoted CSV',code:'invalid_csv',phase:'decisions',side:'decisions',record:1,field:null};await file.fire('change');await waitFor(()=>root.textContent.includes('CSV 逻辑记录（含表头） 1'));assert.equal(uploaded,3);assert.match(root.textContent,/待应用（1）/);dispose();
+});
+
+for (const fixture of [
+  {code:'invalid_row_width',csv:'action,left_id,right_id,reason\nleft_unmatched,L1,\n',record:2,label:'CSV 逻辑记录（含表头） 2'},
+  {code:'invalid_header',csv:'action,left_id,right_id,left_id\n',record:1,label:'CSV 逻辑记录（含表头） 1'},
+  {code:'input_limit_exceeded',csv:`action,left_id,right_id,reason\nleft_unmatched,L1,,${'x'.repeat(65537)}\n`,record:2,label:'CSV 逻辑记录（含表头） 2'},
+  {code:'future_decision_failure',error:{code:'future_decision_failure',message:'Future core error',phase:'decisions',side:'decisions',record:4,field:null},record:4,label:'核心记录号 4'},
+]) test(`uploaded ${fixture.code} preserves core record numbering without assuming decision data rows`, async () => {
+  const csv='id,status,memo\n1,A,same\n';
+  const failure=fixture.error??JSON.parse(invoke(JSON.stringify({op:'resolve',left_csv:csv,right_csv:csv,config:mappingFixture(),decisions_csv:fixture.csv}))).error;
+  assert.equal(failure.code,fixture.code);assert.equal(failure.record,fixture.record);
+  const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState();
+  const revision={revision_id:`rev-${fixture.code}`,exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};store.update({revision,stale:false});
+  const api={request:async path=>{if(path.startsWith('/api/imports/'))return{import:{import_id:path.split('/').at(-1),headers:[]}};if(path===`/api/runs/${revision.revision_id}/reviews`)return{job_id:'failed-review'};if(path.startsWith(`/api/runs/${revision.revision_id}/`))return{items:[],total:0,offset:0,next_offset:0,has_more:false};throw new Error(`Unexpected request ${path}`);},waitJob:async()=>{throw Object.assign(new Error(failure.message),failure);},download:async()=>new Blob(['{}']),upload:async()=>({asset_id:'decisions'})};
+  const dispose=renderResultView({root,store,api,summary:{revision,computation:{},summary:{},structure:{},issues:[]},onSucceeded:()=>assert.fail('failed job cannot register'),onPublished:async()=>assert.fail('failed job cannot publish')});
+  await waitFor(()=>root.textContent.includes('手工决定'));const file=inputByLabel(root,'上传累计决定 CSV');file.files=[{name:'invalid.csv',size:12}];await file.fire('change');
+  await waitFor(()=>root.textContent.includes(`错误码 ${fixture.code}`));assert.ok(root.textContent.includes(fixture.label),root.textContent);assert.doesNotMatch(root.textContent,/决定数据行/);assert.equal(store.get().revision,revision);dispose();
+});
+
+test('cancelled review and failed branch display their safe structured job details', async () => {
+  const make=(revision,jobPath,waitJob)=>{const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState();store.update({revision,stale:false});const api={request:async path=>{if(path.startsWith('/api/imports/'))return{import:{import_id:path.split('/').at(-1),headers:[]}};if(path===`/api/runs/${revision.revision_id}/pairs?offset=0&limit=100`)return{items:[],total:0,offset:0,next_offset:0,has_more:false};if(path===jobPath)return{job_id:'job'};if(path.startsWith(`/api/runs/${revision.revision_id}/`))return{items:[],total:0,offset:0,next_offset:0,has_more:false};throw new Error(`Unexpected request ${path}`);},waitJob,download:async()=>new Blob(['{}']),upload:async()=>({asset_id:'decisions'})};const dispose=renderResultView({root,store,api,summary:{revision,computation:{},summary:{},structure:{},issues:[]},onSucceeded:()=>assert.fail('unsuccessful job cannot register a revision'),onPublished:async()=>assert.fail('unsuccessful job cannot publish')});return{root,store,dispose};};
+  globalThis.confirm=()=>true;
+  const review={revision_id:'rev-cancel',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};
+  const cancelled=make(review,`/api/runs/${review.revision_id}/reviews`,async()=>{throw Object.assign(new Error('Task cancelled'),{cancelled:true,job:{phase:'resolving'}});});
+  await waitFor(()=>cancelled.root.textContent.includes('手工决定'));walk(cancelled.root).find(node=>node.tag==='select').value='left_unmatched';await buttonBy(cancelled.root,'添加手工决定').fire('click');await buttonBy(cancelled.root,'应用待处理决定').fire('click');await waitFor(()=>cancelled.root.textContent.includes('job_cancelled'));assert.match(cancelled.root.textContent,/resolving/);assert.match(cancelled.root.textContent,/待应用（1）/);cancelled.dispose();
+  const branch={revision_id:'rev-branch-error',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};
+  const failed=make(branch,`/api/runs/${branch.revision_id}/branch`,async()=>{throw Object.assign(new Error('CSV input row is invalid'),{code:'invalid_csv',phase:'comparing',side:'left',record:8,field:'id'});});
+  await buttonBy(failed.root,'从原始比较新建分支').fire('click');await waitFor(()=>failed.root.textContent.includes('invalid_csv'));assert.match(failed.root.textContent,/comparing/);assert.match(failed.root.textContent,/left/);assert.match(failed.root.textContent,/CSV 逻辑记录（含表头） 8/);assert.match(failed.root.textContent,/字段 id/);assert.equal(failed.store.get().revision,branch);failed.dispose();
+});
+
+test('result rerenders preserve active-job disabling for unlocked review actions', async () => {
+  const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState();
+  const revision={revision_id:'rev-active-controls',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};store.update({revision,stale:false});
+  const api={request:async path=>{if(path.startsWith('/api/imports/'))return{import:{import_id:path.split('/').at(-1),headers:[]}};if(path.includes('/candidates?'))return{items:[{source_index:0,item:{left_id:'L1',right_id:'R1',score:9000,suggested:true}}],total:1,offset:0,next_offset:1,has_more:false};if(path.includes('/records?'))return{items:[{source_index:0,item:{id:'L2',side:'left',record:2,status:'pending_review'}}],total:1,offset:0,next_offset:1,has_more:false};if(path.startsWith(`/api/runs/${revision.revision_id}/`))return{items:[],total:0,offset:0,next_offset:0,has_more:false};throw new Error(`Unexpected request ${path}`);},download:async()=>new Blob(['{}'])};
+  const dispose=renderResultView({root,store,api,summary:{revision,computation:{},summary:{},structure:{},issues:[]},onPublished:async()=>{}});
+  await waitFor(()=>walk(root).some(node=>node.tag==='button'&&node.textContent==='accept 此配对'&&!node.disabled));
+  store.update({active_job:{job_id:'other-job',phase:'resolving',state:'running'}});dispose.refresh();
+  for(const text of ['accept 此配对','reject 此配对','left_unmatched'])assert.equal(buttonBy(root,text).disabled,true,`${text} stays disabled after rerender`);
+  store.update({active_job:null});dispose.refresh();assert.equal(buttonBy(root,'accept 此配对').disabled,false);dispose();
+});
+
+test('exact-pair accept/reject remain locked through unrelated updates and a failed review cleanup', async () => {
+  const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState();
+  const revision={revision_id:'rev-lock-update',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};store.update({revision,stale:false});
+  const api={request:async path=>{if(path.startsWith('/api/imports/'))return{import:{import_id:path.split('/').at(-1),headers:[]}};if(path===`/api/runs/${revision.revision_id}/pairs?offset=0&limit=100`)return{items:[{source_index:0,item:{left_id:'L1',right_id:'R1',source:'exact_key'}}],total:1,offset:0,next_offset:1,has_more:false};if(path===`/api/runs/${revision.revision_id}/candidates?offset=0&limit=20`)return{items:[{source_index:0,item:{left_id:'L1',right_id:'R1',score:10000,suggested:true}}],total:1,offset:0,next_offset:1,has_more:false};if(path===`/api/runs/${revision.revision_id}/decisions?offset=0&limit=100`)return{items:[],total:0,offset:0,next_offset:0,has_more:false};if(path===`/api/runs/${revision.revision_id}/reviews`)return{job_id:'locked-failure'};if(path.startsWith(`/api/runs/${revision.revision_id}/`))return{items:[],total:0,offset:0,next_offset:0,has_more:false};throw new Error(`Unexpected request ${path}`);},waitJob:async()=>{throw Object.assign(new Error('conflicting decisions'),{code:'conflicting_decisions',phase:'resolving'});},download:async()=>new Blob(['{}']),upload:async()=>({asset_id:'decisions'})};
+  const dispose=renderResultView({root,store,api,summary:{revision,computation:{},summary:{},structure:{},issues:[]},onPublished:async()=>{}});
+  await waitFor(()=>root.textContent.includes('精确键配对已锁定'));
+  assert.equal(buttonBy(root,'accept 此配对').disabled,true);assert.equal(buttonBy(root,'reject 此配对').disabled,true);
+  store.update({error:null});assert.equal(buttonBy(root,'accept 此配对').disabled,true);assert.equal(buttonBy(root,'reject 此配对').disabled,true);
+  await waitFor(()=>root.textContent.includes('手工决定'));walk(root).find(node=>node.tag==='select').value='left_unmatched';await buttonBy(root,'添加手工决定').fire('click');await buttonBy(root,'应用待处理决定').fire('click');await waitFor(()=>root.textContent.includes('conflicting_decisions'));
+  assert.equal(store.get().active_job,null);assert.equal(buttonBy(root,'accept 此配对').disabled,true);assert.equal(buttonBy(root,'reject 此配对').disabled,true);dispose();
+});
+
+test('exact-pair review actions stay disabled while lock loading fails', async () => {
+  const document=makeDocument();globalThis.document=document;const root=new FakeNode('main'),store=createWorkbenchState();
+  const revision={revision_id:'rev-lock-fail',exit_code:1,left_import_id:'li',right_import_id:'ri',config_asset_id:'cfg'};store.update({revision,stale:false});
+  let rejectLocks;const locks=new Promise((_,reject)=>{rejectLocks=reject;});
+  const api={request:async path=>{if(path.startsWith('/api/imports/'))return{import:{import_id:path.split('/').at(-1),headers:[]}};if(path===`/api/runs/${revision.revision_id}/pairs?offset=0&limit=100`)return locks;if(path===`/api/runs/${revision.revision_id}/candidates?offset=0&limit=20`)return{items:[{source_index:0,item:{left_id:'L1',right_id:'R1',score:9000,suggested:true}}],total:1,offset:0,next_offset:1,has_more:false};if(path.startsWith(`/api/runs/${revision.revision_id}/`))return{items:[],total:0,offset:0,next_offset:0,has_more:false};throw new Error(`Unexpected request ${path}`);},download:async()=>new Blob(['{}']),upload:async()=>({asset_id:'decisions'}),waitJob:async()=>({output:{}})};
+  const dispose=renderResultView({root,store,api,summary:{revision,computation:{},summary:{},structure:{},issues:[]},onPublished:async()=>{}});
+  await waitFor(()=>root.textContent.includes('所有竞争候选'));assert.equal(buttonBy(root,'accept 此配对').disabled,true);assert.equal(buttonBy(root,'reject 此配对').disabled,true);
+  store.update({error:null});assert.equal(buttonBy(root,'accept 此配对').disabled,true);assert.equal(buttonBy(root,'reject 此配对').disabled,true);
+  rejectLocks(new Error('pair evidence unavailable'));
+  await waitFor(()=>root.textContent.includes('精确配对锁定信息'));assert.equal(buttonBy(root,'accept 此配对').disabled,true);assert.equal(buttonBy(root,'reject 此配对').disabled,true);dispose();
+});
+
 async function waitFor(predicate) { for(let i=0;i<100;i++){if(predicate())return;await new Promise((resolve)=>setTimeout(resolve,0));}throw new Error('Timed out waiting for UI state'); }

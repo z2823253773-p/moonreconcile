@@ -8,18 +8,25 @@ const FILTERS = {
   records: [['side', '侧别 left/right'], ['status', '状态']],
 };
 
-export function renderResultView({ root, store, api, summary, onPublished, history = [], onSelectHistory, isCurrentHead = true }) {
-  let disposed = false, activeJob = null, loading = false, collectionRoot, notice = '', evidenceExport = null;
+export function renderResultView({ root, store, api, summary, onPublished, onSucceeded = () => {}, history = [], onSelectHistory, isCurrentHead = () => true }) {
+  let disposed = false, activeJob = null, loading = false, collectionRoot, notice = '', evidenceExport = null, reviewActionControls = [];
   const revision = summary.revision, startGeneration = store.generation();
   const pages = new Map(COLLECTIONS.map(name => [name, { offset: 0, nextOffset: 0, hasMore: false, previousOffsets: [], limit: 20, filters: {}, items: [], total: 0, loaded: false, busy: false }]));
   let applied = [], pending = [], lockedPairs = new Set(), pairLockLoaded = false, imported = { left: null, right: null };
   const selected = () => !disposed && store.get().revision?.revision_id === revision.revision_id;
   const current = () => selected() && store.generation() === startGeneration;
-  const stale = () => !current() || store.get().stale;
+  const headCurrent = () => typeof isCurrentHead === 'function' ? isCurrentHead(revision) : Boolean(isCurrentHead);
+  const stale = () => !current() || store.get().stale || !headCurrent();
   const endpoint = collection => `/api/runs/${revision.revision_id}/${collection}`;
+  const refreshReviewControls = () => {
+    const commonDisabled = stale() || loading || Boolean(store.get().active_job);
+    for (const control of root.querySelectorAll('.review-editor button,.review-editor input')) control.disabled = commonDisabled || !pairLockLoaded;
+    for (const control of reviewActionControls) control.node.disabled = commonDisabled || (control.requiresLocks && !pairLockLoaded) || control.locked;
+  };
 
   const render = () => {
     if (disposed) return;
+    reviewActionControls = [];
     root.replaceChildren(element('h3', { text: `结果 revision ${revision.revision_id}${stale() ? ' · 旧版本（只读）' : ''}` }));
     if (stale()) root.append(element('p', { className: 'notice warning', role: 'status', text: '来源或规则已变化；此版本保留查看和导出，当前输入完成新比较前不可应用决定。' }));
     if (notice) root.append(element('p', { className: 'notice error', role: 'alert', text: notice }));
@@ -45,12 +52,13 @@ export function renderResultView({ root, store, api, summary, onPublished, histo
       button('下载 report.json', () => void download(`/api/runs/${revision.revision_id}/export?kind=report`, 'report.json')),
       button('下载 summary.md', () => void download(`/api/runs/${revision.revision_id}/export?kind=summary`, 'summary.md'), { className: 'secondary' }),
       button('下载 decisions.csv', () => void download(`/api/runs/${revision.revision_id}/export?kind=decisions`, 'decisions.csv'), { className: 'secondary' }),
-      button('从原始比较新建分支', () => void branch(), { className: 'secondary', disabled: !isCurrentHead || loading || Boolean(store.get().active_job) }),
+      button('从原始比较新建分支', () => void branch(), { className: 'secondary', disabled: !headCurrent() || loading || Boolean(store.get().active_job) }),
     ]));
     collectionRoot = element('div', { className: 'result-collections' });
     for (const name of COLLECTIONS) collectionRoot.append(renderCollection(name));
     root.append(collectionRoot, renderReview());
     if (activeJob) root.append(element('p', { className: 'notice', role: 'status', text: `${activeJob.label}：${activeJob.phase ?? '处理中'}。` }), button('取消当前任务', () => void cancel(), { className: 'danger' }));
+    refreshReviewControls();
   };
 
   function renderCollection(name) {
@@ -75,13 +83,18 @@ export function renderResultView({ root, store, api, summary, onPublished, histo
       if (name === 'candidates') {
         const locked = lockedPairs.has(JSON.stringify([item.left_id, item.right_id]));
         const reason = element('input', { type: 'text', placeholder: '决定理由（候选外手工 accept 必填）', 'aria-label': `理由 ${item.left_id}/${item.right_id}` });
-        card.append(reason, button('accept 此配对', () => addPending('accept', item.left_id, item.right_id, reason.value), { className:'review-action', disabled: stale() || loading || !pairLockLoaded || locked }), button('reject 此配对', () => addPending('reject', item.left_id, item.right_id, reason.value), { className: 'secondary review-action', disabled: stale() || loading || !pairLockLoaded || locked }));
+        const accept = button('accept 此配对', () => addPending('accept', item.left_id, item.right_id, reason.value), { className:'review-action candidate-review-action', disabled: stale() || loading || !pairLockLoaded || locked });
+        const reject = button('reject 此配对', () => addPending('reject', item.left_id, item.right_id, reason.value), { className: 'secondary review-action candidate-review-action', disabled: stale() || loading || !pairLockLoaded || locked });
+        reviewActionControls.push({ node: accept, locked, requiresLocks: true }, { node: reject, locked, requiresLocks: true });
+        card.append(reason, accept, reject);
         if (locked) card.append(element('span', { className: 'notice', text: '此精确键配对已锁定，只读。' }));
       }
       if (name === 'records' && ['pending_review', 'unprocessed'].includes(item.status)) {
         const side = item.side;
         const reason = element('input', { type: 'text', placeholder: '决定理由（可交核心校验）', 'aria-label': `unmatched理由 ${item.id}` });
-        card.append(reason, button(side === 'left' ? 'left_unmatched' : 'right_unmatched', () => addPending(side === 'left' ? 'left_unmatched' : 'right_unmatched', side === 'left' ? item.id : null, side === 'right' ? item.id : null, reason.value), { className:'review-action', disabled: stale() || loading }));
+        const unmatched = button(side === 'left' ? 'left_unmatched' : 'right_unmatched', () => addPending(side === 'left' ? 'left_unmatched' : 'right_unmatched', side === 'left' ? item.id : null, side === 'right' ? item.id : null, reason.value), { className:'review-action', disabled: stale() || loading });
+        reviewActionControls.push({ node: unmatched, locked: false, requiresLocks: false });
+        card.append(reason, unmatched);
       }
       if (name === 'records') for (const column of imported[item.side]?.headers ?? []) card.append(button(`查看 ${column} 原值`, () => void showCell(item.side, item.record, column), { className: 'secondary' }));
       list.append(card);
@@ -161,6 +174,7 @@ export function renderResultView({ root, store, api, summary, onPublished, histo
     loading = true; notice = ''; activeJob = { label: '版本化复核', phase: '读取全部已应用决定' };
     store.update({ active_job: { job_id: null, phase: '读取全部已应用决定', state: 'running' } });render();
     const generation = store.generation();
+    let successRegistered = false;
     try {
       let decisionsAsset;
       if (file) decisionsAsset = await api.upload('decisions', file);
@@ -176,22 +190,27 @@ export function renderResultView({ root, store, api, summary, onPublished, histo
       const accepted = await api.request(endpoint('reviews'), { method: 'POST', body: { base_revision: revision.revision_id, decisions_asset_id: decisionsAsset.asset_id } });
       activeJob = { job_id: accepted.job_id, label: '版本化复核', phase: '核心 resolve' };store.update({active_job:{job_id:accepted.job_id,phase:'resolving',state:'running'}});render();
       const job = await api.waitJob(accepted.job_id);
-      if (generation !== store.generation() || !current()) throw new Error('复核已完成，但当前来源/选中版本已变化；结果仍可从历史revision读取。');
+      onSucceeded(revision, job.output.revision);
+      successRegistered = true;
+      if (generation !== store.generation() || !current()) throw new Error('复核已完成；新版本已登记到历史记录，但当前选择或输入已变化，未覆盖当前工作台。');
       pending = []; await onPublished(job.output.revision);
-    } catch (error) { notice = `复核未发布；原报告与待应用动作保留。${error.message}`; }
+    } catch (error) { notice = formatTaskFailure(successRegistered ? '复核已成功，新版本已登记到历史；未覆盖当前选择或输入。' : '复核未发布；原报告与待应用动作保留。', error); }
     finally { loading = false; activeJob = null;if(store.get().active_job)store.update({active_job:null});render(); }
   }
 
   async function branch() {
-    if (!isCurrentHead || loading || store.get().active_job || !globalThis.confirm('新建分支会从本版本绑定的原始 CSV 与配置重新运行核心 compare，并清除已应用决定；当前工作台文件与规则将切回该版本输入。继续？')) return;
+    if (!headCurrent() || loading || store.get().active_job || !globalThis.confirm('新建分支会从本版本绑定的原始 CSV 与配置重新运行核心 compare，并清除已应用决定；当前工作台文件与规则将切回该版本输入。继续？')) return;
     loading = true; activeJob = { label: '从原始比较新建分支', phase: '核心 compare' }; notice = '';store.update({active_job:{job_id:null,phase:'从原始快照重新比较',state:'running'}});render(); const generation = store.generation();
+    let successRegistered = false;
     try {
       const accepted = await api.request(`/api/runs/${revision.revision_id}/branch`, { method: 'POST', body: {} });
       activeJob = { job_id: accepted.job_id, label: '从原始比较新建分支', phase: '核心 compare' };store.update({active_job:{job_id:accepted.job_id,phase:'comparing',state:'running'}}); render();
       const job = await api.waitJob(accepted.job_id);
-      if (generation !== store.generation() || !selected()) throw new Error('分支比较已完成，但当前来源/所选版本已变化；新 revision 仍保留为只读。');
+      onSucceeded(revision, job.output.revision);
+      successRegistered = true;
+      if (generation !== store.generation() || !selected()) throw new Error('分支比较已完成；新版本已登记到历史记录，但当前选择或输入已变化，未覆盖当前工作台。');
       pending = []; await onPublished(job.output.revision, { branch: true });
-    } catch (error) { notice = `分支未发布：${error.message}`; }
+    } catch (error) { notice = formatTaskFailure(successRegistered ? '分支比较成功，新版本已登记到历史；未覆盖当前选择或输入。' : '分支未发布；原报告保留。', error); }
     finally { loading = false; activeJob = null;if(store.get().active_job)store.update({active_job:null}); render(); }
   }
 
@@ -217,10 +236,33 @@ export function renderResultView({ root, store, api, summary, onPublished, histo
     } catch (error) { notice = `原始导入信息不可读：${error.message}`; render(); }
   }
   let observedGeneration = startGeneration;
-  const disposeSubscription = store.subscribe(() => { if (!disposed) { const generation=store.generation();if(generation!==observedGeneration){observedGeneration=generation;pending=[];render();}for (const control of root.querySelectorAll('.review-editor button,.review-editor input,.review-action')) control.disabled = stale() || loading || Boolean(store.get().active_job); } });
+  const disposeSubscription = store.subscribe(() => { if (!disposed) { const generation=store.generation();if(generation!==observedGeneration){observedGeneration=generation;pending=[];render();}refreshReviewControls(); } });
   render();
   void bindImports();
   void loadReviewLocks();
   for (const name of COLLECTIONS) void loadCollection(name);
-  return () => { disposed = true; disposeSubscription(); root.replaceChildren(); };
+  const dispose = () => { disposed = true; disposeSubscription(); root.replaceChildren(); };
+  dispose.refresh = render;
+  return dispose;
+}
+
+function formatTaskFailure(prefix, error) {
+  const details = [];
+  const code = typeof error?.code === 'string' ? error.code : error?.cancelled ? 'job_cancelled' : null;
+  const phase = typeof error?.phase === 'string' ? error.phase : error?.job?.phase;
+  const side = typeof error?.side === 'string' ? error.side : null;
+  const record = Number.isSafeInteger(error?.record) && error.record > 0 ? error.record : null;
+  const field = typeof error?.field === 'string' && error.field ? error.field : null;
+  if (code) details.push(`错误码 ${code}`);
+  if (phase) details.push(`阶段 ${phase}`);
+  if (side) details.push(`侧别 ${side}`);
+  if (record) {
+    const csvRecord = ['invalid_csv', 'invalid_row_width', 'invalid_header', 'input_limit_exceeded'].includes(code);
+    const decisionRow = phase === 'decisions' && ['invalid_decision', 'invalid_decision_schema', 'invalid_decision_action', 'decision_limit_exceeded', 'locked_exact_pair', 'conflicting_decisions', 'manual_override_needs_reason'].includes(code);
+    const location = csvRecord ? 'CSV 逻辑记录（含表头）' : decisionRow ? '决定数据行' : '核心记录号';
+    details.push(`${location} ${record}`);
+  }
+  if (field) details.push(`字段 ${field}`);
+  const message = typeof error?.message === 'string' ? error.message : '任务失败';
+  return `${prefix}${message}${details.length ? `（${details.join('；')}）` : ''}`;
 }
