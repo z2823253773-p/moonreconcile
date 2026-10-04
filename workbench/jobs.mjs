@@ -2,33 +2,90 @@ import { fork } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizeLimits, failure, errorDto, sanitizeError, project, PHASES, jsonBytes, assertDto, exact } from './contracts.mjs';
 const DEFAULT_WORKER=fileURLToPath(new URL('./worker.mjs',import.meta.url));
-export async function createJobManager({session,workerPath=DEFAULT_WORKER,bridgePath,limits={}}={}) {
-  const jobs=new Map();let active=null,closed=false;
-  const start=(kind,payload)=>{
-    if(closed)throw new Error('closed');if(active)throw Object.assign(new Error('job busy'),{status:409,code:'job_busy'});
-    if(jobs.size>=(limits.jobs??256))throw Object.assign(new Error('job quota exceeded'),{status:429,code:'quota_exceeded'});
-    const id=randomUUID(), job={job_id:id,kind,state:'running',phase:kind==='compare'?'comparing':'validating',output:null,error:null};jobs.set(id,job);active=id;
-    const task=payload.task??{kind,payload:payload.payload??payload,paths:payload.paths??{},bridge_path:bridgePath};
-    const child=fork(workerPath,[],{stdio:['ignore','ignore','ignore','ipc'],cwd:session.root,env:{...process.env},execArgv:[]});let timer,killTimer;
-    const finalize=()=>{clearTimeout(timer);clearTimeout(killTimer);if(active===id)active=null;};
-    const cancel=async()=>{if(job.state!=='running'&&job.state!=='cancelling')return job;job.state='cancelling';child.kill('SIGTERM');await new Promise(resolve=>{killTimer=setTimeout(()=>{child.kill('SIGKILL');resolve();},limits.killMs??1000);child.once('exit',resolve);});if(job.state==='cancelling')job.state='cancelled';finalize();return job;};
-    job.cancel=cancel;
-    child.on('message',m=>{if(!m||m.job_id!==id||active!==id||job.state!=='running')return;if(m.type==='phase')job.phase=m.phase;else if(m.type==='result')job._candidate=m.output;else if(m.type==='error')job.error=m.error;});
-    child.on('error',e=>{job.error={code:'worker_failed',message:e.message,phase:'host',side:null,record:null,field:null};});
-    child.on('exit',async code=>{
-      clearTimeout(timer);if(job.state==='cancelling'){job.state='cancelled';job._candidate=null;job.error=null;}
-      else if(job.state==='running'){
-        if(job.error){job.state='failed';}
-        else if(code===0&&job._candidate){try{job.output=await payload.commit?.(job._candidate)??job._candidate;if(Buffer.byteLength(JSON.stringify({ok:true,job:safe(job)}))>(limits.responseBytes??2097152))throw Object.assign(new Error('job output exceeds response budget; retry with a smaller page'),{code:'response_limit_exceeded'});job.state='succeeded';}catch(e){job.output=null;job.error={code:e.code??'publish_failed',message:e.message,phase:'publishing',side:null,record:null,field:null};job.state='failed';}}
-        else {job.error={code:'worker_failed',message:`worker exited ${code}`,phase:'host',side:null,record:null,field:null};job.state='failed';}
-      }
-      delete job._candidate;finalize();
-    });
-    child.send({job_id:id,task});
-    timer=setTimeout(()=>{if(job.state==='running'){job.error={code:'job_timeout',message:'job time limit exceeded',phase:'host',side:null,record:null,field:null};job.state='cancelling';child.kill('SIGTERM');setTimeout(()=>child.kill('SIGKILL'),limits.killMs??1000).unref();}},limits.jobTimeoutMs??180000);
-    return job;
-  };
-  return {start,get:id=>{const j=jobs.get(id);if(!j)throw Object.assign(new Error('job not found'),{status:404});return j;},cancel:async id=>{const j=jobs.get(id);if(!j)throw Object.assign(new Error('job not found'),{status:404});return j.cancel?j.cancel():j;},close:async()=>{closed=true;if(active)await (jobs.get(active)?.cancel?.());}};
+
+// Trim only complete preview rows before any registry commit; every succeeded
+// job must remain pollable with the final HTTP envelope.
+function fitOutput(job,output,budget) {
+  const fits=()=>jsonBytes({ok:true,job:{...project('job',job),state:'succeeded',phase:'publishing',output,error:null}})<=budget;
+  if(output.preview) {
+    const p=output.preview;assertDto('preview',p);
+    while(!fits()&&p.rows.length>1){p.rows.pop();p.next_offset=p.offset+p.rows.length;p.has_more=p.next_offset<p.row_count;}
+  }
+  if(!fits())throw failure('response_limit_exceeded','Job display limit exceeded; request a smaller preview page or use the CLI',413,'publishing');
+  return output;
 }
-function safe(j){return {job_id:j.job_id,kind:j.kind,state:j.state,phase:j.phase,output:j.output??null,error:j.error??null};}
+export async function createJobManager({session,workerPath=DEFAULT_WORKER,bridgePath,limits:overrides={}}={}) {
+  const limits=normalizeLimits(overrides),jobs=new Map();let active=null,closed=false;
+  function start(kind,payload={}) {
+    if(closed)throw failure('session_closed','Session is closing',409);
+    if(active)throw failure('job_busy','A task is already active',409);
+    if(jobs.size>=limits.jobs)throw failure('quota_exceeded','Job metadata quota exceeded',413);
+    if(!['import','preview','cell','draft','check','compare','example'].includes(kind))throw failure('invalid_task','Unsupported task kind');
+    const job={job_id:randomUUID(),kind,state:'running',phase:'reading',output:null,error:null};jobs.set(job.job_id,job);
+    const record={job,generation:session.generation,child:null,staging:null,blocked:false,cause:null,candidate:null,workerError:null,exited:false};active=record;
+    let finish;record.done=new Promise(resolve=>finish=resolve);
+    const valid=()=>!record.blocked&&!closed&&active===record&&job.state==='running'&&session.generation===record.generation;
+    function stop(cause=null) {
+      if(!['running','cancelling'].includes(job.state))return;
+      record.blocked=true;record.cause??=cause;job.state='cancelling';record.candidate=null;
+      if(record.child&&!record.exited) {
+        record.child.kill('SIGTERM');
+        record.killTimer??=setTimeout(()=>{if(!record.exited)record.child.kill('SIGKILL');},limits.kill_ms);
+      }
+    }
+    record.stop=stop;
+    record.timer=setTimeout(()=>stop(errorDto('job_timeout','Task time limit exceeded')),limits.job_ms);
+    async function finalize(code) {
+      try {
+        if(valid()) {
+          if(record.workerError)throw Object.assign(new Error(record.workerError.message),{error:record.workerError});
+          if(code!==0||!record.candidate)throw failure('worker_failed','Worker exited without a valid result');
+          job.phase='publishing';
+          if(['preview','cell'].includes(kind)){exact(record.candidate,[kind]);assertDto(kind,record.candidate[kind]);}
+          const prepared=record.prepareOutput?await record.prepareOutput(record.candidate):{output:record.candidate,commit:()=>{}};
+          fitOutput(job,prepared.output,limits.response_bytes);
+          await session.checkQuota();
+          // No await from the final latch through registry/head/job commit.
+          if(valid()) {prepared.commit?.();job.output=prepared.output;job.error=null;job.state='succeeded';}
+        }
+      }catch(e){if(!record.blocked){record.blocked=true;record.cause=sanitizeError(e,[session.root]);}}
+      clearTimeout(record.timer);clearTimeout(record.killTimer);clearInterval(record.quotaTimer);
+      if(job.state!=='succeeded') {
+        if(record.staging)try{await session.remove(record.staging);}catch(e){record.cause=sanitizeError(e);}
+        job.output=null;job.error=record.cause;job.state=record.cause?'failed':'cancelled';
+      }
+      session.release(job.job_id);if(active===record)active=null;finish(job);
+    }
+    void (async()=>{
+      try {
+        await session.reserve(job.job_id,payload.reservation??0);
+        record.staging=await session.staging('job');await session.reserve(job.job_id,payload.reservation??0,record.staging);
+        let checking=false;record.quotaTimer=setInterval(async()=>{
+          if(checking)return;checking=true;
+          try{await session.checkQuota();}catch(e){if(active===record&&['running','cancelling'].includes(job.state))stop(sanitizeError(e));}finally{checking=false;}
+        },limits.quota_poll_ms);
+        const prepared=payload.prepare?await payload.prepare({staging:record.staging,generation:record.generation}):{task:payload.task??{kind,payload,paths:{}},prepareOutput:payload.prepareOutput};
+        record.prepareOutput=prepared.prepareOutput;
+        if(!valid())return await finalize(null);
+        const task={...prepared.task,kind,bridge_path:bridgePath};
+        const child=fork(workerPath,[],{stdio:['ignore','ignore','ignore','ipc'],cwd:session.root,env:{...process.env},execArgv:[]});record.child=child;
+        child.on('message',m=>{
+          if(!valid()||!m||m.job_id!==job.job_id)return;
+          if(m.type==='phase'&&PHASES.includes(m.phase))job.phase=m.phase;
+          else if(m.type==='result'&&m.output&&typeof m.output==='object'&&!record.candidate){record.candidate=m.output;job.phase='publishing';}
+          else if(m.type==='error')record.workerError=sanitizeError(m.error,[session.root]);
+        });
+        child.on('error',()=>{record.workerError=errorDto('worker_failed','Worker process failed');});
+        child.once('exit',code=>{record.exited=true;void finalize(code);});
+        child.send({job_id:job.job_id,task},e=>{if(e)stop(errorDto('worker_failed','Worker IPC failed'));});
+      }catch(e){record.blocked=true;record.cause=sanitizeError(e,[session.root]);await finalize(null);}
+    })();
+    return job;
+  }
+  function get(id){const job=jobs.get(id);if(!job)throw failure('not_found','Job not found',404);return job;}
+  async function cancel(id){const job=get(id);if(active?.job===job){const r=active;r.stop();await r.done;}return job;}
+  async function close(){closed=true;if(active){const r=active;r.stop();await r.done;}}
+  return {start,get,cancel,close,jobs,get active(){return active?.job.job_id??null;}};
+}
