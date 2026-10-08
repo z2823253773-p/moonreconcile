@@ -2,7 +2,7 @@
 
 MoonReconcile compares two CSV exports, explains field differences under explicit rules, and carries human review decisions into a final report. Its six stages are import, column mapping and rules, record matching, field comparison, human review, and export.
 
-The reusable comparison engine is written in MoonBit. Node.js provides the file and command-line adapter. Runtime use needs MoonBit to build and Node.js 22 or later to run the CLI; Python 3.12 is only used by the independent development checks.
+The reusable comparison engine is written in MoonBit. Node.js provides the file and command-line adapter. The CLI in a source checkout needs a compiled bridge; the precompiled local workbench package includes it and runs on Node.js 22 or later without MoonBit, npm installation, Python, or a browser download.
 
 ## Current capabilities
 
@@ -14,22 +14,39 @@ The reusable comparison engine is written in MoonBit. Node.js provides the file 
 
 The three original business examples are authored fixtures, not customer data. The catalog fixture deliberately makes the highest-scoring suggestion false to demonstrate why suggestions require review. It does not establish real-world accuracy or improved matching performance.
 
-## Install and build
+## Run the precompiled workbench
 
-Install the [MoonBit toolchain](https://www.moonbitlang.com/download/) and [Node.js 22+](https://nodejs.org/). This repository has no npm runtime dependencies or lockfile.
+Download and extract `moonreconcile-workbench-0.2.0.zip`, then run this command from the extracted folder:
 
 ```sh
+node workbench/start.mjs
+```
+
+Open the printed `127.0.0.1` URL in a browser on the same computer. The workbench binds only to loopback and does not open a browser automatically. Press `Ctrl+C` in the terminal to stop it and clean its owned temporary session. See [the start guide](START-HERE.md) and [workbench scope and limits](docs/workbench.md).
+
+## Build and develop from source
+
+Install the [MoonBit toolchain](https://www.moonbitlang.com/download/) and [Node.js 22+](https://nodejs.org/). The source workbench uses the three fixed production dependencies in `package-lock.json`; Playwright is used only for development browser tests. Build the core bridge and install locked development dependencies before running the local gates:
+
+```sh
+npm ci
 moon check --target js
 moon info
 moon fmt --check
 moon test --target js
 npm test
+npm run test:workbench
+npm run test:workbench:e2e
+npm run package:workbench
+npm run test:workbench:package
 python3 scripts/check-assignment-oracle.py
 python3 scripts/check-library-consumer.py
 npm run test:workflows
 npm run test:public-data
 node scripts/readme-smoke.mjs
 ```
+
+Packaging also reads the MoonBit core `LICENSE` and `NOTICE` from the installed toolchain. Set `MOONBIT_HOME` or `MOON_HOME` to the toolchain root if it is not discoverable from `moon` on `PATH`. The output is written to ignored `dist/moonreconcile-workbench-0.2.0/` and `.zip` paths.
 
 CI runs these gates on Ubuntu 24.04 and macOS 15, recording the actual MoonBit installer source hash and installed compiler versions. The installer selects the current official toolchain, so later runs may use a newer version. Remote results are recorded in [validation](docs/validation.md); local success alone does not establish a GitHub Actions result.
 

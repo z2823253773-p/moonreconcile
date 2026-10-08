@@ -1,6 +1,6 @@
 {
   "name": "moonreconcile",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -8,8 +8,10 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run build && node --test tests/*.test.mjs",
-    "test:workbench": "node --test tests/workbench-*.test.mjs",
+    "test": "npm run build && node scripts/run-unit-tests.mjs",
+    "test:workbench": "node scripts/run-unit-tests.mjs --workbench",
+    "package:workbench": "node scripts/package-workbench.mjs",
+    "test:workbench:package": "node scripts/check-workbench-package.mjs",
     "test:workbench:e2e": "playwright test",
     "test:workflows": "node scripts/workflows.mjs",
     "benchmark": "node scripts/benchmark.mjs",

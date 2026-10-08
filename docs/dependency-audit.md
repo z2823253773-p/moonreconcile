@@ -95,6 +95,10 @@ The yauzl 3.4.0 source exposes Central Directory CRC metadata and validates deco
 
 The production CLI still imports no ZIP packages; the workbench process uses the three production dependencies. Browser dependencies and browser binaries are development-only and do not enter the application runtime package. No XML or XLSX parser was added.
 
+## 9. Node 22 workbench package
+
+The `0.2.0` workbench bundle builds its production install from a filtered lock containing only `buffer-crc32@1.0.0`, `yauzl@3.4.0`, `yazl@3.3.1`, and their locked transitive dependency `pend@1.2.0`. The package lock and manifest omit `@playwright/test`, `playwright`, and `playwright-core`; those remain development-only. The package builder runs `npm ci` in its fresh output directory from that generated lock instead of copying the checkout's `node_modules` tree. It includes the checkout MIT license, the applicable MoonBit core Apache-2.0 `LICENSE` and `NOTICE`, and the actual license texts found in the installed production dependency graph. The isolated runtime gate result and package/bridge hashes are recorded in the generated ignored `dist/workbench-package-validation-2026-10-08.json`; that artifact records the exact source SHA and whether the worktree was clean at gate time.
+
 ## 5. 许可证
 
 本仓库：[LICENSE](../LICENSE)，MIT。

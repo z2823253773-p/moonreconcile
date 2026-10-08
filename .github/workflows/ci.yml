@@ -86,8 +86,17 @@ jobs:
       - name: Build bridge and run host integration tests
         run: npm test
 
+      - name: Local workbench host tests
+        run: npm run test:workbench
+
       - name: Local workbench browser workflows
         run: npm run test:workbench:e2e
+
+      - name: Build the precompiled Node 22 workbench package
+        run: npm run package:workbench
+
+      - name: Relocated package tests
+        run: node --test tests/workbench-package.test.mjs
 
       - name: Synthetic workflow end-to-end chains
         run: npm run test:workflows
@@ -103,3 +112,22 @@ jobs:
 
       - name: README acceptance smoke from fresh checkout
         run: node scripts/readme-smoke.mjs
+
+      - name: Strict offline package workflow (macOS)
+        if: matrix.os == 'macos-15'
+        run: npm run test:workbench:package
+
+      - name: Strict offline package workflow (Ubuntu network namespace)
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          set -euo pipefail
+          node_binary="$(command -v node)"
+          sudo --preserve-env=PATH unshare --net -- /usr/bin/bash -c '
+            set -euo pipefail
+            ip link set lo up
+            export MOONRECONCILE_NETWORK_ISOLATED=1
+            export MOONRECONCILE_NODE_BINARY="$1"
+            export PATH="$(dirname "$1"):/usr/bin:/bin:/usr/sbin:/sbin"
+            cd "$2"
+            exec "$1" scripts/check-workbench-package.mjs
+          ' _ "$node_binary" "$GITHUB_WORKSPACE"

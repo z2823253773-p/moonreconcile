@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { startWorkbench } from './server.mjs';
-if(Number(process.versions.node.split('.')[0])<22)throw new Error('MoonReconcile workbench requires Node.js 22 or newer');
+import { assertSupportedNodeVersion } from './runtime.mjs';
+assertSupportedNodeVersion();
+const { startWorkbench } = await import('./server.mjs');
 const app=await startWorkbench();
 process.stdout.write(`${app.origin}/#token=${app.token}\n`);
 let stopping=false;
