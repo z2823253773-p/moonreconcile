@@ -8,6 +8,7 @@ import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import yazl from 'yazl';
+import { BRIDGE_RELATIVE, verifyBridge, sourceInputs, packageContract, packageGuide, thirdPartyNotices, writePackageProvenance } from './workbench-package-provenance.mjs';
 
 const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const VERSION = '0.2.0';
@@ -17,7 +18,6 @@ const OUTPUT = path.resolve(process.env.MOONRECONCILE_PACKAGE_DIR ?? path.join(D
 const ZIP_PATH = path.resolve(process.env.MOONRECONCILE_PACKAGE_ZIP ?? path.join(path.dirname(OUTPUT), `${path.basename(OUTPUT)}.zip`));
 const DIST = path.dirname(OUTPUT);
 const OWNER_FILE = path.join(DIST, `.${NAME}.owner.json`);
-const EXPECTED = { 'buffer-crc32': '1.0.0', yauzl: '3.4.0', yazl: '3.3.1' };
 
 function fail(message) {
   throw new Error(message);
@@ -53,79 +53,6 @@ async function copyTree(source, target) {
   }
 }
 
-function packageLock(rootLock, dependencies) {
-  const packages = { '': {
-    name: 'moonreconcile-workbench',
-    version: VERSION,
-    dependencies,
-    engines: { node: '>=22' },
-  } };
-  const visited = new Set();
-  const visit = (name) => {
-    if (visited.has(name)) return;
-    visited.add(name);
-    const key = `node_modules/${name}`;
-    const entry = rootLock.packages?.[key];
-    if (!entry) fail(`locked production dependency is missing: ${name}`);
-    packages[key] = entry;
-    for (const child of Object.keys(entry.dependencies ?? {})) visit(child);
-  };
-  for (const name of Object.keys(dependencies)) visit(name);
-  return { name: 'moonreconcile-workbench', version: VERSION, lockfileVersion: 3, requires: true, packages };
-}
-
-async function coreNoticeDirectory() {
-  const candidates = [process.env.MOONBIT_HOME, process.env.MOON_HOME].filter(Boolean);
-  const moon = spawnSync('which', ['moon'], { encoding: 'utf8' });
-  if (moon.status === 0) candidates.push(path.dirname(path.dirname(moon.stdout.trim())));
-  for (const home of candidates) {
-    const directory = path.join(home, 'lib/core');
-    if (await exists(path.join(directory, 'LICENSE')) && await exists(path.join(directory, 'NOTICE'))) return directory;
-  }
-  fail('MoonBit core LICENSE and NOTICE not found. Set MOON_HOME or MOONBIT_HOME to the toolchain root before packaging.');
-}
-
-async function thirdPartyNotices(dependencies, lock) {
-  const coreDir = await coreNoticeDirectory();
-  const sections = [
-    '# Third-party notices',
-    '',
-    'The compiled MoonBit bridge contains MoonBit core runtime code.',
-    'MoonBit core is licensed under Apache License 2.0; its source NOTICE is included verbatim below.',
-    '',
-    '## MoonBit core LICENSE',
-    '',
-    await fs.readFile(path.join(coreDir, 'LICENSE'), 'utf8'),
-    '',
-    '## MoonBit core NOTICE',
-    '',
-    await fs.readFile(path.join(coreDir, 'NOTICE'), 'utf8'),
-  ];
-  const licenses = new Set();
-  const visit = (name) => {
-    if (licenses.has(name)) return;
-    licenses.add(name);
-    const entry = lock.packages[`node_modules/${name}`];
-    for (const child of Object.keys(entry.dependencies ?? {})) visit(child);
-  };
-  Object.keys(dependencies).forEach(visit);
-  for (const name of [...licenses].sort()) {
-    const entry = lock.packages[`node_modules/${name}`];
-    const packagePath = path.join(OUTPUT, 'node_modules', name);
-    const metadata = JSON.parse(await fs.readFile(path.join(packagePath, 'package.json'), 'utf8'));
-    if (metadata.version !== entry.version) fail(`installed version mismatch for ${name}: ${metadata.version}`);
-    const licenseName = typeof metadata.license === 'string' ? metadata.license : JSON.stringify(metadata.license);
-    const licenseFile = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license', 'license.md'].map((n) => path.join(packagePath, n));
-    let text;
-    for (const file of licenseFile) {
-      if (await exists(file)) { text = await fs.readFile(file, 'utf8'); break; }
-    }
-    if (!text) fail(`license text missing from production dependency ${name}@${metadata.version}`);
-    sections.push('', `## ${name}@${metadata.version} (${licenseName})`, '', text.trimEnd());
-  }
-  return `${sections.join('\n')}\n`;
-}
-
 async function makeZip() {
   const zip = new yazl.ZipFile();
   const add = async (directory, relative = '') => {
@@ -152,8 +79,11 @@ async function makeZip() {
 }
 
 async function main() {
-  const bridgePath = path.join(ROOT, '_build/js/debug/build/cmd/bridge/bridge.js');
+  const bridgePath = path.join(ROOT, BRIDGE_RELATIVE);
   if (!await exists(bridgePath)) fail(`compiled bridge missing at ${bridgePath}; build it before packaging`);
+  const buildRecord = await verifyBridge(ROOT);
+  const inputs = await sourceInputs(ROOT);
+  const contract = await packageContract(ROOT);
   const defaultOutput = path.join(DEFAULT_DIST, NAME);
   const defaultZip = path.join(DEFAULT_DIST, `${NAME}.zip`);
   const insideRoot = (candidate) => candidate === ROOT || candidate.startsWith(`${ROOT}${path.sep}`);
@@ -186,33 +116,15 @@ async function main() {
   }
   const bridge = await fs.readFile(bridgePath);
   if (!bridge.length) fail(`compiled bridge is empty: ${bridgePath}`);
-  const rootManifest = JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8'));
-  if (rootManifest.version !== VERSION) fail(`package version must be ${VERSION}; found ${rootManifest.version}`);
-  const rootLock = JSON.parse(await fs.readFile(path.join(ROOT, 'package-lock.json'), 'utf8'));
-  const dependencies = {};
-  for (const [name, version] of Object.entries(EXPECTED)) {
-    if (rootManifest.dependencies?.[name] !== version || rootLock.packages?.[`node_modules/${name}`]?.version !== version) {
-      fail(`fixed production dependency mismatch for ${name}@${version}`);
-    }
-    dependencies[name] = version;
-  }
-  if (Object.keys(rootManifest.dependencies ?? {}).sort().join(',') !== Object.keys(EXPECTED).sort().join(',')) {
-    fail('production dependency list changed; audit and update the package contract first');
-  }
+  const { dependencies } = contract.manifest;
 
   if (isDefaultArtifact) {
     await fs.rm(OUTPUT, { recursive: true, force: true });
     await fs.rm(ZIP_PATH, { force: true });
   }
   await fs.mkdir(OUTPUT, { recursive: true });
-  const packageManifest = {
-    name: 'moonreconcile-workbench', version: VERSION, private: true, type: 'module',
-    engines: { node: '>=22' },
-    scripts: { start: 'node workbench/start.mjs' },
-    bin: { reconcile: './cli/main.mjs' },
-    dependencies,
-  };
-  const lock = packageLock(rootLock, dependencies);
+  const packageManifest = contract.manifest;
+  const lock = contract.lock;
   await fs.writeFile(path.join(OUTPUT, 'package.json'), `${JSON.stringify(packageManifest, null, 2)}\n`);
   await fs.writeFile(path.join(OUTPUT, 'package-lock.json'), `${JSON.stringify(lock, null, 2)}\n`);
   await fs.mkdir(path.join(OUTPUT, 'runtime'), { recursive: true });
@@ -224,10 +136,7 @@ async function main() {
   await copyTree(path.join(ROOT, 'docs/workbench.md'), path.join(OUTPUT, 'docs/workbench.md'));
   await copyTree(path.join(ROOT, 'LICENSE'), path.join(OUTPUT, 'LICENSE'));
   const sourceStartGuide = await fs.readFile(path.join(ROOT, 'docs/workbench-start-here.md'), 'utf8');
-  const packagedStartGuide = sourceStartGuide
-    .replace('](workbench.md)', '](docs/workbench.md)')
-    .replace('](../cli/main.mjs)', '](cli/main.mjs)')
-    .replace('](limitations.md)', '](docs/limitations.md)');
+  const packagedStartGuide = packageGuide(sourceStartGuide);
   await fs.writeFile(path.join(OUTPUT, 'START-HERE.md'), packagedStartGuide);
   await fs.writeFile(path.join(OUTPUT, 'README.md'), packagedStartGuide);
 
@@ -236,7 +145,8 @@ async function main() {
   });
   if (install.error) fail(`could not run npm ci for locked production dependencies: ${install.error.message}`);
   if (install.status !== 0) fail(`npm ci failed with status ${install.status}`);
-  await fs.writeFile(path.join(OUTPUT, 'THIRD-PARTY-NOTICES'), await thirdPartyNotices(dependencies, lock));
+  await fs.writeFile(path.join(OUTPUT, 'THIRD-PARTY-NOTICES'), await thirdPartyNotices(OUTPUT, lock));
+  await writePackageProvenance(ROOT, OUTPUT, inputs, buildRecord);
   await makeZip();
   process.stdout.write(JSON.stringify({
     package: OUTPUT,

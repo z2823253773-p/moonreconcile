@@ -10,11 +10,14 @@ import process from 'node:process';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import yauzl from 'yauzl';
+import { gitIdentity, verifySourceAtHead, verifyPackage, files, PACKAGE_PROVENANCE } from './workbench-package-provenance.mjs';
+import { stopAndVerify } from './workbench-package-lifecycle.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const NAME = 'moonreconcile-workbench-0.2.0';
 const PACKAGE_DIR = path.join(ROOT, 'dist', NAME);
 const ZIP_PATH = path.join(ROOT, 'dist', `${NAME}.zip`);
+const EVIDENCE_PATH = path.join(ROOT, 'dist/workbench-package-validation-2026-10-08.json');
 const SANDBOX_PROFILE = '(version 1) (allow default) (deny network-outbound) (allow network-outbound (remote ip "localhost:*"))';
 
 function hash(bytes) { return createHash('sha256').update(bytes).digest('hex'); }
@@ -136,12 +139,14 @@ async function upload(origin, token, kind, file, filename) {
   return (await api(origin, token, '/api/assets', { method: 'POST', kind, bytes: await fs.readFile(file), filename })).asset;
 }
 
-async function git(args) {
-  return spawnSync('git', ['-c', `safe.directory=${ROOT}`, ...args], { cwd: ROOT, encoding: 'utf8' });
-}
-
 async function main() {
+  // Supersede the previous attempt before any identity/runtime checks.
+  await fs.mkdir(path.dirname(EVIDENCE_PATH), { recursive: true });
+  await fs.writeFile(EVIDENCE_PATH, JSON.stringify({ status: 'running', created_at: new Date().toISOString() }) + '\n');
   assertSupportedRunner();
+  const identity = gitIdentity(ROOT, true);
+  const provenance = await verifyPackage(ROOT, PACKAGE_DIR);
+  await verifySourceAtHead(ROOT, provenance.source_inputs);
   assert.ok(await fs.stat(PACKAGE_DIR), 'run npm run package:workbench before the package gate');
   const archiveBytes = await fs.readFile(ZIP_PATH);
   const packageManifest = JSON.parse(await fs.readFile(path.join(PACKAGE_DIR, 'package.json'), 'utf8'));
@@ -154,31 +159,35 @@ async function main() {
   assertStatus(versionResult, 0, 'Node runtime version');
   assert.equal(Number(versionResult.stdout.trim().replace(/^v/, '').split('.')[0]), 22, `offline package gate must use Node 22, received ${versionResult.stdout.trim()}`);
   if (path.basename(runtime) !== 'node') throw new Error(`configured runtime path must name node: ${runtime}`);
-  const sourceSha = (await git(['rev-parse', 'HEAD'])).stdout.trim();
-  const sourceStatus = (await git(['status', '--porcelain'])).stdout.trim();
+
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'moonreconcile-package-gate-'));
   const home = path.join(temp, 'home');
+  const sessionParent = path.join(temp, 'sessions');
   const onlyBin = path.join(temp, 'node-only-bin');
   const extracted = path.join(temp, 'relocated');
-  await Promise.all([fs.mkdir(home), fs.mkdir(onlyBin), fs.mkdir(extracted)]);
+  await Promise.all([fs.mkdir(sessionParent), fs.mkdir(home), fs.mkdir(onlyBin), fs.mkdir(extracted)]);
   const nodeOnly = path.join(onlyBin, 'node');
   await fs.copyFile(runtime, nodeOnly);
   await fs.chmod(nodeOnly, 0o755);
   assert.deepEqual(await fs.readdir(onlyBin), ['node']);
   const relocated = path.join(extracted, NAME);
-  const result = { created_at: new Date().toISOString(), source_sha: sourceSha, source_worktree_clean: sourceStatus.length === 0,
+  const result = { created_at: new Date().toISOString(), ...identity, package_source_sha: provenance.source_sha, package_source_worktree_clean: provenance.source_worktree_clean,
+    provenance_sha256: hash(await fs.readFile(path.join(PACKAGE_DIR, PACKAGE_PROVENANCE))),
     package: NAME, package_version: packageManifest.version, node_binary_sha256: hash(await fs.readFile(nodeOnly)),
     node_version: versionResult.stdout.trim(), bridge_sha256: hash(await fs.readFile(path.join(PACKAGE_DIR, 'runtime/bridge.js'))),
     archive_sha256: hash(archiveBytes), package_dependencies: packageManifest.dependencies, environment: { path_entries: ['node'], npm_available: false, moon_available: false, python_available: false },
     network_isolation: { mechanism: process.platform === 'darwin' ? 'macOS sandbox-exec; deny network-outbound; allow localhost only' : 'Linux unshare --net namespace with loopback enabled before Node starts', profile: process.platform === 'darwin' ? SANDBOX_PROFILE : 'isolated network namespace; no external interface; lo brought up by CI wrapper', loopback: 'pending', external_probe: 'pending' }, gates: [] };
 
   let child;
+  let failure;
   try {
     await extractZip(ZIP_PATH, extracted);
-    assert.equal(hash(await fs.readFile(path.join(relocated, 'runtime/bridge.js'))), result.bridge_sha256, 'relocated bridge must match packaged build');
+    assert.deepEqual(await files(extracted), Object.fromEntries(Object.entries(await files(PACKAGE_DIR)).map(([name, sha]) => [`${NAME}/${name}`, sha])), 'archive must equal the complete package directory, without extra or missing files');
+    await verifyPackage(ROOT, relocated);
+    result.gates.push({ name: 'source-build-package-archive-identity', status: 0, packaged_source_sha: provenance.source_sha, validated_source_sha: identity.source_sha });
     const locked = JSON.parse(await fs.readFile(path.join(relocated, 'package-lock.json'), 'utf8'));
     assert.ok(!Object.keys(locked.packages).some((key) => /playwright/i.test(key)), 'browser packages must not ship');
-    const homeEnv = { PATH: onlyBin, HOME: home, TMPDIR: temp, TMP: temp, LANG: 'en_US.UTF-8' };
+    const homeEnv = { PATH: onlyBin, HOME: home, TMPDIR: sessionParent, TMP: sessionParent, LANG: 'en_US.UTF-8' };
     const dependencyToolProbe = runOfflineNode(nodeOnly, ['-e', `import {spawnSync} from 'node:child_process';const results=[];for(const name of ['npm','moon','python3']){const r=spawnSync(name,['--version']);results.push({name,error:r.error?.code??null,status:r.status});if(r.error?.code!=='ENOENT')process.exit(3)}process.stdout.write(JSON.stringify(results));process.exit(0)`], { cwd: relocated, env: homeEnv, encoding: 'utf8', timeout: 10000 });
     assertStatus(dependencyToolProbe, 0, 'runtime cannot invoke npm, moon, or python');
     result.gates.push({ name: 'only-node-on-PATH', status: status(dependencyToolProbe) });
@@ -195,8 +204,8 @@ async function main() {
     }
 
     child = process.platform === 'darwin'
-      ? spawn('/usr/bin/sandbox-exec', ['-p', SANDBOX_PROFILE, nodeOnly, 'workbench/start.mjs'], { cwd: relocated, env: homeEnv, stdio: ['ignore', 'pipe', 'pipe'] })
-      : spawn(nodeOnly, ['workbench/start.mjs'], { cwd: relocated, env: homeEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+      ? spawn('/usr/bin/sandbox-exec', ['-p', SANDBOX_PROFILE, nodeOnly, 'workbench/start.mjs'], { cwd: relocated, env: homeEnv, stdio: ['ignore', 'pipe', 'pipe'], detached: true })
+      : spawn(nodeOnly, ['workbench/start.mjs'], { cwd: relocated, env: homeEnv, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const app = await waitForStartup(child);
     result.network_isolation.loopback = 'Node 22 child fetched local workbench index successfully';
     const localLoopback = runOfflineNode(nodeOnly, ['-e', `const response=await fetch(${JSON.stringify(app.origin)},{headers:{'Sec-Fetch-Site':'none'}});process.exit(response.status===200?0:4)`], { cwd: relocated, env: homeEnv, encoding: 'utf8', timeout: 10000 });
@@ -250,19 +259,25 @@ async function main() {
     result.gates.push({ name: 'zip-save-reset-restore-replay', status: 0, restored_report_sha256: hash(restoredReport), zip_sha256: hash(zipBytes) });
 
     result.gates.push({ name: 'workbench-worker-process', status: 0, evidence: 'import/check/compare/review/bundle/restore jobs completed with only Node on PATH' });
-    result.status = 'passed';
-    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  } catch (error) {
+    failure = error;
   } finally {
-    if (childAlive(child)) {
-      child.kill('SIGTERM');
-      await new Promise((resolve) => { const timer = setTimeout(resolve, 3000); child.once('exit', () => { clearTimeout(timer); resolve(); }); });
+    if (child) {
+      try { result.shutdown = await stopAndVerify(child, sessionParent); }
+      catch (error) { result.shutdown = error.shutdown; failure ??= error; }
     }
-    await fs.rm(temp, { recursive: true, force: true });
+    try { await fs.rm(temp, { recursive: true, force: true }); }
+    catch (error) { failure ??= error; }
   }
-
-  const evidencePath = path.join(ROOT, 'dist', 'workbench-package-validation-2026-10-08.json');
-  await fs.writeFile(evidencePath, `${JSON.stringify(result, null, 2)}\n`);
-  process.stdout.write(`validation artifact: ${evidencePath}\n`);
+  if (failure) { failure.validation = result; throw failure; }
+  assert.deepEqual(gitIdentity(ROOT, true), identity, 'source identity changed during package validation');
+  await verifyPackage(ROOT, PACKAGE_DIR);
+  await verifySourceAtHead(ROOT, provenance.source_inputs);
+  assert.equal(hash(await fs.readFile(ZIP_PATH)), result.archive_sha256, 'archive bytes changed during package validation');
+  result.status = 'passed';
+  await fs.writeFile(EVIDENCE_PATH, `${JSON.stringify(result, null, 2)}\n`);
+  process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  process.stdout.write(`validation artifact: ${EVIDENCE_PATH}\n`);
 }
 
 function assertSupportedRunner() {
@@ -273,9 +288,9 @@ function assertSupportedRunner() {
   throw new Error('Use macOS sandbox-exec or the Linux unshare --net wrapper; never run the package gate without verified network isolation.');
 }
 
-function childAlive(child) { return child && child.exitCode === null && child.signalCode === null; }
-
-main().catch((error) => {
+main().catch(async (error) => {
+  const failed = { ...error.validation, created_at: new Date().toISOString(), status: 'failed', error: error.message };
+  await fs.writeFile(EVIDENCE_PATH, `${JSON.stringify(failed, null, 2)}\n`);
   process.stderr.write(`package validation failed: ${error.stack ?? error.message}\n`);
   process.exitCode = 1;
 });

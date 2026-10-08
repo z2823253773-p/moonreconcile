@@ -9,7 +9,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const workbenchOnly = process.argv.includes('--workbench');
 const files = (await readdir(path.join(root, 'tests')))
   .filter((name) => name.endsWith('.test.mjs'))
-  .filter((name) => name !== 'workbench-package.test.mjs')
+  .filter((name) => !['workbench-package.test.mjs', 'workbench-package-validation.test.mjs'].includes(name))
   .filter((name) => !workbenchOnly || name.startsWith('workbench-'))
   .sort()
   .map((name) => path.join(root, 'tests', name));

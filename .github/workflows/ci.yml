@@ -58,6 +58,8 @@ jobs:
           shasum -a 256 "$RUNNER_TEMP/moon-install.sh"
           bash "$RUNNER_TEMP/moon-install.sh" latest
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+          echo "MOON_HOME=$HOME/.moon" >> "$GITHUB_ENV"
+          echo "MOONBIT_HOME=$HOME/.moon" >> "$GITHUB_ENV"
 
       - name: Record actual toolchain versions
         run: |
@@ -98,6 +100,10 @@ jobs:
       - name: Relocated package tests
         run: node --test tests/workbench-package.test.mjs
 
+      - name: Package identity and shutdown regressions (macOS network sandbox)
+        if: matrix.os == 'macos-15'
+        run: node --test tests/workbench-package-validation.test.mjs
+
       - name: Synthetic workflow end-to-end chains
         run: npm run test:workflows
 
@@ -122,7 +128,7 @@ jobs:
         run: |
           set -euo pipefail
           node_binary="$(command -v node)"
-          sudo --preserve-env=PATH unshare --net -- /usr/bin/bash -c '
+          sudo --preserve-env=PATH,MOON_HOME,MOONBIT_HOME unshare --net -- /usr/bin/bash -c '
             set -euo pipefail
             ip link set lo up
             export MOONRECONCILE_NETWORK_ISOLATED=1
