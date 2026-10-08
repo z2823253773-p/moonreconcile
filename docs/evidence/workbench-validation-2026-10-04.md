@@ -4,10 +4,7 @@ Validation run: 2026-10-08 (Asia/Shanghai). The filename is retained from the Ta
 
 ## Exact source and package
 
-- Validated source SHA: `ebb9f6d36558aae37928a7feda912b335aa4e9f8` (clean worktree at strict package-gate start).
-- Package: `dist/moonreconcile-workbench-0.2.0.zip`, SHA-256 `8441ecd4a4d7b832863d3845e076dee889df829c54f867f0b738ec1683f27ef1`.
-- Bridge: SHA-256 `e6f817bd20b68f9cd7b304759abeca5e0573a96554f970de798a651bc2d09bd0`.
-- Full machine-readable package evidence: [`workbench-package-validation-2026-10-08.json`](../../dist/workbench-package-validation-2026-10-08.json), SHA-256 `727eb5664c5ac9257711cf563355449f910c19f44a2849e013d08620bd2e6a58`.
+- Source SHA, worktree cleanliness, package archive hash, and bridge hash for the latest strict gate are recorded in the generated machine-readable evidence: [`workbench-package-validation-2026-10-08.json`](../../dist/workbench-package-validation-2026-10-08.json). The ZIP is timestamped, so rebuilds can have a different archive hash while carrying the same files.
 - Exact source implementation and follow-up link-fix commits are recorded in the local `.superpowers/sdd/2026-10-04-local-workbench/task-6-report.md` handoff. The report lives in ignored retained plan workspace, not in the package.
 
 ## Local checks
