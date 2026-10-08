@@ -9,6 +9,7 @@ import { writeRunBundle, readRunBundle } from '../workbench/archive.mjs';
 import { executeTask } from '../workbench/engine-host.mjs';
 import { loadBridgeInvoke } from '../cli/bridge.mjs';
 import { run } from '../cli/main.mjs';
+import { mutateZip, repackPythonZip } from './helpers/zip-mutations.mjs';
 
 const RUN_FILES = [
   'manifest.json','input/left.csv','input/right.csv','config.json','report.json',
@@ -36,6 +37,32 @@ test('writes the exact twelve-file whitelist and restores verified bytes', async
   assert.deepEqual(read.sidecar,f.sidecar);
   for(const name of RUN_FILES)assert.deepEqual(await fs.readFile(path.join(read.runPath,name)),bytesFor(name));
   assert.deepEqual((await (await import('node:fs/promises')).readdir(read.runPath)).sort(),['candidates.csv','config.json','decisions.csv','fields.csv','input','manifest.json','pairs.csv','report.json','summary.md','unresolved.csv']);
+});
+
+for(const kind of ['local-path','local-name','local-encrypted','local-strong-encrypted','local-flags','local-descriptor','local-compression','osx-symlink','osx-special','osx-directory'])test(`rejects ${kind} metadata mutated independently of valid ZIP payloads`,async t=>{
+  const f=await fixture(t),baseline=path.join(f.root,'baseline.zip'),assetPath=path.join(f.root,`${kind}.zip`),stagingPath=path.join(f.root,'stage');
+  await writeRunBundle({runPath:f.runPath,sidecar:f.sidecar,destPath:baseline});
+  mutateZip(baseline,assetPath,kind);
+  await assert.rejects(readRunBundle({assetPath,stagingPath}),{code:'invalid_bundle'});
+  await assert.rejects(fs.stat(stagingPath),{code:'ENOENT'});
+});
+
+for(const kind of ['local-crc','local-compressed-size','local-uncompressed-size'])test(`rejects contradictory ${kind} without a data descriptor`,async t=>{
+  const f=await fixture(t),baseline=path.join(f.root,'baseline.zip'),python=path.join(f.root,'python.zip'),assetPath=path.join(f.root,`${kind}.zip`),stagingPath=path.join(f.root,'stage');
+  await writeRunBundle({runPath:f.runPath,sidecar:f.sidecar,destPath:baseline});
+  repackPythonZip(baseline,python,'deflated');mutateZip(python,assetPath,kind);
+  await assert.rejects(readRunBundle({assetPath,stagingPath}),{code:'invalid_bundle'});
+  await assert.rejects(fs.stat(stagingPath),{code:'ENOENT'});
+});
+
+for(const kind of ['python-stored','python-deflated','descriptor-values','osx-regular'])test(`preserves valid ${kind} ZIP bytes`,async t=>{
+  const f=await fixture(t),baseline=path.join(f.root,'baseline.zip'),assetPath=path.join(f.root,`${kind}.zip`),stagingPath=path.join(f.root,'stage');
+  await writeRunBundle({runPath:f.runPath,sidecar:f.sidecar,destPath:baseline});
+  if(kind.startsWith('python-'))repackPythonZip(baseline,assetPath,kind.slice(7));
+  else mutateZip(baseline,assetPath,kind);
+  const restored=await readRunBundle({assetPath,stagingPath});
+  assert.deepEqual(restored.sidecar,f.sidecar);
+  for(const name of RUN_FILES)assert.deepEqual(await fs.readFile(path.join(restored.runPath,name)),bytesFor(name));
 });
 
 test('rejects duplicate, unsafe, aliased, unknown, directory, and non-file ZIP entries', async t => {

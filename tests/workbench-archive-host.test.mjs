@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { startWorkbench } from '../workbench/server.mjs';
+import { mutateZip } from './helpers/zip-mutations.mjs';
 
 function client(app) {
   const headers={authorization:`Bearer ${app.token}`,'content-type':'application/json'};
@@ -23,6 +24,18 @@ async function makeBundle(app,c) {
   const exported=await fetch(`${app.origin}/api/bundles/${packed.output.bundle_asset_id}/export`,{headers:c.headers});assert.equal(exported.status,200);
   return {revision,report,bundle:Buffer.from(await exported.arrayBuffer()),bundle_asset_id:packed.output.bundle_asset_id,example};
 }
+
+for(const kind of ['local-path','local-encrypted','local-flags','local-compression','osx-symlink','osx-special'])test(`HTTP restore rejects ${kind} and preserves every published entry and owned directory`,async t=>{
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'moonreconcile-header-http-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+  const app=await startWorkbench();t.after(()=>app.close());const c=client(app),saved=await makeBundle(app,c);
+  const baseline=path.join(root,'baseline.zip'),malformed=path.join(root,`${kind}.zip`);await fs.writeFile(baseline,saved.bundle);mutateZip(baseline,malformed,kind);
+  const asset=await c.upload('run',await fs.readFile(malformed),`${kind}.zip`);
+  const snapshot=async()=>structuredClone({assets:[...app.session.assets.entries()],imports:[...app.session.imports.entries()],revisions:[...app.session.revisions.entries()],bindings:[...app.session.bindings.entries()],heads:[...app.session.heads.entries()],directories:(await fs.readdir(app.session.root)).sort()});
+  const before=await snapshot(),failed=await c.job('/api/restores',{asset_id:asset.asset_id});
+  assert.equal(failed.state,'failed',JSON.stringify(failed.error));assert.equal(failed.error.code,'invalid_bundle');assert.equal(failed.output,null);assert.equal(app.jobs.active,null);
+  assert.deepEqual(await snapshot(),before);
+  assert.deepEqual(await fs.readFile(path.join(app.session.getRevision(saved.revision.revision_id).path,'report.json')),saved.report);
+});
 
 test('bundle export, reset, upload, CLI replay restore, and fresh local registration are atomic',async t=>{
   const app=await startWorkbench();t.after(()=>app.close());const c=client(app),saved=await makeBundle(app,c),oldIds={revision:saved.revision.revision_id,left:saved.revision.left_import_id,right:saved.revision.right_import_id,config:saved.revision.config_asset_id};

@@ -51,7 +51,7 @@ function archiveError(message='Invalid or damaged ZIP bundle') {return failure('
 function entryType(entry) {
   const creator=(entry.versionMadeBy>>>8)&0xff, mode=(entry.externalFileAttributes>>>16)&0xffff;
   if(entry.fileName.endsWith('/')||(entry.externalFileAttributes&0x10)!==0)throw archiveError('Directory entries are not allowed');
-  if(creator===3) {
+  if(creator===3||creator===19) {
     const type=mode&0o170000;
     if(type!==0&&type!==0o100000)throw archiveError('Non-regular files are not allowed');
   }
@@ -81,7 +81,17 @@ async function streamEntry(zip,entry,dest,limits,totals,expectedCrc) {
   const cap=entryLimit(entry.fileName,limits);
   if(!Number.isSafeInteger(entry.uncompressedSize)||entry.uncompressedSize<0||entry.uncompressedSize>cap)throw failure('quota_exceeded','ZIP entry uncompressed byte limit exceeded',413,'restoring');
   let input;
-  try{input=await zip.openReadStreamPromise(entry);}catch(error){throw archiveError(error.message);}
+  try {
+    // openReadStream only reads a minimal local header. Check its full metadata
+    // before trusting the central directory to choose names and decode bytes.
+    const local=await zip.readLocalFileHeaderPromise(entry);
+    if(local.generalPurposeBitFlag&0x41)throw archiveError('Encrypted ZIP entries are not supported');
+    if(!local.fileName.equals(entry.fileNameRaw)||local.generalPurposeBitFlag!==entry.generalPurposeBitFlag||local.compressionMethod!==entry.compressionMethod)throw archiveError('ZIP local and central metadata disagree');
+    // Bit 3 permits local CRC/size placeholders; streamed bytes and CRC below
+    // still verify the authoritative central values for descriptor entries.
+    if(!(local.generalPurposeBitFlag&0x8)&&(local.crc32!==entry.crc32||local.compressedSize!==entry.compressedSize||local.uncompressedSize!==entry.uncompressedSize))throw archiveError('ZIP local and central sizes or CRC disagree');
+    input=await zip.openReadStreamPromise(entry);
+  } catch(error){throw archiveError(error.message);}
   const file=await fs.open(dest,'wx',0o600);
   const hash=createHash('sha256');let actual=0,crc=0;
   try {
