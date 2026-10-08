@@ -223,8 +223,13 @@ async function main() {
   await copyTree(path.join(ROOT, 'docs/limitations.md'), path.join(OUTPUT, 'docs/limitations.md'));
   await copyTree(path.join(ROOT, 'docs/workbench.md'), path.join(OUTPUT, 'docs/workbench.md'));
   await copyTree(path.join(ROOT, 'LICENSE'), path.join(OUTPUT, 'LICENSE'));
-  await copyTree(path.join(ROOT, 'docs/workbench-start-here.md'), path.join(OUTPUT, 'START-HERE.md'));
-  await copyTree(path.join(ROOT, 'docs/workbench-start-here.md'), path.join(OUTPUT, 'README.md'));
+  const sourceStartGuide = await fs.readFile(path.join(ROOT, 'docs/workbench-start-here.md'), 'utf8');
+  const packagedStartGuide = sourceStartGuide
+    .replace('](workbench.md)', '](docs/workbench.md)')
+    .replace('](../cli/main.mjs)', '](cli/main.mjs)')
+    .replace('](limitations.md)', '](docs/limitations.md)');
+  await fs.writeFile(path.join(OUTPUT, 'START-HERE.md'), packagedStartGuide);
+  await fs.writeFile(path.join(OUTPUT, 'README.md'), packagedStartGuide);
 
   const install = spawnSync('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], {
     cwd: OUTPUT, encoding: 'utf8', stdio: 'inherit',

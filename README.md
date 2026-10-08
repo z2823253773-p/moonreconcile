@@ -22,7 +22,7 @@ Download and extract `moonreconcile-workbench-0.2.0.zip`, then run this command 
 node workbench/start.mjs
 ```
 
-Open the printed `127.0.0.1` URL in a browser on the same computer. The workbench binds only to loopback and does not open a browser automatically. Press `Ctrl+C` in the terminal to stop it and clean its owned temporary session. See [the start guide](START-HERE.md) and [workbench scope and limits](docs/workbench.md).
+Open the printed `127.0.0.1` URL in a browser on the same computer. The workbench binds only to loopback and does not open a browser automatically. Press `Ctrl+C` in the terminal to stop it and clean its owned temporary session. See [the start guide](docs/workbench-start-here.md) and [workbench scope and limits](docs/workbench.md).
 
 ## Build and develop from source
 

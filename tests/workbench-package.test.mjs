@@ -156,6 +156,19 @@ test('package_contains_only_runtime_deps_and_licenses', async () => {
   assert.doesNotMatch(await readFile(path.join(packageRoot, 'START-HERE.md'), 'utf8'), /\/Users\/|node_modules\/|_build/);
 });
 
+test('workbench_start_guide_links_resolve_in_checkout_and_package', async () => {
+  const rootReadme = await readFile(path.join(root, 'README.md'), 'utf8');
+  const startLinks = [...rootReadme.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]).filter((href) => !/^https?:/.test(href));
+  for (const href of startLinks) await readFile(path.resolve(root, href));
+
+  const sourceGuide = await readFile(path.join(root, 'docs/workbench-start-here.md'), 'utf8');
+  const packageGuide = await readFile(path.join(packageRoot, 'START-HERE.md'), 'utf8');
+  for (const [text, base] of [[sourceGuide, path.join(root, 'docs')], [packageGuide, packageRoot]]) {
+    const links = [...text.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]);
+    for (const href of links) await readFile(path.resolve(base, href));
+  }
+});
+
 test('runtime rejects Node versions below 22 clearly', async () => {
   assert.throws(() => assertSupportedNodeVersion('21.99.0'), /Node\.js 22 or newer/);
   assert.doesNotThrow(() => assertSupportedNodeVersion('22.0.0'));

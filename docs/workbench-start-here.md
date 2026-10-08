@@ -17,4 +17,4 @@
 
 浏览器关闭或终端异常退出后，系统临时目录中可能留下以 `moonreconcile-` 开头的本次会话目录。删除前先确认没有仍在运行的工作台进程，并确认目录中 `.owner` 标记属于本次遗留会话。不要删除其他程序的临时目录。
 
-进一步说明见 [工作台使用与范围](docs/workbench.md)、[命令行帮助](cli/main.mjs) 与 [限制记录](docs/limitations.md)。
+进一步说明见 [工作台使用与范围](workbench.md)、[命令行帮助](../cli/main.mjs) 与 [限制记录](limitations.md)。
