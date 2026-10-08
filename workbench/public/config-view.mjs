@@ -1,4 +1,4 @@
-import { configToForm, formToConfig } from './config-model.mjs';
+import { configToForm, formToConfig, encodeString, decodeString, encodeStringList, decodeStringList } from './config-model.mjs';
 import { button, element, label, optionList } from './dom.mjs';
 
 const TYPES = [['', '请选择类型'], ['text', '文本'], ['decimal', '金额/小数'], ['date', '日期']];
@@ -25,7 +25,40 @@ function rowEditor({ title, rows, renderRow, add, page, setPage, root }) {
 export function renderConfigView({ root, store, api }) {
   let model = null, fieldPage = 0, candidatePage = 0, leftMapPage = {}, rightMapPage = {}, missingPages = {}, editGeneration = 0;
   let busy = false, activeJob = null, sourceHeaders = { left: [], right: [] };
-  let validationNote = null, exportButton = null;
+  let validationNote = null, exportButton = null, saveButton = null, editingNotice = null;
+  const textEdits = new Map();
+  const removeListRow = (rows, index) => {
+    const entries = textEdits.get(rows);
+    if (entries) {
+      const shifted = new Map();
+      for (const [key, entry] of entries) if (key !== index) shifted.set(key > index ? key - 1 : key, entry);
+      textEdits.delete(rows);
+      if (shifted.size) textEdits.set(rows, shifted);
+    }
+    rows.splice(index, 1);
+  };
+  const hasTextErrors = () => [...textEdits.values()].some((entries) => [...entries.values()].some((entry) => entry.error));
+  const syncTextErrors = () => {
+    if (editingNotice) { editingNotice.hidden = !hasTextErrors(); editingNotice.textContent = hasTextErrors() ? '转义文本不完整或无效；修正后才能校验保存。已输入的文本保留在对应控件。' : ''; }
+    if (saveButton) saveButton.disabled = busy || Boolean(store.get().active_job) || hasTextErrors();
+  };
+  const stringEditor = (target, key, { list = false, placeholder = '' } = {}) => {
+    const saved = textEdits.get(target)?.get(key);
+    const node = list ? area(saved?.text ?? encodeStringList(target[key])) : textInput(saved?.text ?? encodeString(target[key]), { placeholder });
+    node.addEventListener('input', () => {
+      let entries = textEdits.get(target); if (!entries) { entries = new Map(); textEdits.set(target, entries); }
+      try {
+        target[key] = list ? decodeStringList(node.value) : decodeString(node.value);
+        entries.delete(key); updateDraft();
+      } catch (error) {
+        entries.set(key, { text: node.value, error: error.message });
+        editGeneration++; store.invalidateRules({ error: null });
+      }
+      syncTextErrors();
+    });
+    return node;
+  };
+  const openGroups = { fields: true, candidates: false };
   const captureContext = () => ({ generation: store.generation(), left: store.get().left_import_id, right: store.get().right_import_id, edit: editGeneration });
   const contextMatches = (context) => context.generation === store.generation() && context.left === store.get().left_import_id && context.right === store.get().right_import_id && context.edit === editGeneration;
   const staleMessage = () => `规则或来源已变化，当前结果为旧版本。${store.get().config_asset_id && !store.get().draft_dirty ? '当前规则已校验，可运行新比较更新结果。' : '校验当前规则后运行新比较。'}`;
@@ -74,6 +107,7 @@ export function renderConfigView({ root, store, api }) {
   const invalidateRules = () => { if (model) updateDraft(); };
   const render = () => {
     sourceHeaders={left:store.get().left_headers??[],right:store.get().right_headers??[]};
+    for (const details of root.querySelectorAll('details')) if (details.attrs?.['data-config-group'] || details.dataset?.configGroup) openGroups[details.attrs?.['data-config-group'] ?? details.dataset.configGroup] = details.open;
     root.replaceChildren();
     root.append(element('h2', { text: '核对规则' }));
     if (store.get().stale) root.append(element('p', { className: 'notice warning stale-notice', role: 'status', text: staleMessage() }));
@@ -114,14 +148,17 @@ export function renderConfigView({ root, store, api }) {
     controls.append(label('导入配置 JSON', configFile), exportButton);
     root.append(controls);
     if (!model) { root.append(element('p', { text: '导入左右文件后，可以从空白列草稿开始，也可以编辑后导入 Config v1 配置。所有字段类型都需明确选择。' })); return; }
-    const global = element('details', { open: true, className: 'config-group' }); global.append(element('summary', { text: '字段、主键与忽略列' }));
+    root.append(element('p', { className: 'notice', text: '字符串使用转义文本模式：换行 \\n、回车 \\r、制表 \\t、反斜杠 \\\\、控制字符 \\uXXXX；普通文字直接输入。列表每行一项，空行不计项，\\e 表示空字符串。来源下拉框保留完整原值。' }));
+    editingNotice = element('p', { className: 'notice error', role: 'alert', hidden: true }); root.append(editingNotice);
+    const global = element('details', { open: openGroups.fields, 'data-config-group': 'fields', className: 'config-group' }); global.append(element('summary', { text: '字段、主键与忽略列' }));
     global.append(rowEditor({ title: '逻辑字段', rows: model.fields, page: fieldPage, setPage: (n) => fieldPage = n, root: render, add: () => {model.fields.push({ name: '', left: '', right: '', type: '', compare: true, trim_ascii: false, lower_ascii: false, left_values: [], right_values: [], missing: [], both_missing: 'equal', abs_tol: '0', rel_tol: '0', days_tol: 0 });invalidateRules();}, renderRow: (field, index) => {
       const card = element('article', { className: 'field-card' }); card.append(element('h3', { text: `字段 ${index + 1}: ${field.name || '未命名'}` }));
       const grid = element('div', { className: 'form-grid' });
       for (const key of ['name', 'left', 'right']) {
         const src = key === 'left' ? sourceHeaders.left : key === 'right' ? sourceHeaders.right : [];
-        const control = src.length ? select([['', '请选择来源列'], ...src.map((value) => [value, value])], field[key]) : textInput(field[key], { placeholder: key === 'name' ? '逻辑字段名' : '导入后可从表头选择，也可输入列名' });
-        grid.append(inputFor(field, control, key));
+        const values = field[key] && !src.includes(field[key]) ? [...src, field[key]] : src;
+        const control = src.length ? select([['', '请选择来源列'], ...values.map((value) => [value, encodeString(value)])], field[key]) : stringEditor(field, key, { placeholder: key === 'name' ? '逻辑字段名' : '来源列名（转义文本）' });
+        grid.append(src.length ? inputFor(field, control, key) : label(FIELD_LABELS[key], control));
       }
       const typeControl = select(TYPES, field.type); typeControl.addEventListener('change', () => { field.type = typeControl.value; updateDraft(); }); grid.append(label('类型（必选）', typeControl));
       const toggles = element('div', { className: 'check-row' });
@@ -133,27 +170,28 @@ export function renderConfigView({ root, store, api }) {
       for (const [key, caption] of [['left_values', '左侧值映射'], ['right_values', '右侧值映射']]) {
         const mapRows=field[key]; const pageKey=`${index}:${key}`; const pages=key==='left_values'?leftMapPage:rightMapPage;
         card.append(rowEditor({ title: caption, rows: mapRows, page: pages[pageKey] ?? 0, setPage: (n)=>pages[pageKey]=n, root: render, add: ()=>{mapRows.push({key:'',value:''});invalidateRules();}, renderRow: (entry, mapIndex) => {
-          const row=element('div',{className:'map-row'});const k=textInput(entry.key),v=textInput(entry.value);k.addEventListener('input',()=>{entry.key=k.value;updateDraft();});v.addEventListener('input',()=>{entry.value=v.value;updateDraft();});row.append(label('原值',k),label('映射为',v),button('删除映射',()=>{mapRows.splice(mapIndex,1);pages[pageKey]=Math.min(pages[pageKey]??0,Math.max(0,Math.ceil(mapRows.length/pageSize)-1));invalidateRules();render();},{className:'danger'}));return row;
+          const row=element('div',{className:'map-row'});const k=stringEditor(entry,'key'),v=stringEditor(entry,'value');row.append(label('原值',k),label('映射为',v),button('删除映射',()=>{textEdits.delete(mapRows[mapIndex]);mapRows.splice(mapIndex,1);pages[pageKey]=Math.min(pages[pageKey]??0,Math.max(0,Math.ceil(mapRows.length/pageSize)-1));invalidateRules();render();},{className:'danger'}));return row;
         }}));
       }
-      card.append(rowEditor({title:'缺失标记（空值也可作为一项）',rows:field.missing,page:missingPages[index]??0,setPage:(n)=>missingPages[index]=n,root:render,add:()=>{field.missing.push('');invalidateRules();},renderRow:(value,missingIndex)=>{const row=element('div',{className:'map-row'}),entry=textInput(value);entry.addEventListener('input',()=>{field.missing[missingIndex]=entry.value;updateDraft();});row.append(label('缺失标记值',entry),button('删除缺失标记',()=>{field.missing.splice(missingIndex,1);missingPages[index]=Math.min(missingPages[index]??0,Math.max(0,Math.ceil(field.missing.length/pageSize)-1));invalidateRules();render();},{className:'danger'}));return row;}}));
-      card.append(button('删除字段',()=>{model.fields.splice(index,1);fieldPage=Math.min(fieldPage,Math.max(0,Math.ceil(model.fields.length/pageSize)-1));resetMapPages();invalidateRules();render();},{className:'danger'}));
+      card.append(rowEditor({title:'缺失标记（空值也可作为一项）',rows:field.missing,page:missingPages[index]??0,setPage:(n)=>missingPages[index]=n,root:render,add:()=>{field.missing.push('');invalidateRules();},renderRow:(value,missingIndex)=>{const row=element('div',{className:'map-row'}),entry=stringEditor(field.missing,missingIndex);row.append(label('缺失标记值',entry),button('删除缺失标记',()=>{removeListRow(field.missing,missingIndex);missingPages[index]=Math.min(missingPages[index]??0,Math.max(0,Math.ceil(field.missing.length/pageSize)-1));invalidateRules();render();},{className:'danger'}));return row;}}));
+      card.append(button('删除字段',()=>{const removed=model.fields[index];for(const target of [removed,removed.missing,...removed.left_values,...removed.right_values])textEdits.delete(target);model.fields.splice(index,1);fieldPage=Math.min(fieldPage,Math.max(0,Math.ceil(model.fields.length/pageSize)-1));resetMapPages();invalidateRules();render();},{className:'danger'}));
       return card;
     }}));
-    for (const [key, title] of [['key','主键字段（每行一项）'],['ignore_left','忽略左侧列（每行一项）'],['ignore_right','忽略右侧列（每行一项）']]) { const input=area(model[key].join('\n'));input.addEventListener('input',()=>{model[key]=input.value.split('\n').filter((value)=>value!=='');updateDraft();});global.append(label(title,input)); }
+    for (const [key, title] of [['key','主键字段（每行一项）'],['ignore_left','忽略左侧列（每行一项）'],['ignore_right','忽略右侧列（每行一项）']]) { const input=stringEditor(model,key,{list:true});global.append(label(title,input)); }
     root.append(global);
     unmappedSection = element('section', { className: 'notice validation-summary', hidden: true });
     root.append(unmappedSection);
-    const candidates = element('details', { className: 'config-group' }); candidates.append(element('summary', { text: '候选匹配（可选）' }));
-    const candidateOn=checkbox(model.candidates!==null);candidateOn.addEventListener('change',()=>{model.candidates=candidateOn.checked?{fields:[],threshold:1,blocking:[]}:null;candidatePage=0;invalidateRules();render();});candidates.append(label('启用候选规则',candidateOn));
+    const candidates = element('details', { open: openGroups.candidates, 'data-config-group': 'candidates', className: 'config-group' }); candidates.append(element('summary', { text: '候选匹配（可选）' }));
+    const candidateOn=checkbox(model.candidates!==null);candidateOn.addEventListener('change',()=>{if(model.candidates)for(const target of [model.candidates.blocking,...model.candidates.fields])textEdits.delete(target);model.candidates=candidateOn.checked?{fields:[],threshold:1,blocking:[]}:null;candidatePage=0;invalidateRules();render();});candidates.append(label('启用候选规则',candidateOn));
     if (model.candidates) {
       const c=model.candidates,threshold=textInput(String(c.threshold));threshold.inputMode='numeric';threshold.pattern='[0-9]+';threshold.addEventListener('input',()=>{c.threshold=threshold.value===''?'':(/^[0-9]+$/.test(threshold.value)?Number(threshold.value):threshold.value);updateDraft();});candidates.append(label('候选阈值（1–10000 严格整数）',threshold));
-      candidates.append(rowEditor({title:'候选评分字段',rows:c.fields,page:candidatePage,setPage:(n)=>candidatePage=n,root:render,add:()=>{c.fields.push({field:'',metric:'',weight:1});invalidateRules();},renderRow:(item,index)=>{const row=element('div',{className:'form-grid'});const field=textInput(item.field);field.addEventListener('input',()=>{item.field=field.value;updateDraft();});const metric=select(METRICS,item.metric);metric.addEventListener('change',()=>{item.metric=metric.value;updateDraft();});const weight=textInput(String(item.weight));weight.inputMode='numeric';weight.pattern='[0-9]+';weight.addEventListener('input',()=>{item.weight=weight.value===''?'':(/^[0-9]+$/.test(weight.value)?Number(weight.value):weight.value);updateDraft();});row.append(label('评分逻辑字段',field),label('指标',metric),label('权重（1–10000 严格整数）',weight),button('删除评分字段',()=>{c.fields.splice(index,1);candidatePage=Math.min(candidatePage,Math.max(0,Math.ceil(c.fields.length/pageSize)-1));invalidateRules();render();},{className:'danger'}));return row;}}));
-      const blocking=element('section',{className:'editor-block'});blocking.append(element('h4',{text:'Blocking 分组（组间 OR，组内 AND）'}));c.blocking.forEach((group,index)=>{const row=element('div',{className:'map-row'}),g=area(group.join('\n'));g.addEventListener('input',()=>{c.blocking[index]=g.value.split('\n');updateDraft();});row.append(label(`分组 ${index+1} 字段`,g),button('删除分组',()=>{c.blocking.splice(index,1);invalidateRules();render();},{className:'danger'}));blocking.append(row);});blocking.append(button('添加 Blocking 分组',()=>{c.blocking.push([]);invalidateRules();render();},{className:'secondary'}));candidates.append(blocking);
+      candidates.append(rowEditor({title:'候选评分字段',rows:c.fields,page:candidatePage,setPage:(n)=>candidatePage=n,root:render,add:()=>{c.fields.push({field:'',metric:'',weight:1});invalidateRules();},renderRow:(item,index)=>{const row=element('div',{className:'form-grid'});const field=stringEditor(item,'field');const metric=select(METRICS,item.metric);metric.addEventListener('change',()=>{item.metric=metric.value;updateDraft();});const weight=textInput(String(item.weight));weight.inputMode='numeric';weight.pattern='[0-9]+';weight.addEventListener('input',()=>{item.weight=weight.value===''?'':(/^[0-9]+$/.test(weight.value)?Number(weight.value):weight.value);updateDraft();});row.append(label('评分逻辑字段',field),label('指标',metric),label('权重（1–10000 严格整数）',weight),button('删除评分字段',()=>{textEdits.delete(c.fields[index]);c.fields.splice(index,1);candidatePage=Math.min(candidatePage,Math.max(0,Math.ceil(c.fields.length/pageSize)-1));invalidateRules();render();},{className:'danger'}));return row;}}));
+      const blocking=element('section',{className:'editor-block'});blocking.append(element('h4',{text:'Blocking 分组（组间 OR，组内 AND）'}));c.blocking.forEach((group,index)=>{const row=element('div',{className:'map-row'}),g=stringEditor(c.blocking,index,{list:true});row.append(label(`分组 ${index+1} 字段`,g),button('删除分组',()=>{removeListRow(c.blocking,index);invalidateRules();render();},{className:'danger'}));blocking.append(row);});blocking.append(button('添加 Blocking 分组',()=>{c.blocking.push([]);invalidateRules();render();},{className:'secondary'}));candidates.append(blocking);
     }
     root.append(candidates);
     const actions=element('div',{className:'toolbar'});
-    actions.append(button(busy?'处理中…':'校验并保存规则',async()=>{
+    saveButton=button(busy?'处理中…':'校验并保存规则',async()=>{
+      if (hasTextErrors()) { syncTextErrors(); return; }
       const current=store.get();if(!current.left_import_id||!current.right_import_id){store.update({error:'请先导入左右 CSV。'});render();return;}
       let config;try{config=formToConfig(model);}catch(error){store.update({error:error.message});render();return;}
         if(busy||store.get().active_job)return;
@@ -168,7 +206,7 @@ export function renderConfigView({ root, store, api }) {
         store.update({config:normalized,config_asset_id:out.config_asset_id,draft_dirty:false,error:null});render();
       } catch(error) {store.update({error:taskErrorText(error)});render(); /* error remains visible */}
       finally{busy=false;store.update({active_job:null});render();}
-    },{disabled:globallyBusy||!model}));
+    },{disabled:globallyBusy||!model||hasTextErrors()}); actions.append(saveButton); syncTextErrors();
     if (activeJob) actions.append(button('取消当前任务',async()=>{try{await api.request(`/api/jobs/${activeJob}`,{method:'DELETE'});}catch(error){store.update({error:error.message});render();}},{className:'danger'}));
     root.append(actions);
     validationNote=element('section',{className:'notice success validation-summary',role:'status',hidden:true});
@@ -189,14 +227,14 @@ export function renderConfigView({ root, store, api }) {
     syncBindingPresentation();
   };
   function resetMapPages(){leftMapPage={};rightMapPage={};missingPages={};}
-  function resetPages(){fieldPage=0;candidatePage=0;resetMapPages();}
+  function resetPages({keepTextEdits=false}={}){fieldPage=0;candidatePage=0;resetMapPages();if(!keepTextEdits)textEdits.clear();}
   let lastLeft=store.get().left_import_id,lastRight=store.get().right_import_id,lastConfig=store.get().config,lastStale=store.get().stale,lastAsset=store.get().config_asset_id,lastDraft=store.get().draft_dirty,lastJob=store.get().active_job;
   const syncStaleNotice=()=>{const existing=root.querySelector('.stale-notice');if(store.get().stale&&!existing){root.querySelector('h2')?.after(element('p',{className:'notice warning stale-notice',role:'status',text:staleMessage()}));}else if(store.get().stale&&existing)existing.textContent=staleMessage();else if(!store.get().stale)existing?.remove();};
   const dispose = store.subscribe((next) => {
     const sourceChanged=next.left_import_id!==lastLeft||next.right_import_id!==lastRight;
     const configChanged=next.config!==lastConfig;
     const bindingChanged=next.config_asset_id!==lastAsset||next.draft_dirty!==lastDraft;
-    if(sourceChanged){lastLeft=next.left_import_id;lastRight=next.right_import_id;resetPages();if(configChanged)model=next.config?configToForm(next.config):null;render();}
+    if(sourceChanged){lastLeft=next.left_import_id;lastRight=next.right_import_id;resetPages({keepTextEdits:!configChanged});if(configChanged)model=next.config?configToForm(next.config):null;render();}
     else if(lastStale!==next.stale)syncStaleNotice();
     if(configChanged){
       if(next.config_asset_id&&!next.draft_dirty){model=next.config?configToForm(next.config):null;resetPages();render();}

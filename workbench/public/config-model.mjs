@@ -63,3 +63,15 @@ export function formToConfig(model) {
   };
   return output;
 }
+
+
+// JSON string contents without enclosing quotes: ordinary text stays readable,
+// while native input/textarea normalization never touches actual control bytes.
+export const encodeString = (value) => JSON.stringify(String(value)).slice(1, -1)
+  .replace(/[\u007f-\u009f\u2028\u2029]/g, (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`);
+export function decodeString(text) {
+  try { return JSON.parse(`"${text}"`); }
+  catch { throw new TypeError('转义文本不完整或无效，请使用 \\\\、\\n、\\r、\\t 或 \\uXXXX。'); }
+}
+export const encodeStringList = (items) => items.map((item) => item === '' ? '\\e' : encodeString(item)).join('\n');
+export const decodeStringList = (text) => text.split('\n').filter((line) => line !== '').map((line) => line === '\\e' ? '' : decodeString(line));

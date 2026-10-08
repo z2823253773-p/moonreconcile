@@ -102,3 +102,15 @@ test("inspect_csv production response stays within the UTF-8 JSON budget", () =>
   assert.equal(result.preview.next_offset, result.preview.rows.length);
   assert.equal(result.preview.has_more, true);
 });
+
+// The message must identify the rejected property, alongside the unchanged DTO.
+test('inspect integer diagnostics name the actual property', () => {
+  for (const [key,value,fragment] of [['offset',-1,'out of range'],['offset',0.5,'must be an integer'],['limit','x','must be an integer']]) {
+    const result=page('id\n1\n',{[key]:value});
+    assert.equal(result.error.field,key);
+    assert.equal(result.error.code,'invalid_request');
+    assert.equal(result.error.record,null);
+    assert.ok(result.error.message.includes(`'${key}'`));
+    assert.ok(result.error.message.includes(fragment));
+  }
+});

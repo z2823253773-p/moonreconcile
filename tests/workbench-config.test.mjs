@@ -79,6 +79,7 @@ test('static app is fixed-whitelist and imports expose safe asset metadata', asy
   const app=await startWorkbench();t.after(()=>app.close());
   const root=await fetch(app.origin+'/');assert.equal(root.status,200);assert.match(await root.text(),/public\/app\.mjs/);
   const script=await fetch(app.origin+'/public/config-model.mjs');assert.equal(script.status,200);assert.match(script.headers.get('content-type'),/javascript/);
+  assert.equal((await fetch(app.origin+'/public/idle-reminder.mjs')).status,200);
   assert.equal((await fetch(app.origin+'/public/unknown.mjs')).status,404);
   const auth={authorization:`Bearer ${app.token}`,'content-type':'application/json'};
   const upload=await fetch(app.origin+'/api/assets?kind=csv',{method:'POST',headers:{authorization:`Bearer ${app.token}`,'content-type':'application/octet-stream','x-filename':encodeURIComponent('左侧.csv')},body:'id\n1\n'});
@@ -104,4 +105,15 @@ test('edits stale old revisions, recheck keeps stale, and only compare clears it
   store.update({config:{fields:[]},config_asset_id:'cfg-a',draft_dirty:false});assert.equal(store.get().stale,true);assert.equal(store.get().config_asset_id,'cfg-a');
   store.update({revision:{revision_id:'rev-a'},stale:false,pending_decisions:[{action:'accept'}]});assert.equal(store.get().stale,false);
   store.update({left_import_id:'left-b'});assert.equal(store.get().stale,true);assert.equal(store.get().revision.revision_id,'rev-a');assert.equal(store.get().config_asset_id,null);assert.deepEqual(store.get().pending_decisions,[]);
+});
+
+test('escaped Config string editors are reversible including empty list entries and control bytes',async()=>{
+  const {encodeString,decodeString,encodeStringList,decodeStringList}=await import('../workbench/public/config-model.mjs');
+  for(const [value,want] of [['simple','simple'],['LF\nCR\rCRLF\r\n','LF\\nCR\\rCRLF\\r\\n'],['literal\\n','literal\\\\n'],['\t\u0000\u007f\u0085\u2028','\\t\\u0000\\u007f\\u0085\\u2028'],['"','\\"'],['','']]){
+    assert.equal(encodeString(value),want);assert.equal(decodeString(want),value);
+  }
+  for(const [items,want] of [[[],''],[[''],'\\e'],[['','literal\\e','a\r\nb'],'\\e\nliteral\\\\e\na\\r\\nb']]){
+    assert.equal(encodeStringList(items),want);assert.deepEqual(decodeStringList(want),items);
+  }
+  for(const invalid of ['unfinished\\','\\x','raw"quote','\\u00'])assert.throws(()=>decodeString(invalid),/转义/);
 });

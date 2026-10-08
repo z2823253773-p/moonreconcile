@@ -48,7 +48,7 @@ fn inspect_required_int(
         Err(
           request_error(
             "invalid_request",
-            "request property '{key}' is out of range",
+            "request property '\{key}' is out of range",
             Some(key),
           ),
         )
@@ -58,7 +58,7 @@ fn inspect_required_int(
           Err(
             request_error(
               "invalid_request",
-              "request property '{key}' must be an integer",
+              "request property '\{key}' must be an integer",
               Some(key),
             ),
           )
@@ -70,7 +70,7 @@ fn inspect_required_int(
       Err(
         request_error(
           "invalid_request",
-          "request property '{key}' must be an integer",
+          "request property '\{key}' must be an integer",
           Some(key),
         ),
       )

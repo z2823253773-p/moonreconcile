@@ -24,7 +24,7 @@ class FakeNode {
 }
 
 function walk(root) { return [root,...root.children.flatMap(walk)]; }
-function makeDocument() { const body=new FakeNode('body');return {body,createElement:(tag)=>new FakeNode(tag),createTextNode:(text)=>{const node=new FakeNode('#text');node.textContent=text;return node;}}; }
+function makeDocument() { const body=new FakeNode('body'),events=new EventTarget();globalThis.window=new EventTarget();return {body,addEventListener:events.addEventListener.bind(events),removeEventListener:events.removeEventListener.bind(events),createElement:(tag)=>new FakeNode(tag),createTextNode:(text)=>{const node=new FakeNode('#text');node.textContent=text;return node;}}; }
 function buttonBy(root,text) { const node=walk(root).find((item)=>item.tag==='button'&&item.textContent===text);assert.ok(node,`button ${text} exists`);return node; }
 function inputByLabel(root,text) { const node=walk(root).find((item)=>item.tag==='label'&&item.textContent.startsWith(text));assert.ok(node,`label ${text} exists`);return node.children.find((item)=>['input','textarea','select'].includes(item.tag)); }
 function configWith({mappingCount=0,candidates=0}={}) {
@@ -86,7 +86,7 @@ test('validated rules list unmapped columns and transformations, then hide bindi
   dispose();
 });
 
-test('late compare and summary responses cannot clear stale edits', async () => {
+test('late compare and summary responses cannot clear stale edits', async (t) => {
   const document=makeDocument();globalThis.document=document;const appRoot=new FakeNode('main');document.querySelector=()=>appRoot;
   globalThis.location={origin:'http://127.0.0.1:7777',hash:'#token=ui-test',pathname:'/',search:''};globalThis.history={replaceState(){}};
   let compareNumber=0,releaseCompare,releaseSummary;const jobRequests=new Map();
@@ -112,7 +112,7 @@ test('late compare and summary responses cannot clear stale edits', async () => 
     }
     throw new Error(`Unexpected request ${path}`);
   };
-  await import('../workbench/public/app.mjs?race-test');
+  const appWindow=window;t.after(()=>appWindow.dispatchEvent(new Event('pagehide')));await import('../workbench/public/app.mjs?race-test');
   await buttonBy(appRoot,'载入合成 orders 示例').fire('click');
   await waitFor(()=>walk(appRoot).some((node)=>node.textContent.includes('id')));
   await buttonBy(appRoot,'运行核心比较').fire('click');
@@ -459,7 +459,7 @@ test('ZIP export owns the shared lock through download and reports pending draft
   await waitFor(()=>root.textContent.includes('ZIP 导出失败'));assert.equal(store.get().active_job,null);assert.match(root.textContent,/CSV 逻辑记录（含表头） 3/);assert.match(root.textContent,/字段 action/);dispose();assert.equal(root.children.length,0);
 });
 
-test('cancelled compare restores the previous visible summary and keeps its download revision',async()=>{
+test('cancelled compare restores the previous visible summary and keeps its download revision',async(t)=>{
   const document=makeDocument();globalThis.document=document;const appRoot=new FakeNode('main');document.querySelector=()=>appRoot;globalThis.location={origin:'http://127.0.0.1:7777',hash:'#token=cancel-test',pathname:'/',search:''};globalThis.history={replaceState(){}};
   const preview={headers:['id'],row_count:1,column_count:1,rows:[],offset:0,next_offset:1,has_more:false},config=JSON.parse(invoke(JSON.stringify({op:'check_config',config:{schema_version:1,fields:[{name:'id',left:'id',right:'id',type:'text'}],key:['id']}}))).config;
   const revision={revision_id:'prior-visible',exit_code:0,left_import_id:'left',right_import_id:'right',config_asset_id:'cfg'};let comparisons=0;const jobs=new Map(),ok=body=>new Response(JSON.stringify({ok:true,...body}),{status:200});
@@ -475,7 +475,7 @@ test('cancelled compare restores the previous visible summary and keeps its down
     if(route.startsWith('/api/runs/prior-visible/'))return ok({items:[],total:0,next_offset:0,has_more:false});
     throw Error(`Unexpected ${route} ${options.method}`);
   };
-  await import('../workbench/public/app.mjs?cancel-summary-regression');await buttonBy(appRoot,'载入合成 orders 示例').fire('click');await waitFor(()=>!buttonBy(appRoot,'运行核心比较').disabled);await buttonBy(appRoot,'运行核心比较').fire('click');await waitFor(()=>Boolean(appRoot.querySelector('.result-summary')));
+  const appWindow=window;t.after(()=>appWindow.dispatchEvent(new Event('pagehide')));await import('../workbench/public/app.mjs?cancel-summary-regression');await buttonBy(appRoot,'载入合成 orders 示例').fire('click');await waitFor(()=>!buttonBy(appRoot,'运行核心比较').disabled);await buttonBy(appRoot,'运行核心比较').fire('click');await waitFor(()=>Boolean(appRoot.querySelector('.result-summary')));
   await buttonBy(appRoot,'运行核心比较').fire('click');await waitFor(()=>appRoot.textContent.includes('任务已取消'));assert.ok(appRoot.querySelector('.result-summary'),'the prior summary stays visible after cancellation');assert.match(appRoot.textContent,/prior-visible/);assert.equal(buttonBy(appRoot,'下载 report.json').disabled,false);assert.equal(buttonBy(appRoot,'运行核心比较').disabled,false);
 });
 
@@ -491,4 +491,56 @@ test('rebuilding the selected revision preserves its pending draft and keeps rem
   const api={request:async route=>route.startsWith('/api/imports/')?{import:{headers:[]}}:{items:[],total:0,next_offset:0,has_more:false}};
   let dispose=renderResultView({root,store,api,summary:{revision},onPublished:async()=>{}});await waitFor(()=>!buttonBy(root,'添加手工决定').disabled);assert.match(root.textContent,/待应用（1）/);dispose();
   dispose=renderResultView({root,store,api,summary:{revision},onPublished:async()=>{}});await waitFor(()=>!buttonBy(root,'添加手工决定').disabled);assert.match(root.textContent,/待应用（1）/);assert.deepEqual(store.get().pending_decisions,[draft]);await buttonBy(root,'移除待应用动作').fire('click');assert.deepEqual(store.get().pending_decisions,[]);dispose();
+});
+
+test('config escaped editors preserve CR LF literal backslashes and empty list references', async()=>{
+  const config=configWith();config.fields[0].name='field\r\nname';config.key=['field\r\nname'];config.ignore_left=[''];
+  const {root,store,dispose}=mountConfig(config);
+  assert.equal(inputByLabel(root,'逻辑字段名').value,'field\\r\\nname');
+  const key=inputByLabel(root,'主键字段（每行一项）');assert.equal(key.value,'field\\r\\nname');key.value='field\\r\\nname';await key.fire('input');assert.deepEqual(store.get().config.key,['field\r\nname']);
+  const ignored=inputByLabel(root,'忽略左侧列（每行一项）');assert.equal(ignored.value,'\\e');ignored.value='';await ignored.fire('input');assert.deepEqual(store.get().config.ignore_left,[]);ignored.value='\\e';await ignored.fire('input');assert.deepEqual(store.get().config.ignore_left,['']);
+  const name=inputByLabel(root,'逻辑字段名');name.value='literal\\\\n';await name.fire('input');assert.equal(store.get().config.fields[0].name,'literal\\n');
+  // Invalid incomplete escapes must disable save, rather than silently save the old value.
+  name.value='unfinished\\';await name.fire('input');assert.equal(store.get().config_asset_id,null);assert.ok(buttonBy(root,'校验并保存规则').disabled);assert.match(root.textContent,/转义/);
+  dispose();
+});
+
+for (const kind of ['missing','blocking']) test(`${kind} invalid escape follows its row when a preceding row is deleted and disappears with its own row`,async()=>{
+  const config=configWith({candidates:1});config.fields[0].missing=['first','second'];config.candidates.blocking=[['field-0'],['field-0']];
+  const {root,dispose}=mountConfig(config),caption=kind==='missing'?'缺失标记值':'分组 2 字段';
+  const editors=()=>walk(root).filter(node=>node.tag==='label'&&node.textContent.startsWith(kind==='missing'?'缺失标记值':'分组 ')).map(node=>node.children.find(child=>['input','textarea'].includes(child.tag)));
+  const entry=kind==='missing'?editors()[1]:inputByLabel(root,caption);entry.value='unfinished\\';await entry.fire('input');
+  assert.equal(buttonBy(root,'校验并保存规则').disabled,true);
+  const removal=kind==='missing'?'删除缺失标记':'删除分组';await buttonBy(root,removal).fire('click');
+  assert.equal(editors()[0].value,'unfinished\\','invalid draft belongs to the retained row after index shift');
+  assert.equal(buttonBy(root,'校验并保存规则').disabled,true);
+  await buttonBy(root,removal).fire('click');assert.equal(buttonBy(root,'校验并保存规则').disabled,false,'removed invalid row must not block save');dispose();
+});
+
+test('disabling candidates discards invalid drafts belonging to removed scoring and blocking controls',async()=>{
+  const config=configWith({candidates:1});config.candidates.blocking=[['field-0']];const {root,store,dispose}=mountConfig(config);
+  for(const caption of ['评分逻辑字段','分组 1 字段']){const entry=inputByLabel(root,caption);entry.value='unfinished\\';await entry.fire('input');}
+  const enabled=inputByLabel(root,'启用候选规则');enabled.checked=false;await enabled.fire('change');
+  assert.equal(store.get().config.candidates,undefined);assert.equal(buttonBy(root,'校验并保存规则').disabled,false);dispose();
+});
+
+test('incomplete scalar and paginated missing edits survive rerenders and source changes until corrected',async()=>{
+  const config=configWith();config.fields[0].missing=Array.from({length:51},(_,index)=>`missing-${index}`);const {root,store,dispose}=mountConfig(config);
+  const name=inputByLabel(root,'逻辑字段名');name.value='unfinished\\';await name.fire('input');
+  const missingSection=()=>walk(root).find(node=>node.tag==='section'&&node.children[0]?.textContent.startsWith('缺失标记'));
+  await buttonBy(missingSection(),'下一页').fire('click');let entry=inputByLabel(missingSection(),'缺失标记值');entry.value='bad\\u';await entry.fire('input');
+  await buttonBy(missingSection(),'上一页').fire('click');await buttonBy(missingSection(),'下一页').fire('click');assert.equal(inputByLabel(missingSection(),'缺失标记值').value,'bad\\u');
+  store.update({left_import_id:'replacement-left'});assert.equal(inputByLabel(root,'逻辑字段名').value,'unfinished\\');assert.equal(buttonBy(root,'校验并保存规则').disabled,true);
+  dispose();
+});
+
+test('idle watcher disposal cancels its timer and removes activity listeners',async()=>{
+  const {watchIdle}=await import('../workbench/public/idle-reminder.mjs');const target=new EventTarget(),timers=new Map();let time=0,serial=0,idles=0,activities=0;
+  const dispose=watchIdle({target,onIdle:()=>idles++,onActivity:()=>activities++,now:()=>time,schedule:(callback,delay)=>{const id=++serial;timers.set(id,{callback,delay});return id;},cancel:id=>timers.delete(id)});
+  assert.equal(timers.size,1);assert.equal([...timers.values()][0].delay,30*60*1000);
+  time=30*60*1000;const [[id,timer]]=[...timers];timers.delete(id);timer.callback();assert.equal(idles,1);
+  target.dispatchEvent(new Event('input'));assert.equal(activities,1);assert.equal(timers.size,1);
+  dispose();assert.equal(timers.size,0);const scheduled=serial;
+  for(const type of ['pointerdown','pointermove','keydown','input','change','wheel','touchstart'])target.dispatchEvent(new Event(type));
+  assert.equal(serial,scheduled,'disposed listener must not rearm an orphan timer');assert.equal(idles,1);assert.equal(activities,1);
 });

@@ -155,7 +155,7 @@ test('catalog form threshold, core manual reason rejection, competing reject/acc
   await expect(result(page).locator('.notice.error')).toContainText('manual_override_needs_reason');await expect(result(page).locator('.notice.error')).toContainText('决定数据行 1');await expect(panel(page)).toContainText('待应用决定：1 项');
   const failed=await saveDownload(page,panel(page).getByRole('button',{name:'下载 report.json',exact:true}),path.join(root,'failed-report.json'));expect(await fs.readFile(failed)).toEqual(await fs.readFile(baseline.report));
   await page.getByRole('button',{name:'移除待应用动作',exact:true}).click();await expect(panel(page)).toContainText('待应用决定：0 项');
-  await candidates.locator('summary').click();await page.getByLabel('候选阈值（1–10000 严格整数）').fill('8000');await checkRules(page);await compare(page);
+  await expect(candidates).toHaveJSProperty('open',true);await page.getByLabel('候选阈值（1–10000 严格整数）').fill('8000');await checkRules(page);await compare(page);
   const candidateSection=section(page,'所有竞争候选与诊断');await expect(candidateSection.locator('.evidence-item')).toHaveCount(2);
   const highest=candidateSection.locator('.evidence-item').filter({has:page.getByRole('heading',{name:/L1\/R2$/})}),competitor=candidateSection.locator('.evidence-item').filter({has:page.getByRole('heading',{name:/L1\/R1$/})});
   expect(JSON.parse(await highest.locator('pre').innerText()).score).toBe(10000);expect(JSON.parse(await competitor.locator('pre').innerText()).score).toBe(8000);
@@ -178,7 +178,7 @@ test('HTML and long Chinese are text; malformed CSV and invalid config preserve 
   const parserError=page.locator('#imports [role=alert]').filter({hasText:'invalid_csv'}).last();await expect(parserError).toContainText('逻辑记录 3');
   await page.getByRole('button',{name:'载入合成 orders 示例',exact:true}).click();await expect(page.locator('#imports')).toContainText('完整校验 3 行');
   const invalid=path.join(root,'invalid-config.json');await fs.writeFile(invalid,JSON.stringify({schema_version:1,fields:[{name:'id',left:'order_id',right:'external_ref',type:'unsupported'}],key:['id']}));
-  await page.getByLabel('导入配置 JSON',{exact:true}).setInputFiles(invalid);await expect(page.locator('#config [role=alert]')).toContainText('字段');await expect(page.locator('#config [role=alert]')).toContainText('错误码');await expect(page.locator('#config [role=alert]')).toContainText('阶段');
+  await page.getByLabel('导入配置 JSON',{exact:true}).setInputFiles(invalid);const error=page.locator('#config').getByRole('alert');await expect(error).toContainText('字段');await expect(error).toContainText('错误码');await expect(error).toContainText('阶段');
   await page.screenshot({path:testInfo.outputPath('safe-errors.png'),fullPage:true});
 });
 
@@ -200,8 +200,8 @@ test('resource-limited comparison stays incomplete and exit 3 after UI review',a
   await expect(page.getByRole('button',{name:'从当前列生成空白草稿',exact:true})).toBeEnabled();await page.getByRole('button',{name:'从当前列生成空白草稿',exact:true}).click();
   const fields=page.locator('.field-card');await expect(fields).toHaveCount(2);for(let i=0;i<2;i++)await fields.nth(i).getByLabel('类型（必选）').selectOption('text');await fields.nth(0).getByLabel('参与逐行比较',{exact:true}).uncheck();
   const candidates=page.locator('#config details.config-group').filter({has:page.getByText('候选匹配（可选）',{exact:true})});await candidates.locator('summary').click();await page.getByLabel('启用候选规则',{exact:true}).check();
-  // Adding the row re-renders the form; reopen its native details before edits.
-  await candidates.locator('summary').click();const rows=candidates.locator('.editor-block').filter({has:page.getByRole('heading',{name:/^候选评分字段/})});await rows.getByRole('button',{name:'添加',exact:true}).click();await candidates.locator('summary').click();
+  // Native details stays open after enabling candidates and adding a row.
+  await expect(candidates).toHaveJSProperty('open',true);const rows=candidates.locator('.editor-block').filter({has:page.getByRole('heading',{name:/^候选评分字段/})});await rows.getByRole('button',{name:'添加',exact:true}).click();await expect(candidates).toHaveJSProperty('open',true);
   await page.getByLabel('评分逻辑字段',{exact:true}).fill('label');await page.getByRole('combobox',{name:'指标',exact:true}).selectOption('exact');await page.getByLabel('权重（1–10000 严格整数）').fill('10000');await page.getByLabel('候选阈值（1–10000 严格整数）').fill('10000');await checkRules(page);await compare(page);
   await expect(result(page).locator('.result-summary')).toContainText('incomplete');await manual(page,'left_unmatched','L101','','明确核对');await applyPending(page);
   const evidence=await downloadEvidence(page,root);const report=JSON.parse(await fs.readFile(evidence.report));expect(report.exit_code).toBe(3);expect(report.computation.status).toBe('incomplete');expect(report.decisions).toHaveLength(1);

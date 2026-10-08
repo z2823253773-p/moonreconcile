@@ -19,7 +19,7 @@ const FILTERS={fields:['status','field','left_id','right_id'],candidates:['left_
 const EXAMPLES={orders:'合成 orders 示例',migration:'合成 migration 示例',catalog:'合成 catalog 示例',ourairports:'OurAirports 公开快照 CN/FR（2026-09-01 / 2026-10-01），来源见 examples/ourairports/provenance.json'};
 const STATIC_FILES=new Map([
   ['/','index.html'],['/index.html','index.html'],
-  ['/public/app.mjs','app.mjs'],['/public/api.mjs','api.mjs'],['/public/state.mjs','state.mjs'],
+  ['/public/app.mjs','app.mjs'],['/public/idle-reminder.mjs','idle-reminder.mjs'],['/public/api.mjs','api.mjs'],['/public/state.mjs','state.mjs'],
   ['/public/dom.mjs','dom.mjs'],['/public/import-view.mjs','import-view.mjs'],
   ['/public/config-view.mjs','config-view.mjs'],['/public/config-model.mjs','config-model.mjs'],
   ['/public/result-view.mjs','result-view.mjs'],['/public/review-view.mjs','review-view.mjs'],['/public/review-model.mjs','review-model.mjs'],

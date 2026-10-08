@@ -5,6 +5,7 @@ import { renderResultView } from './result-view.mjs';
 import { renderExportView } from './export-view.mjs';
 import { createWorkbenchState } from './state.mjs';
 import { button, element } from './dom.mjs';
+import { watchIdle } from './idle-reminder.mjs';
 
 const appRoot=document.querySelector('#app');
 const token=consumeTokenFragment();
@@ -16,6 +17,9 @@ else {
   const importRoot=element('section',{className:'panel',id:'imports'}),configRoot=element('section',{className:'panel',id:'config'}),runRoot=element('section',{className:'panel',id:'run'});
   const archiveRoot=element('section',{className:'export-panel'});
   appRoot.replaceChildren(top,importRoot,configRoot,runRoot);
+  let idleNotice=null;
+  const stopIdle=watchIdle({target:document,onIdle:()=>{if(!idleNotice){idleNotice=element('p',{className:'notice warning idle-reminder',role:'status',text:'已空闲 30 分钟。工作仍保留，可以继续操作；需要留存时请导出配置或运行 ZIP。'});top.append(idleNotice);}},onActivity:()=>{idleNotice?.remove();idleNotice=null;}});
+  window.addEventListener('pagehide',stopIdle,{once:true});
   const importView=renderImportView({root:importRoot,store,api});renderConfigView({root:configRoot,store,api});
   let busy=false,jobId=null,summary=null,resultDispose=null,resultRefresh=null,resultRevisionId=null,latestRevisionId=null;
   const history=[];
