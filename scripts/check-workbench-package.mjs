@@ -15,9 +15,9 @@ import { stopAndVerify } from './workbench-package-lifecycle.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const NAME = 'moonreconcile-workbench-0.2.0';
-const PACKAGE_DIR = path.join(ROOT, 'dist', NAME);
-const ZIP_PATH = path.join(ROOT, 'dist', `${NAME}.zip`);
-const EVIDENCE_PATH = path.join(ROOT, 'dist/workbench-package-validation-2026-10-08.json');
+const PACKAGE_DIR = path.resolve(process.env.MOONRECONCILE_PACKAGE_DIR ?? path.join(ROOT, 'dist', NAME));
+const ZIP_PATH = path.resolve(process.env.MOONRECONCILE_PACKAGE_ZIP ?? path.join(ROOT, 'dist', `${NAME}.zip`));
+const EVIDENCE_PATH = path.resolve(process.env.MOONRECONCILE_VALIDATION_EVIDENCE ?? path.join(ROOT, 'dist/workbench-package-validation-2026-10-08.json'));
 const SANDBOX_PROFILE = '(version 1) (allow default) (deny network-outbound) (allow network-outbound (remote ip "localhost:*"))';
 
 function hash(bytes) { return createHash('sha256').update(bytes).digest('hex'); }

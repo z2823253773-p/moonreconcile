@@ -1,6 +1,6 @@
 # Restricted XLSX B Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Implementation workflow:** One authorized implementation writer owns the change. GPT-6.1-sol performs independent scoped review at high reasoning effort. Do not add implementation writers. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a verified, restricted XLSX-to-CSV import adapter with explicit profiles, traceable materials and mixed-format report-bundle restore, while retaining MoonBit's sole authority over reconciliation.
 
@@ -138,6 +138,10 @@ Use `/private/tmp/moonreconcile-quarter-node22/bin/node` for every `node` comman
 | No placeholder/public capability before complete scope gate | T4/5 constructor-only; T7 reviewed activation and repeat gate |
 
 Self-review: no missing §8 requirement identified; all P0 preserved by referenced current paths and regression gates. Every later type comes from preflight or earlier Interfaces; no task implements business comparison/CSV parsing. Planned additional conservative limits/namespace/type/version choices are expressly B decisions, not altered A+C requirements. All Review Focus lines have owning tests. Genuine save/candidate audit/probe remain **not executed**; plan contains no invented passing counts. Task7 has intentional two-stage preactivation/final activation verification to prevent premature capability. All tasks PLANNED; checkbox checked only with actual command/review evidence.
+
+## Review-cycle limit
+
+For each implementation scope, record exact base/head, reviewer finding, cycle number, repair, and disposition in the ignored governance ledger. One cycle is one implementation repair followed by one independent review. Allow at most two such cycles; if the second review still has an unresolved finding, stop implementation and report the evidence with concrete decision options. Do not restart the counter by splitting a scope or editing the ledger history. Keep failed logs and historical artifact names intact.
 
 Copy-ready Task 1 brief:
 

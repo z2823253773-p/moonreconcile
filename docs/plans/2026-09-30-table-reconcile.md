@@ -217,3 +217,7 @@ Implementation is complete only when Tasks 1–8 pass (publication proof include
 Complete Task 1 before Task 2; integrate contracts sequentially. A reviewer may reject a task without changing adjacent interfaces. Record task status, exact commands, failure evidence, fixes, SHA and any contract change in `docs/validation.md`. Major contract changes require synchronizing this plan and tests.
 
 Self-review completed: every spec section has a task; interface names and JSON keys align; the five review risks map to explicit tests; real workflow/XLSX need is honestly unverified; all data processing algorithms stay in MoonBit. Work must not stop after exact diff, matching alone, or export-only output.
+
+## Current maintenance governance
+
+For new maintenance based on the accepted A+C source, use `make verify` from a clean source SHA and preserve the frozen P0/business assertions. Keep one implementation writer and request an independent GPT-6.1-sol scoped review at high reasoning effort. Record base/head, findings, repair, and disposition in the ignored governance ledger. Limit each maintenance scope to two repair-and-review cycles; after the second unresolved review, stop and report the evidence with decision options. This current limit does not rewrite historical review counts or acceptance evidence.
