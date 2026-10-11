@@ -1,4 +1,5 @@
 import io
+import hashlib
 import json
 import os
 import shlex
@@ -268,6 +269,178 @@ class VerifyTests(unittest.TestCase):
             root = Path(temporary)
             result = verify.run_stage("fresh-control-required", [self.node(), "--input-type=module", "-e", code], root, {}, root / "control.log", 5)
             self.assertEqual(result["exit_code"], 0)
+
+    def test_cache_components_reject_live_dangling_and_file_parents_without_outside_writes(self):
+        for name in ("runs", "downloads", "playwright-browsers", "npm-config", "bootstrap-probe"):
+            for kind in ("live", "dangling", "file"):
+                with self.subTest(name=name, kind=kind), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    cache, outside = root / ".verify", root / "outside"
+                    cache.mkdir(); outside.mkdir()
+                    sentinel = outside / "sentinel"
+                    sentinel.write_bytes(b"unchanged")
+                    target = cache / name
+                    if kind == "file":
+                        target.write_bytes(b"owned alternative")
+                    else:
+                        target.symlink_to(outside if kind == "live" else outside / "missing", target_is_directory=True)
+                    with self.assertRaises(verify.VerifyError):
+                        verify._ensure_private_cache(target / "child", boundary=root)
+                    self.assertEqual(sorted(p.name for p in outside.iterdir()), ["sentinel"])
+                    self.assertEqual(sentinel.read_bytes(), b"unchanged")
+                    if kind != "file":
+                        self.assertTrue(target.is_symlink(), "rejected link must not be deleted")
+
+    def test_npm_pipeline_rejects_root_and_nested_links_before_actual_npm_can_write(self):
+        for name in ("", "_logs", "_cacache/index-v5"):
+            for dangling in (False, True):
+                with self.subTest(name=name, dangling=dangling), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    cache, outside = root / ".verify", root / "outside"
+                    cache.mkdir(); outside.mkdir()
+                    (outside / "sentinel").write_bytes(b"unchanged")
+                    link = cache / "npm-cache" / name if name else cache / "npm-cache"
+                    link.parent.mkdir(parents=True, exist_ok=True)
+                    link.symlink_to(outside / "missing" if dangling else outside, target_is_directory=True)
+                    node = Path(self.node())
+                    with self.assertRaises(verify.VerifyError):
+                        env = verify.tool_env(cache, node.parent.parent, root / "moon")
+                        verify.run_stage("must-not-execute-npm", [str(node.parent / "npm"), "config", "get", "registry"], root, env, root / "stage.log", 5)
+                    self.assertFalse((root / "stage.log").exists())
+                    self.assertTrue(link.is_symlink())
+                    self.assertEqual(sorted(p.name for p in outside.iterdir()), ["sentinel"])
+                    self.assertEqual((outside / "sentinel").read_bytes(), b"unchanged")
+
+    def test_browser_writable_metadata_rejects_links_but_bundle_links_remain(self):
+        for name in (".links", ".links/record", "__dirlock", "chromium-1/INSTALLATION_COMPLETE"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                cache, outside = root / ".verify", root / "outside"
+                browser = cache / "playwright-browsers"
+                browser.mkdir(parents=True); outside.mkdir()
+                sentinel = outside / "sentinel"
+                sentinel.write_bytes(b"unchanged")
+                link = browser / name
+                link.parent.mkdir(parents=True, exist_ok=True)
+                link.symlink_to(outside if name in (".links", "__dirlock") else outside / "sentinel")
+                with self.assertRaises(verify.VerifyError):
+                    verify.tool_env(cache, cache / "node", cache / "moon")
+                self.assertEqual(sorted(p.name for p in outside.iterdir()), ["sentinel"])
+                self.assertEqual(sentinel.read_bytes(), b"unchanged")
+                self.assertTrue(link.is_symlink())
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache = root / ".verify"
+            framework = cache / "playwright-browsers/chromium-1/Framework/Versions"
+            (framework / "A").mkdir(parents=True)
+            (framework / "Current").symlink_to("A", target_is_directory=True)
+            verify.tool_env(cache, cache / "node", cache / "moon")
+            self.assertTrue((framework / "Current").is_symlink())
+
+    def test_download_links_are_rejected_before_network_or_unlink(self):
+        for name in ("archive.tar.gz", "archive.tar.gz.part"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                cache = root / ".verify/downloads"
+                cache.mkdir(parents=True)
+                link = cache / name
+                link.symlink_to(root / "missing")
+                with patch.object(verify.urllib.request, "urlopen", side_effect=AssertionError("network must not run")):
+                    with self.assertRaises(verify.VerifyError):
+                        verify._download("https://example.invalid/archive", cache / "archive.tar.gz", "0" * 64, boundary=root)
+                self.assertTrue(link.is_symlink())
+                self.assertFalse((root / "missing").exists())
+
+    def test_bootstrap_probe_rejects_cache_link_before_destructive_reset(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / ".verify").mkdir()
+            outside = root / "outside"
+            (outside / "node").mkdir(parents=True)
+            sentinel = outside / "node/sentinel"
+            sentinel.write_bytes(b"preserve")
+            (root / ".verify/bootstrap-probe").symlink_to(outside, target_is_directory=True)
+            with patch.object(sys, "argv", ["verify.py", "--root", str(root), "--bootstrap-only"]):
+                with self.assertRaises(verify.VerifyError):
+                    verify.main()
+            self.assertEqual(sentinel.read_bytes(), b"preserve")
+            self.assertTrue((root / ".verify/bootstrap-probe").is_symlink())
+
+    def test_core_overlay_links_rejected_before_outside_build_cleanup(self):
+        for location in ("lib", "lib/core", "lib/core/_build"):
+            with self.subTest(location=location), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                cache = root / ".verify"
+                downloads = cache / "downloads"
+                downloads.mkdir(parents=True)
+                def archive(name, entries):
+                    target = downloads / name
+                    with tarfile.open(target, "w:gz") as handle:
+                        for relative, payload in entries.items():
+                            member = tarfile.TarInfo(relative)
+                            member.mode = 0o755
+                            member.size = len(payload)
+                            handle.addfile(member, io.BytesIO(payload))
+                    return hashlib.sha256(target.read_bytes()).hexdigest()
+                node_hash = archive("node.tar.gz", {"node-vfixture/bin/node": b"#!/bin/sh\necho v22.23.3\n"})
+                moon_entries = {"bin/moon": b"#!/bin/sh\necho '0.1.20260920 0.10.14+7d59c7ec9'\n", "bin/moonc": b"#!/bin/sh\nexit 0\n"}
+                moon_hash = archive("moon-sdk.tar.gz", moon_entries)
+                core_hash = archive("moon-core.tar.gz", {"core/source.mbt": b"core fixture\n"})
+                moon = cache / "moon"
+                verify.safe_extract_tar(downloads / "moon-sdk.tar.gz", moon)
+                (moon / ".verify-toolchain.json").write_text("{}")
+                outside = root / "outside"
+                (outside / "core/_build").mkdir(parents=True)
+                (outside / "source.mbt").write_bytes(b"core fixture\n")
+                (outside / "core/source.mbt").write_bytes(b"core fixture\n")
+                sentinel = outside / "core/_build/sentinel"
+                sentinel.write_bytes(b"preserve")
+                (outside / "_build").mkdir()
+                (outside / "_build/sentinel").write_bytes(b"preserve")
+                link = moon / location
+                link.parent.mkdir(parents=True, exist_ok=True)
+                if location == "lib/core/_build":
+                    (moon / "lib/core/source.mbt").write_bytes(b"core fixture\n")
+                    target = outside / "_build"
+                else:
+                    target = outside
+                link.symlink_to(target, target_is_directory=True)
+                before = {str(p.relative_to(outside)): p.read_bytes() for p in outside.rglob("*") if p.is_file()}
+                lock = {"node_url": "https://unused.invalid/node", "node_sha256": node_hash, "moon_url": "https://unused.invalid/moon", "moon_sha256": moon_hash}
+                with patch.object(verify, "CORE_SHA256", core_hash):
+                    with self.assertRaisesRegex(verify.VerifyError, "symlink"):
+                        verify.bootstrap(cache, lock)
+                after = {str(p.relative_to(outside)): p.read_bytes() for p in outside.rglob("*") if p.is_file()}
+                self.assertEqual(after, before)
+                self.assertTrue(link.is_symlink())
+
+    def test_old_python_fails_before_cache_setup(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with patch.object(sys, "argv", ["verify.py", "--root", str(root), "--bootstrap-only"]), patch.object(sys, "version_info", (3, 11)):
+                with self.assertRaisesRegex(verify.VerifyError, "Python 3.12"):
+                    verify.main()
+            self.assertFalse((root / ".verify").exists())
+
+    def test_real_system_alias_base_and_verified_archive_internal_links_remain_supported(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            # Keep the lexical /tmp prefix even when tempfile canonicalizes its base.
+            root = Path("/tmp") / Path(temporary).name
+            cache = root / ".verify"
+            verify._ensure_private_cache(cache / "runs/example", boundary=verify._cache_boundary(cache))
+            self.assertTrue((Path(temporary) / ".verify/runs/example").is_dir())
+            archive = root / "archive.tar.gz"
+            with tarfile.open(archive, "w:gz") as handle:
+                member = tarfile.TarInfo("tool/bin/tool"); member.mode = 0o755; member.size = 4
+                handle.addfile(member, io.BytesIO(b"tool"))
+                link = tarfile.TarInfo("tool/bin/alias"); link.type = tarfile.SYMTYPE; link.linkname = "tool"
+                handle.addfile(link)
+            installed = cache / "sdk"
+            verify.safe_extract_tar(archive, installed)
+            verify.verify_tar_tree(archive, installed)
+            verify._ensure_private_cache(installed, boundary=root)
+            self.assertTrue((installed / "tool/bin/alias").is_symlink())
+            verify.tool_env(cache, cache / "node", cache / "moon")
 
     def test_bootstrap_failure_summary_never_claims_a_pass(self):
         with tempfile.TemporaryDirectory() as temporary, patch.object(verify, "bootstrap", side_effect=verify.VerifyError("pinned archive digest changed")):

@@ -212,20 +212,93 @@ def safe_extract_tar(archive: Path, destination: Path) -> None:
         raise VerifyError(f"archive extraction failed: {error}") from error
 
 
-def _ensure_private_cache(path: Path) -> None:
-    if path.exists() and (path.is_symlink() or not path.is_dir()):
-        raise VerifyError(f"cache path must be an owned directory, not a symlink or file: {path}")
-    path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if path.is_symlink() or not path.is_dir():
-        raise VerifyError(f"cache path is not a real directory: {path}")
+def _cache_boundary(cache: Path) -> Path:
+    # .verify and its bootstrap-probe child share the checkout's real boundary.
+    # Other explicit caches (private tests) are owned beneath their chosen parent.
+    for candidate in (cache, *cache.parents):
+        if candidate.name == ".verify":
+            return candidate.parent.absolute()
+    return cache.parent.absolute()
 
 
-def _download(url: str, target: Path, expected_sha256: str) -> str:
-    _ensure_private_cache(target.parent)
+def _validate_cache_path(path: Path, *, boundary: Path) -> Path:
+    """Reject existing links/types from a trusted real base down, without following them.
+
+    System aliases above the base (/tmp, /var on macOS) are legitimate. This is
+    a static pre-existing-path check, not a claim to defeat concurrent replacement.
+    """
+    if ".." in path.parts:
+        raise VerifyError(f"cache path must not contain parent traversal: {path}")
+    base = boundary.absolute()
+    try:
+        relative = path.absolute().relative_to(base)
+    except ValueError as error:
+        raise VerifyError(f"cache path escapes its ownership boundary: {path}") from error
+    real_base = base.resolve(strict=True)
+    if not real_base.is_dir():
+        raise VerifyError(f"cache boundary must be a real directory: {boundary}")
+    cursor = real_base
+    for index, part in enumerate(relative.parts):
+        cursor /= part
+        if cursor.is_symlink():  # Also rejects dangling links before mkdir/open/delete.
+            raise VerifyError(f"cache path traverses a symlink: {cursor}")
+        if cursor.exists() and index < len(relative.parts) - 1 and not cursor.is_dir():
+            raise VerifyError(f"cache parent is not a directory: {cursor}")
+    return cursor
+
+
+def _validate_cache_file(path: Path, *, boundary: Path) -> None:
+    checked = _validate_cache_path(path, boundary=boundary)
+    if checked.exists() and not checked.is_file():
+        raise VerifyError(f"cache output must be an owned regular file: {path}")
+
+
+def _ensure_private_cache(path: Path, *, boundary: Path) -> None:
+    checked = _validate_cache_path(path, boundary=boundary)
+    if checked.exists() and not checked.is_dir():
+        raise VerifyError(f"cache path must be an owned directory, not a file: {path}")
+    checked.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _validate_cache_path(path, boundary=boundary)
+
+
+def _validate_mutable_cache_tree(path: Path, *, boundary: Path) -> None:
+    """npm writes beneath existing entries; reject every untrusted nested link."""
+    checked = _validate_cache_path(path, boundary=boundary)
+    if not checked.exists():
+        return
+    if not checked.is_dir():
+        raise VerifyError(f"mutable cache must be a directory: {path}")
+    for parent, directories, files in os.walk(checked, followlinks=False):
+        for name in directories + files:
+            entry = Path(parent) / name
+            if entry.is_symlink() or not (entry.is_dir() or entry.is_file()):
+                raise VerifyError(f"mutable cache contains a link or special file: {entry}")
+
+
+def _validate_browser_cache(path: Path, *, boundary: Path) -> None:
+    # Playwright writes its link/lock metadata and per-browser marker files.
+    # Bundle-internal framework links are not writable cache roots and are retained.
+    _validate_cache_path(path, boundary=boundary)
+    for entry in path.iterdir():
+        _validate_cache_path(entry, boundary=boundary)
+        if entry.is_dir() and entry.name not in (".links", "__dirlock"):
+            for marker in ("INSTALLATION_COMPLETE", "DEPENDENCIES_VALIDATED"):
+                _validate_cache_file(entry / marker, boundary=boundary)
+    for name in (".links", "__dirlock"):
+        _validate_mutable_cache_tree(path / name, boundary=boundary)
+
+
+def _download(url: str, target: Path, expected_sha256: str, *, boundary: Path | None = None) -> str:
+    boundary = boundary if boundary is not None else _cache_boundary(target.parent)
+    _ensure_private_cache(target.parent, boundary=boundary)
+    _validate_cache_path(target, boundary=boundary)
     if target.exists():
         return verify_archive(target, expected_sha256)
     partial = target.with_name(target.name + ".part")
-    if partial.exists() or partial.is_symlink():
+    _validate_cache_path(partial, boundary=boundary)
+    if partial.exists():
+        if not partial.is_file():
+            raise VerifyError(f"partial archive must be an owned regular file: {partial}")
         partial.unlink()
     last_error: Exception | None = None
     for attempt in range(3):
@@ -277,20 +350,22 @@ def _make_moon_executables(bin_dir: Path) -> None:
 
 def bootstrap(cache: Path, lock: dict[str, str]) -> dict[str, str]:
     """Verify immutable archives, extract to owned staging, and install privately."""
-    _ensure_private_cache(cache)
+    boundary = _cache_boundary(cache)
+    _ensure_private_cache(cache, boundary=boundary)
     downloads = cache / "downloads"
-    _ensure_private_cache(downloads)
+    _ensure_private_cache(downloads, boundary=boundary)
     node_archive = downloads / "node.tar.gz"
     moon_archive = downloads / "moon-sdk.tar.gz"
     core_archive = downloads / "moon-core.tar.gz"
-    node_hash = _download(lock["node_url"], node_archive, lock["node_sha256"])
-    moon_hash = _download(lock["moon_url"], moon_archive, lock["moon_sha256"])
-    core_hash = _download(CORE_URL, core_archive, CORE_SHA256)
+    node_hash = _download(lock["node_url"], node_archive, lock["node_sha256"], boundary=boundary)
+    moon_hash = _download(lock["moon_url"], moon_archive, lock["moon_sha256"], boundary=boundary)
+    core_hash = _download(CORE_URL, core_archive, CORE_SHA256, boundary=boundary)
     expected_node_bin_hash = archive_member_sha256(node_archive, "bin/node")
     expected_moon_bin_hash = archive_member_sha256(moon_archive, "bin/moon")
     expected_moonc_bin_hash = archive_member_sha256(moon_archive, "bin/moonc")
 
     node_home = cache / "node"
+    _validate_cache_path(node_home, boundary=boundary)
     if node_home.is_symlink() or (node_home.exists() and not node_home.is_dir()):
         raise VerifyError("cached Node installation path must be a real directory")
     if (node_home / "bin").is_symlink() or (node_home / "bin/node").is_symlink():
@@ -317,6 +392,7 @@ def bootstrap(cache: Path, lock: dict[str, str]) -> dict[str, str]:
         raise VerifyError(f"Node version mismatch: expected v{VERSION}, got {version}")
 
     moon_home = cache / "moon"
+    _validate_cache_path(moon_home, boundary=boundary)
     if moon_home.is_symlink() or (moon_home.exists() and not moon_home.is_dir()):
         raise VerifyError("cached Moon installation path must be a real directory")
     marker = moon_home / ".verify-toolchain.json"
@@ -326,8 +402,10 @@ def bootstrap(cache: Path, lock: dict[str, str]) -> dict[str, str]:
             safe_extract_tar(moon_archive, staging)
             lib = staging / "lib"
             core = lib / "core"
+            _validate_cache_path(core, boundary=boundary)
             if core.exists() or core.is_symlink():
                 shutil.rmtree(core)
+            _ensure_private_cache(lib, boundary=boundary)
             safe_extract_tar(core_archive, lib)
             bin_dir = staging / "bin"
             moon = bin_dir / "moon"
@@ -365,12 +443,14 @@ def bootstrap(cache: Path, lock: dict[str, str]) -> dict[str, str]:
     if sha256_file(node) != expected_node_bin_hash or sha256_file(moon) != expected_moon_bin_hash or sha256_file(moonc) != expected_moonc_bin_hash:
         raise VerifyError("cached tool executable hash mismatch; the extracted cache cannot be trusted")
     # The SDK archive's lib/core is deliberately replaced by the separately pinned core archive.
-    verify_tar_tree(moon_archive, moon_home, allowed_extra_roots=("lib/core",))
     core_dir = moon_home / "lib/core"
+    _validate_cache_path(core_dir, boundary=boundary)
+    verify_tar_tree(moon_archive, moon_home, allowed_extra_roots=("lib/core",))
     # Bundling creates disposable metadata here. Verify all pinned source bytes first, then discard
     # that owned build cache and bundle again so stale generated data is never trusted.
     verify_tar_tree(core_archive, core_dir, strip_first_component=True, allowed_extra_roots=("_build",))
     generated = core_dir / "_build"
+    _validate_cache_path(generated, boundary=boundary)
     if generated.is_symlink():
         raise VerifyError("refusing a symlink at the owned Moon core build-cache path")
     if generated.exists():
@@ -413,12 +493,19 @@ def invocation_env() -> dict[str, str]:
 
 
 def tool_env(cache: Path, node_home: Path, moon_home: Path, temporary: Path | None = None) -> dict[str, str]:
+    boundary = _cache_boundary(cache)
+    _ensure_private_cache(cache, boundary=boundary)
+    npm_cache = cache / "npm-cache"
+    _validate_mutable_cache_tree(npm_cache, boundary=boundary)
+    _ensure_private_cache(npm_cache, boundary=boundary)
     browser_cache = cache / "playwright-browsers"
-    _ensure_private_cache(browser_cache)
+    _ensure_private_cache(browser_cache, boundary=boundary)
+    _validate_browser_cache(browser_cache, boundary=boundary)
     config = cache / "npm-config"
-    _ensure_private_cache(config)
+    _ensure_private_cache(config, boundary=boundary)
     for name in ("user.npmrc", "global.npmrc"):
         target = config / name
+        _validate_cache_file(target, boundary=boundary)
         if target.is_symlink() or (target.exists() and not target.is_file()):
             raise VerifyError("npm config override must be an owned regular file")
         target.write_text("")
@@ -482,6 +569,9 @@ def verify_tracked_blobs(root: Path, head: str) -> int:
 
 def run_stage(name: str, argv: list[str], cwd: Path, env: dict[str, str], log_path: Path,
               timeout: float) -> dict[str, object]:
+    log_boundary = _cache_boundary(log_path.parent)
+    _ensure_private_cache(log_path.parent, boundary=log_boundary)
+    _validate_cache_file(log_path, boundary=log_boundary)
     started = time.monotonic()
     result: dict[str, object] = {"name": name, "argv": argv, "cwd": str(cwd), "started_at": datetime.now(timezone.utc).isoformat()}
     try:
@@ -530,7 +620,9 @@ def run_stage(name: str, argv: list[str], cwd: Path, env: dict[str, str], log_pa
         result.update({"exit_code": code, "status": "failed", "start_error": str(error)})
     duration = round(time.monotonic() - started, 3)
     result["duration_seconds"] = duration
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_boundary = _cache_boundary(log_path.parent)
+    _ensure_private_cache(log_path.parent, boundary=log_boundary)
+    _validate_cache_file(log_path, boundary=log_boundary)
     log_path.write_text(f"stage: {name}\nargv: {json.dumps(argv)}\nexit: {code}\nduration_seconds: {duration}\n\n{output}")
     return result
 
@@ -599,6 +691,8 @@ def main() -> int:
     parser.add_argument("--bootstrap-only", action="store_true", help="cold-check pinned bootstrap without running product gates")
     args = parser.parse_args()
     root = args.root.resolve()
+    if sys.version_info < (3, 12):
+        raise VerifyError("Python 3.12+ is required for the independent consumer safe archive extraction")
     clean_env = invocation_env()
     os.environ.clear()
     os.environ.update(clean_env)  # This process and its children only; preserve the real HOME.
@@ -615,17 +709,21 @@ def main() -> int:
         if verify_cache.is_symlink() or (verify_cache.exists() and not verify_cache.is_dir()):
             raise VerifyError(".verify cache must be a real project-local directory")
         cache = root / ".verify" / "bootstrap-probe"
+        _ensure_private_cache(cache, boundary=root)
         if cache.exists():
             if cache.is_symlink() or not cache.is_dir():
                 raise VerifyError("bootstrap probe cache path must be an owned directory")
-            for installed in (cache / "node", cache / "moon", cache / "home", cache / "tmp"):
+            installed_paths = (cache / "node", cache / "moon", cache / "home", cache / "tmp")
+            for installed in installed_paths:
+                _validate_cache_path(installed, boundary=root)
+            for installed in installed_paths:
                 if installed.is_symlink():
                     raise VerifyError(f"bootstrap probe refuses a symlink: {installed}")
                 if installed.is_dir():
                     shutil.rmtree(installed)
                 elif installed.exists():
                     installed.unlink()
-        _ensure_private_cache(cache)
+        _ensure_private_cache(cache, boundary=root)
         result = bootstrap_only_result(cache, lock)
         print(json.dumps(result, indent=2))
         return 0 if result["status"] == "bootstrap-passed" else 1
@@ -639,14 +737,14 @@ def main() -> int:
     cache = root / ".verify"
     if cache.is_symlink() or (cache.exists() and not cache.is_dir()):
         raise VerifyError(".verify cache must be a real project-local directory")
-    _ensure_private_cache(cache)
+    _ensure_private_cache(cache, boundary=root)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + f"-{os.getpid()}"
     run_dir = cache / "runs" / run_id
-    _ensure_private_cache(run_dir)
+    _ensure_private_cache(run_dir, boundary=root)
     temporary = tempfile.TemporaryDirectory(prefix="moonreconcile-verify-", dir=system_temp_base(root))
     tmp = Path(temporary.name)
     logs = run_dir / "logs"
-    logs.mkdir(mode=0o700)
+    _ensure_private_cache(logs, boundary=root)
     summary: dict[str, object] = {
         "status": "running", "head": head, "branch": subprocess.check_output(["git", "branch", "--show-current"], cwd=root, text=True).strip(),
         "platform": f"{platform.system()} {platform.machine()}", "started_at": datetime.now(timezone.utc).isoformat(),
@@ -667,7 +765,6 @@ def main() -> int:
         node_home, moon_home = cache / "node", cache / "moon"
         env = tool_env(cache, node_home, moon_home, tmp)
         summary["owned_temporary_root"] = str(tmp)
-        (cache / "npm-cache").mkdir(mode=0o700, exist_ok=True)
         node = node_home / "bin/node"
         npm = node_home / "bin/npm"
         if platform.system() == "Windows":
@@ -800,6 +897,7 @@ def main() -> int:
         except Exception as error:
             summary["status"] = "failed"
             summary["error"] = f"owned temporary cleanup failed: {error}"
+        _validate_cache_file(summary_path, boundary=root)
         summary_path.write_text(json.dumps(summary, indent=2) + "\n")
         print(json.dumps({"status": summary["status"], "head": head, "run": str(run_dir),
                           "summary": str(summary_path), "failure_stage": summary.get("failure_stage"),
