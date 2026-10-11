@@ -38,7 +38,7 @@ async function fixture(label) {
   }
   // Include this round's new helper before it is committed. All fixture writes
   // remain under the root created by this test, never under a reviewer fixture.
-  for (const relative of ['scripts/workbench-package-provenance.mjs', 'scripts/workbench-package-lifecycle.mjs']) {
+  for (const relative of ['scripts/workbench-package-provenance.mjs', 'scripts/workbench-package-lifecycle.mjs', 'scripts/workbench-package-network.mjs']) {
     try { await fs.copyFile(path.join(root, relative), path.join(directory, relative)); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
   await fs.symlink(path.join(root, 'node_modules'), path.join(directory, 'node_modules'));

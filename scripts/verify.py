@@ -16,6 +16,7 @@ import tarfile
 import tempfile
 import time
 import urllib.request
+import unittest
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
@@ -253,14 +254,14 @@ def _download(url: str, target: Path, expected_sha256: str) -> str:
 
 
 def _run_checked(argv: list[str], cwd: Path, env: dict[str, str], label: str, timeout: int = 120) -> str:
-    try:
-        result = subprocess.run(argv, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                timeout=timeout, check=False)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise VerifyError(f"{label} could not complete: {error}") from error
-    if result.returncode != 0:
-        raise VerifyError(f"{label} exited {result.returncode}:\n{result.stdout[-4000:]}")
-    return result.stdout
+    # Share stage ownership and timeout handling with bootstrap helpers, too.
+    with tempfile.TemporaryDirectory(prefix="moonreconcile-helper-", dir=system_temp_base(cwd)) as temporary:
+        log = Path(temporary) / "helper.log"
+        result = run_stage(label, argv, cwd, env, log, timeout)
+        output = log.read_text().split("\n\n", 1)[-1]
+        if result["exit_code"] != 0:
+            raise VerifyError(f"{label} could not complete (exit {result['exit_code']}):\n{output[-4000:]}")
+        return output
 
 
 def _make_moon_executables(bin_dir: Path) -> None:
@@ -336,7 +337,7 @@ def bootstrap(cache: Path, lock: dict[str, str]) -> dict[str, str]:
             _make_moon_executables(bin_dir)
             env = {
                 "PATH": str(bin_dir), "MOON_HOME": str(staging),
-                "MOONBIT_HOME": str(staging), "TMPDIR": str(cache), "LANG": "C.UTF-8",
+                "MOONBIT_HOME": str(staging), "TMPDIR": str(system_temp_base(ROOT)), "LANG": "C.UTF-8",
             }
             moon_version = _run_checked([str(moon), "version", "--all"], ROOT, env, "Moon version").strip()
             expected_version = "0.1.20260920"
@@ -393,17 +394,45 @@ def bootstrap_only_result(cache: Path, lock: dict[str, str]) -> dict[str, object
         return {"status": "bootstrap-failed", "cache": str(cache), "error": str(error)}
 
 
-def tool_env(cache: Path, node_home: Path, moon_home: Path) -> dict[str, str]:
+def system_temp_base(root: Path) -> Path:
+    # Do not trust ambient TMPDIR: nested Moon workspaces affect enclosing checkouts.
+    base = Path("/private/tmp" if platform.system() == "Darwin" else "/tmp").resolve()
+    if base.is_relative_to(root.resolve()):
+        raise VerifyError("system temporary directory must be outside the source checkout")
+    return base
+
+
+def invocation_env() -> dict[str, str]:
+    allowed = {"HOME", "USER", "LOGNAME", "LANG", "TZ", "SYSTEMROOT",
+               "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
+               "http_proxy", "https_proxy", "all_proxy", "no_proxy",
+               "SSL_CERT_FILE", "SSL_CERT_DIR", "NODE_EXTRA_CA_CERTS"}
+    return {**{key: value for key, value in os.environ.items() if key in allowed or key.startswith("LC_")},
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "PYTHONNOUSERSITE": "1",
+            "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1"}
+
+
+def tool_env(cache: Path, node_home: Path, moon_home: Path, temporary: Path | None = None) -> dict[str, str]:
     browser_cache = cache / "playwright-browsers"
     _ensure_private_cache(browser_cache)
-    home = cache / "home"
-    _ensure_private_cache(home)
+    config = cache / "npm-config"
+    _ensure_private_cache(config)
+    for name in ("user.npmrc", "global.npmrc"):
+        target = config / name
+        if target.is_symlink() or (target.exists() and not target.is_file()):
+            raise VerifyError("npm config override must be an owned regular file")
+        target.write_text("")
+    # Preserve HOME and documented transport/locale inputs, but no executable
+    # preloads, Python search paths, dynamic-loader settings, or ambient npm config.
+    ambient = invocation_env()
+    scratch = temporary if temporary is not None else system_temp_base(cache.parent)
     return {
-        **os.environ,
+        **ambient,
         "PATH": os.pathsep.join([str(node_home / "bin"), str(moon_home / "bin"), "/usr/bin", "/bin", "/usr/sbin", "/sbin"]),
         "MOON_HOME": str(moon_home), "MOONBIT_HOME": str(moon_home),
         "PLAYWRIGHT_BROWSERS_PATH": str(browser_cache), "npm_config_cache": str(cache / "npm-cache"),
-        "TMPDIR": str(cache / "tmp"), "TMP": str(cache / "tmp"),
+        "npm_config_userconfig": str(config / "user.npmrc"), "npm_config_globalconfig": str(config / "global.npmrc"),
+        "PYTHONNOUSERSITE": "1", "TMPDIR": str(scratch), "TMP": str(scratch), "TEMP": str(scratch),
         "MOONRECONCILE_NODE_BINARY": str(node_home / "bin/node"),
     }
 
@@ -456,26 +485,44 @@ def run_stage(name: str, argv: list[str], cwd: Path, env: dict[str, str], log_pa
     started = time.monotonic()
     result: dict[str, object] = {"name": name, "argv": argv, "cwd": str(cwd), "started_at": datetime.now(timezone.utc).isoformat()}
     try:
-        process = subprocess.Popen(argv, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE,
+        stage_env = {**env, "MOONRECONCILE_VERIFIER_PROCESS_GROUP": "1"}
+        process = subprocess.Popen(argv, cwd=cwd, env=stage_env, text=True, stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, start_new_session=True)
         try:
             output, _ = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
             _stop_owned_process_group(process)
-            output, _ = process.communicate()
+            try:
+                output, _ = process.communicate(timeout=5)
+            except subprocess.TimeoutExpired as error:
+                # An unknown independently detached process may hold inherited pipes.
+                # Do not scan/kill global processes or wait without a bound.
+                output = error.output or ""
+                if isinstance(output, bytes):
+                    output = output.decode("utf-8", "replace")
+                if process.stdout is not None:
+                    process.stdout.close()
+                result["cleanup_error"] = "pipe drain exceeded 5 seconds after owned group cleanup"
+                output += "\nPIPE DRAIN FAILED: unknown detached pipe holder; stage remains failed\n"
             output = (output or "") + f"\nTIMEOUT after {timeout} seconds; owned process group terminated\n"
             code = 124
             result.update({"exit_code": code, "status": "failed", "timed_out_after_seconds": timeout,
                            "owned_process_group_terminated": True})
         else:
             code = process.returncode
+            _stop_owned_process_group(process)
+            result["owned_process_group_terminated"] = True
         output = output or ""
         if "status" not in result:
             result.update({"exit_code": code, "status": "passed" if code == 0 else "failed"})
     except KeyboardInterrupt:
-        if "process" in locals() and process.poll() is None:
+        if "process" in locals():
             _stop_owned_process_group(process)
-            process.communicate()
+            try:
+                process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                if process.stdout is not None:
+                    process.stdout.close()
         raise
     except OSError as error:
         output = f"PROCESS START FAILURE: {error}\n"
@@ -507,7 +554,10 @@ def _stop_owned_process_group(process: subprocess.Popen[str]) -> None:
     except ProcessLookupError:
         pass
     if process.poll() is None:
-        process.wait()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired as error:
+            raise VerifyError("owned direct process could not be reaped after SIGKILL") from error
 
 
 def _strict_command(env: dict[str, str], node: Path) -> list[str]:
@@ -526,10 +576,15 @@ def _strict_command(env: dict[str, str], node: Path) -> list[str]:
         # sudo executes a real network namespace and raises loopback only; this is not a claimed fake env isolation.
         wrapper = 'ip link set lo up && exec "$@"'
         return [sudo, "-n", unshare, "--net", "--", "/bin/sh", "-c", wrapper, "verify-netns",
-                "env", "MOONRECONCILE_NETWORK_ISOLATED=1", f"MOONRECONCILE_NODE_BINARY={node}",
+                "env", "-i", "MOONRECONCILE_NETWORK_ISOLATED=1",
+                "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null", "GIT_CONFIG_NOSYSTEM=1", f"MOONRECONCILE_NODE_BINARY={node}",
                 f"MOONRECONCILE_VALIDATION_EVIDENCE={env['MOONRECONCILE_VALIDATION_EVIDENCE']}",
                 f"MOONRECONCILE_PACKAGE_DIR={env['MOONRECONCILE_PACKAGE_DIR']}",
                 f"MOONRECONCILE_PACKAGE_ZIP={env['MOONRECONCILE_PACKAGE_ZIP']}",
+                "MOONRECONCILE_VERIFIER_PROCESS_GROUP=1", "PYTHONNOUSERSITE=1",
+                f"TMPDIR={env['TMPDIR']}", f"TMP={env['TMP']}",
+                f"npm_config_userconfig={env['npm_config_userconfig']}",
+                f"npm_config_globalconfig={env['npm_config_globalconfig']}",
                 f"MOON_HOME={env['MOON_HOME']}", f"MOONBIT_HOME={env['MOONBIT_HOME']}",
                 f"PLAYWRIGHT_BROWSERS_PATH={env['PLAYWRIGHT_BROWSERS_PATH']}",
                 f"npm_config_cache={env['npm_config_cache']}", f"PATH={env['PATH']}",
@@ -544,8 +599,13 @@ def main() -> int:
     parser.add_argument("--bootstrap-only", action="store_true", help="cold-check pinned bootstrap without running product gates")
     args = parser.parse_args()
     root = args.root.resolve()
+    clean_env = invocation_env()
+    os.environ.clear()
+    os.environ.update(clean_env)  # This process and its children only; preserve the real HOME.
     if args.unit_only:
-        return subprocess.run([sys.executable, "-m", "unittest", "tests.test_verify", "-v"], cwd=root).returncode
+        sys.path.insert(0, str(root))  # Only this explicitly selected checkout is added after isolated startup.
+        suite = unittest.TestLoader().discover(str(root / "tests"), pattern="test_verify.py")
+        return 0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1
 
     if args.bootstrap_only:
         lock = LOCKS.get((platform.system(), platform.machine()))
@@ -583,10 +643,8 @@ def main() -> int:
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + f"-{os.getpid()}"
     run_dir = cache / "runs" / run_id
     _ensure_private_cache(run_dir)
-    tmp = cache / "tmp"
-    _ensure_private_cache(tmp)
-    os.environ["TMPDIR"] = str(tmp)
-    os.environ["TMP"] = str(tmp)
+    temporary = tempfile.TemporaryDirectory(prefix="moonreconcile-verify-", dir=system_temp_base(root))
+    tmp = Path(temporary.name)
     logs = run_dir / "logs"
     logs.mkdir(mode=0o700)
     summary: dict[str, object] = {
@@ -607,7 +665,8 @@ def main() -> int:
             raise
         summary["toolchain"] = toolchain
         node_home, moon_home = cache / "node", cache / "moon"
-        env = tool_env(cache, node_home, moon_home)
+        env = tool_env(cache, node_home, moon_home, tmp)
+        summary["owned_temporary_root"] = str(tmp)
         (cache / "npm-cache").mkdir(mode=0o700, exist_ok=True)
         node = node_home / "bin/node"
         npm = node_home / "bin/npm"
@@ -615,6 +674,7 @@ def main() -> int:
             raise VerifyError("Windows is unsupported by the pinned verifier")
         _run_checked([str(npm), "--version"], root, env, "bundled npm version")
         stages: list[tuple[str, list[str], float]] = [
+            ("verifier-unit", [sys.executable, "-I", "scripts/verify.py", "--unit-only"], TIMEOUT_SECONDS),
             ("moon-check", [str(moon_home / "bin/moon"), "check", "--target", "js"], TIMEOUT_SECONDS),
             ("moon-test", [str(moon_home / "bin/moon"), "test", "--target", "js"], TIMEOUT_SECONDS),
             ("moon-info", [str(moon_home / "bin/moon"), "info"], TIMEOUT_SECONDS),
@@ -665,8 +725,8 @@ def main() -> int:
         if not python:
             raise VerifyError("Python 3 is required for the independent assignment and consumer gates")
         required = [
-            ("assignment-oracle", [python, "scripts/check-assignment-oracle.py"]),
-            ("library-consumer", [python, "scripts/check-library-consumer.py"]),
+            ("assignment-oracle", [python, "-I", "scripts/check-assignment-oracle.py"]),
+            ("library-consumer", [python, "-I", "scripts/check-library-consumer.py"]),
             ("readme-smoke", [str(node), "scripts/readme-smoke.mjs"]),
             ("package-unit", [str(node), "--test", "tests/workbench-package.test.mjs"]),
             ("package-validation-unit", [str(node), "--test", "tests/workbench-package-validation.test.mjs"]),
@@ -677,7 +737,7 @@ def main() -> int:
             if outcome["exit_code"] != 0:
                 raise VerifyError(f"stage {name} failed with exit {outcome['exit_code']}")
 
-        package_root = Path(tempfile.mkdtemp(prefix="moonreconcile-verify-package-", dir=tempfile.gettempdir()))
+        package_root = Path(tempfile.mkdtemp(prefix="moonreconcile-verify-package-", dir=tmp))
         package_dir = package_root / "package"
         package_zip = package_root / "package.zip"
         package_env = dict(env)
@@ -727,13 +787,19 @@ def main() -> int:
             summary["error"] = str(error)
         if package_root is not None and package_root.exists():
             try:
-                if package_root.is_symlink() or not package_root.resolve().is_relative_to(Path(tempfile.gettempdir()).resolve()) or not package_root.name.startswith("moonreconcile-verify-package-"):
+                if package_root.is_symlink() or not package_root.resolve().is_relative_to(tmp.resolve()) or not package_root.name.startswith("moonreconcile-verify-package-"):
                     raise VerifyError(f"refusing to remove package output outside its owned temporary directory: {package_root}")
                 shutil.rmtree(package_root)
                 summary["owned_package_cleanup"] = "removed"
             except Exception as error:
                 summary["status"] = "failed"
                 summary["error"] = f"owned package cleanup failed: {error}"
+        try:
+            temporary.cleanup()
+            summary["owned_temporary_cleanup"] = "removed"
+        except Exception as error:
+            summary["status"] = "failed"
+            summary["error"] = f"owned temporary cleanup failed: {error}"
         summary_path.write_text(json.dumps(summary, indent=2) + "\n")
         print(json.dumps({"status": summary["status"], "head": head, "run": str(run_dir),
                           "summary": str(summary_path), "failure_stage": summary.get("failure_stage"),

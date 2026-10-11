@@ -1,4 +1,4 @@
-# Project Agents.md Guide
+# MoonReconcile agent guide
 
 This is a [MoonBit](https://docs.moonbitlang.com) project.
 
@@ -53,6 +53,11 @@ You can browse and install extra skills here:
   not covered by tests.
 
 ## Verification and implementation governance
+
+- Product implementation belongs to `.worktrees/quarter-workbench` on
+  `feature/quarter-workbench`. Preserve the main `feature/initial-product`
+  checkout and previously accepted evidence. Work is local by default; do not
+  push, merge, release, or submit competition materials without authorization.
 
 - `make verify` is the local one-command acceptance entrypoint. It requires a
   clean tracked and untracked source tree, checks every tracked file against

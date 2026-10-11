@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import os from 'node:os';
@@ -11,7 +11,8 @@ import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import yauzl from 'yauzl';
 import { gitIdentity, verifySourceAtHead, verifyPackage, files, PACKAGE_PROVENANCE } from './workbench-package-provenance.mjs';
-import { stopAndVerify } from './workbench-package-lifecycle.mjs';
+import { spawnOwnedServer, stopAndVerify } from './workbench-package-lifecycle.mjs';
+import { externalControlEvidence } from './workbench-package-network.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const NAME = 'moonreconcile-workbench-0.2.0';
@@ -198,14 +199,15 @@ async function main() {
     result.gates.push({ name: 'external-network-denied', status: status(external), observed: external.stdout.trim() });
     if (process.platform === 'darwin') {
       const externalControl = spawnSync(nodeOnly, ['-e', `import net from 'node:net';const socket=net.createConnection({host:'1.1.1.1',port:443});const timer=setTimeout(()=>{socket.destroy();process.stdout.write('timeout');process.exit(4)},3000);socket.once('connect',()=>{clearTimeout(timer);socket.destroy();process.stdout.write('connected');process.exit(0)});socket.once('error',(error)=>{clearTimeout(timer);process.stdout.write(error.code??'unknown');process.exit(1)})`], { cwd: relocated, env: homeEnv, encoding: 'utf8', timeout: 7000 });
-      result.network_isolation.external_control = externalControl.status === 0 ? 'unsandboxed Node connected to 1.1.1.1:443' : `unsandboxed control unavailable in outer runner (${externalControl.stdout.trim() || externalControl.stderr.trim() || `status ${status(externalControl)}`}); earlier controlled preflight recorded external success before isolation`;
+      result.network_isolation.external_control = externalControlEvidence(process.platform, externalControl);
+      result.gates.push({ name: 'fresh-external-network-positive-control', status: status(externalControl) });
     } else {
-      result.network_isolation.external_control = 'unavailable inside unshared network namespace; macOS preflight previously recorded the positive control';
+      result.network_isolation.external_control = externalControlEvidence(process.platform);
     }
 
     child = process.platform === 'darwin'
-      ? spawn('/usr/bin/sandbox-exec', ['-p', SANDBOX_PROFILE, nodeOnly, 'workbench/start.mjs'], { cwd: relocated, env: homeEnv, stdio: ['ignore', 'pipe', 'pipe'], detached: true })
-      : spawn(nodeOnly, ['workbench/start.mjs'], { cwd: relocated, env: homeEnv, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+      ? spawnOwnedServer('/usr/bin/sandbox-exec', ['-p', SANDBOX_PROFILE, nodeOnly, 'workbench/start.mjs'], { cwd: relocated, env: homeEnv, stdio: ['ignore', 'pipe', 'pipe'] })
+      : spawnOwnedServer(nodeOnly, ['workbench/start.mjs'], { cwd: relocated, env: homeEnv, stdio: ['ignore', 'pipe', 'pipe'] });
     const app = await waitForStartup(child);
     result.network_isolation.loopback = 'Node 22 child fetched local workbench index successfully';
     const localLoopback = runOfflineNode(nodeOnly, ['-e', `const response=await fetch(${JSON.stringify(app.origin)},{headers:{'Sec-Fetch-Site':'none'}});process.exit(response.status===200?0:4)`], { cwd: relocated, env: homeEnv, encoding: 'utf8', timeout: 10000 });

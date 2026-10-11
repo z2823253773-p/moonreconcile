@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 
 const alive = (child) => child && Number.isInteger(child.pid) && child.exitCode === null && child.signalCode === null;
 
@@ -13,11 +14,17 @@ function waitForClose(child, milliseconds) {
   });
 }
 
-// The validator spawns this process in its own group. Escalation reaches only
-// that owned service and its workers, never an unrelated local workbench.
+// Standalone checkers own a detached service group. Under verify.py the service
+// stays in the runner-owned group, so checker death cannot orphan its server.
+export function spawnOwnedServer(command, args, options) {
+  const detached = process.env.MOONRECONCILE_VERIFIER_PROCESS_GROUP !== '1';
+  const child = spawn(command, args, { ...options, detached });
+  child.ownedDetached = detached;
+  return child;
+}
 function signalOwned(child, signal) {
   if (!alive(child)) return;
-  try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+  try { process.kill(child.ownedDetached === false ? child.pid : -child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
 }
 
 export async function stopAndVerify(child, sessionParent) {
