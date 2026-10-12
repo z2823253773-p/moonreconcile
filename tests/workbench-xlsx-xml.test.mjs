@@ -61,10 +61,82 @@ test('normalizes literal line endings while preserving numeric carriage returns'
   assert.equal(events.filter(event => event.type === 'text').map(event => event.value).join(''), 'one\ntwo\rthree');
 });
 
-test('handles references and UTF-8 code points split across input chunks', () => {
+test('handles a reference split across input chunks followed by a UTF-8 code point', () => {
   const source = `<t>${'x'.repeat(4092)}&#60;🙂</t>`;
+  assert.equal(new TextEncoder().encode(source.slice(0, source.indexOf('&#60;'))).length, 4095);
+  assert.equal(new TextEncoder().encode(source.slice(0, source.indexOf('🙂'))).length, 4100);
   const events = eventsFor(source);
   assert.equal(events.filter(event => event.type === 'text').map(event => event.value).join(''), `${'x'.repeat(4092)}<🙂`);
+});
+
+test('preserves a four-byte UTF-8 character at every split across byte 4096', () => {
+  for (const emojiOffset of [4093, 4094, 4095]) {
+    const source = `<t>${'x'.repeat(emojiOffset - 3)}🙂</t>`;
+    const bytes = new TextEncoder().encode(source);
+    assert.equal(new TextEncoder().encode(source.slice(0, source.indexOf('🙂'))).length, emojiOffset);
+    assert.deepEqual([...bytes.subarray(emojiOffset, emojiOffset + 4)], [0xf0, 0x9f, 0x99, 0x82]);
+    assert.ok(emojiOffset < 4096 && emojiOffset + 4 > 4096);
+    const events = eventsFor(source);
+    assert.equal(events.filter(event => event.type === 'text').map(event => event.value).join(''), `${'x'.repeat(emojiOffset - 3)}🙂`);
+    assert.equal(events.filter(event => event.type === 'close').length, 1);
+  }
+});
+
+test('accepts decimal and hexadecimal supplementary-character references', () => {
+  assert.deepEqual(eventsFor('<t>&#128578;&#x1F642;</t>'), [
+    { type: 'open', uri: '', local: 't', attributes: [] },
+    { type: 'text', value: '🙂🙂' },
+    { type: 'close', uri: '', local: 't' },
+  ]);
+});
+
+test('rejects high and low surrogate numeric references instead of emitting text', () => {
+  for (const reference of ['&#xD800;', '&#xDBFF;', '&#xDC00;', '&#xDFFF;', '&#55296;', '&#56319;', '&#56320;', '&#57343;']) {
+    const events = [];
+    assert.throws(() => parseXmlEvents(new TextEncoder().encode(`<t>${reference}</t>`), {
+      onEvent: event => events.push(event),
+      limits: { xml_bytes: 65536, xml_depth: 64 }, part: 'surrogate.xml',
+    }), error => error.code === 'invalid_xlsx', reference);
+    assert.deepEqual(events, [{ type: 'open', uri: '', local: 't', attributes: [] }], reference);
+  }
+});
+
+test('rejects invalid UTF-8 sequences crossing byte 4096 without completing XML', () => {
+  const prefix = new TextEncoder().encode(`<t>${'x'.repeat(4092)}`);
+  const suffix = new TextEncoder().encode('</t>');
+  assert.equal(prefix.byteLength, 4095);
+  for (const invalidSequence of [[0xf0, 0x28, 0x8c, 0xbc], [0xed, 0xa0, 0x80]]) {
+    const bytes = Uint8Array.from([...prefix, ...invalidSequence, ...suffix]);
+    assert.equal(bytes[4095], invalidSequence[0]);
+    assert.equal(bytes[4096], invalidSequence[1]);
+    const events = [];
+    assert.throws(() => parseXmlEvents(bytes, {
+      onEvent: event => events.push(event),
+      limits: { xml_bytes: 65536, xml_depth: 64 }, part: 'encoding.xml',
+    }), error => error.code === 'invalid_xlsx');
+    assert.deepEqual(events, [{ type: 'open', uri: '', local: 't', attributes: [] }]);
+  }
+});
+
+test('rejects truncated UTF-8 at the final decoder flush on and across byte 4096', () => {
+  // A complete root makes an ignored trailing partial sequence look successful.
+  const prefix = new TextEncoder().encode(`<t>${'x'.repeat(4088)}</t>`);
+  assert.equal(prefix.byteLength, 4095);
+  for (const incompleteSequence of [[0xf0], [0xf0, 0x9f], [0xf0, 0x9f, 0x99]]) {
+    const bytes = Uint8Array.from([...prefix, ...incompleteSequence]);
+    assert.equal(bytes[4095], 0xf0);
+    assert.equal(bytes.byteLength, 4095 + incompleteSequence.length);
+    const events = [];
+    assert.throws(() => parseXmlEvents(bytes, {
+      onEvent: event => events.push(event),
+      limits: { xml_bytes: 65536, xml_depth: 64 }, part: 'encoding.xml',
+    }), error => error.code === 'invalid_xlsx');
+    assert.deepEqual(events, [
+      { type: 'open', uri: '', local: 't', attributes: [] },
+      { type: 'text', value: 'x'.repeat(4088) },
+      { type: 'close', uri: '', local: 't' },
+    ]);
+  }
 });
 
 test('rejects malformed markup and does not continue emitting events after the error', () => {
@@ -117,6 +189,35 @@ test('enforces the XML byte limit before emitting any events', () => {
     onEvent: event => events.push(event), limits: { xml_bytes: 6, xml_depth: 64 }, part: 'large.xml',
   }), error => error.code === 'xlsx_limit_exceeded');
   assert.deepEqual(events, []);
+});
+
+test('rejects caller depth limits above the frozen ceiling before emitting events', () => {
+  const events = [];
+  const bytes = new TextEncoder().encode(`${'<a>'.repeat(65)}${'</a>'.repeat(65)}`);
+  assert.throws(() => parseXmlEvents(bytes, {
+    onEvent: event => events.push(event), limits: { xml_bytes: 1024, xml_depth: 65 }, part: 'depth.xml',
+  }), error => error.code === 'invalid_xlsx');
+  assert.deepEqual(events, []);
+});
+
+test('rejects caller byte limits above the frozen ceiling even for small XML', () => {
+  const events = [];
+  assert.throws(() => parseXmlEvents(new TextEncoder().encode('<t/>'), {
+    onEvent: event => events.push(event), limits: { xml_bytes: 67108865, xml_depth: 64 }, part: 'large.xml',
+  }), error => error.code === 'invalid_xlsx');
+  assert.deepEqual(events, []);
+});
+
+test('accepts the frozen ceilings and retains lower testing limits', () => {
+  assert.doesNotThrow(() => parseXmlEvents(new TextEncoder().encode('<t/>'), {
+    onEvent() {}, limits: { xml_bytes: 67108864, xml_depth: 64 }, part: 'limits.xml',
+  }));
+  assert.doesNotThrow(() => parseXmlEvents(new TextEncoder().encode('<a><b/></a>'), {
+    onEvent() {}, limits: { xml_bytes: 11, xml_depth: 2 }, part: 'limits.xml',
+  }));
+  assert.throws(() => parseXmlEvents(new TextEncoder().encode('<a><b><c/></b></a>'), {
+    onEvent() {}, limits: { xml_bytes: 1024, xml_depth: 2 }, part: 'limits.xml',
+  }), error => error.code === 'xlsx_limit_exceeded');
 });
 
 test('preserves namespace-expanded element and attribute names', () => {

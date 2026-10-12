@@ -2,6 +2,8 @@ import { SaxesParser } from 'saxes';
 
 const XINCLUDE = 'http://www.w3.org/2001/XInclude';
 const CHUNK_BYTES = 4096;
+const MAX_XML_BYTES = 67108864;
+const MAX_XML_DEPTH = 64;
 
 function safePartName(value) {
   if (typeof value !== 'string' || value.length > 256) return 'xml';
@@ -23,12 +25,13 @@ function xmlError(code, part, position = undefined) {
 /**
  * Parse one bounded UTF-8 XML part and emit namespace-expanded XML events.
  * Character references are decoded by the XML tokenizer exactly once.
+ * Caller limits may lower the frozen ceilings; raising either is invalid.
  */
 export function parseXmlEvents(bytes, { onEvent, limits, part } = {}) {
   const partName = safePartName(part);
   if (!(bytes instanceof Uint8Array) || typeof onEvent !== 'function' || !limits ||
-      !Number.isSafeInteger(limits.xml_bytes) || limits.xml_bytes < 0 ||
-      !Number.isSafeInteger(limits.xml_depth) || limits.xml_depth < 1) {
+      !Number.isSafeInteger(limits.xml_bytes) || limits.xml_bytes < 0 || limits.xml_bytes > MAX_XML_BYTES ||
+      !Number.isSafeInteger(limits.xml_depth) || limits.xml_depth < 1 || limits.xml_depth > MAX_XML_DEPTH) {
     throw xmlError('invalid_xlsx', partName);
   }
   if (bytes.byteLength > limits.xml_bytes) throw xmlError('xlsx_limit_exceeded', partName);
