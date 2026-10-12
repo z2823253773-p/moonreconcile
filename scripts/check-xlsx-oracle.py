@@ -150,7 +150,7 @@ def check_genuine(manifest_path):
             require(sample["application_version"].startswith("26.2.4.2"), f"{name}: unexpected LibreOffice version")
             require("isolated" in method and "profile" in method, f"{name}: save method lacks isolated profile proof")
         else:
-            require(sample["application_version"].startswith("16.0300"), f"{name}: unexpected Excel version")
+            require(sample["application_version"].startswith("16.113.4"), f"{name}: unexpected Excel bundle version")
             require("ui" in method and "disk" in method, f"{name}: save method lacks UI save and disk readback details")
         expected_name = Path(sample["expected_cells_path"])
         require(not expected_name.is_absolute() and ".." not in expected_name.parts,
