@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test, { before, after } from 'node:test';
+import { packageContract, thirdPartyNotices } from '../scripts/workbench-package-provenance.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const name = 'moonreconcile-workbench-0.2.0';
@@ -38,9 +39,13 @@ async function fixture(label) {
   }
   // Include this round's new helper before it is committed. All fixture writes
   // remain under the root created by this test, never under a reviewer fixture.
-  for (const relative of ['scripts/workbench-package-provenance.mjs', 'scripts/workbench-package-lifecycle.mjs', 'scripts/workbench-package-network.mjs']) {
-    try { await fs.copyFile(path.join(root, relative), path.join(directory, relative)); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  for (const relative of ['scripts/workbench-package-provenance.mjs', 'scripts/workbench-package-lifecycle.mjs', 'scripts/workbench-package-network.mjs', 'docs/licenses/saxes-6.0.0-LICENSE.txt']) {
+    try {
+      await fs.mkdir(path.dirname(path.join(directory, relative)), { recursive: true });
+      await fs.copyFile(path.join(root, relative), path.join(directory, relative));
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
+  try { await fs.cp(path.join(root, 'workbench/xlsx'), path.join(directory, 'workbench/xlsx'), { recursive: true }); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   await fs.symlink(path.join(root, 'node_modules'), path.join(directory, 'node_modules'));
   const buildDir = '_build/js/debug/build/cmd/bridge';
   await fs.mkdir(path.join(directory, buildDir), { recursive: true });
@@ -110,6 +115,32 @@ test('builder refuses an old bridge after committed core source inputs change', 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /compiled bridge source\/build inputs changed/);
   console.log(JSON.stringify({ fixture: 'new-core-old-bridge', builder_exit: result.status, rejected: 'compiled bridge source/build inputs changed' }));
+});
+
+test('package contract rejects saxes and xmlchars lock drift', async () => {
+  const directory = await fixture('xml-dependency-lock-drift');
+  const lockPath = path.join(directory, 'package-lock.json');
+  const lock = JSON.parse(await fs.readFile(lockPath, 'utf8'));
+  lock.packages['node_modules/saxes'].integrity = 'sha512-tampered';
+  await fs.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+  await assert.rejects(packageContract(directory), /locked candidate integrity drift: saxes/);
+
+  lock.packages['node_modules/saxes'].integrity = 'sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==';
+  lock.packages['node_modules/xmlchars'].version = '2.3.0';
+  await fs.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+  await assert.rejects(packageContract(directory), /locked transitive dependency drift: xmlchars/);
+});
+
+test('offline saxes notice supplement rejects missing or altered license source', async () => {
+  const directory = await fixture('xml-license-source-drift');
+  const contract = await packageContract(root);
+  const sourceLicense = path.join(directory, 'docs/licenses/saxes-6.0.0-LICENSE.txt');
+  await fs.rm(sourceLicense);
+  await assert.rejects(thirdPartyNotices(root, contract.lock, directory));
+
+  await fs.copyFile(path.join(root, 'docs/licenses/saxes-6.0.0-LICENSE.txt'), sourceLicense);
+  await fs.appendFile(sourceLicense, 'changed\n');
+  await assert.rejects(thirdPartyNotices(root, contract.lock, directory), /saxes v6\.0\.0 supplemental license source hash changed/);
 });
 
 test('strict checker rejects an archive that differs from the complete package directory', async () => {

@@ -152,7 +152,7 @@ async function main() {
   const archiveBytes = await fs.readFile(ZIP_PATH);
   const packageManifest = JSON.parse(await fs.readFile(path.join(PACKAGE_DIR, 'package.json'), 'utf8'));
   assert.equal(packageManifest.version, '0.2.0');
-  assert.deepEqual(Object.keys(packageManifest.dependencies).sort(), ['buffer-crc32', 'yauzl', 'yazl']);
+  assert.deepEqual(Object.keys(packageManifest.dependencies).sort(), ['buffer-crc32', 'saxes', 'yauzl', 'yazl']);
   assert.equal(packageManifest.devDependencies, undefined);
 
   const runtime = nodeBinary();

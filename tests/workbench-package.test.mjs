@@ -129,13 +129,15 @@ test('relocated_bridge_equals_checkout', async (t) => {
 test('package_contains_only_runtime_deps_and_licenses', async () => {
   const pkg = await packageJson();
   const entries = await readdir(packageRoot);
-  assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['buffer-crc32', 'yauzl', 'yazl']);
+  assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['buffer-crc32', 'saxes', 'yauzl', 'yazl']);
   assert.equal(pkg.devDependencies, undefined);
   assert.ok(entries.includes('LICENSE'));
   assert.ok(entries.includes('THIRD-PARTY-NOTICES'));
   const notices = await readFile(path.join(packageRoot, 'THIRD-PARTY-NOTICES'), 'utf8');
   assert.match(notices, /Apache License, Version 2\.0/);
-  for (const dependency of ['buffer-crc32@1.0.0', 'yauzl@3.4.0', 'yazl@3.3.1', 'pend@1.2.0']) assert.ok(notices.includes(dependency), `missing notice for ${dependency}`);
+  for (const dependency of ['buffer-crc32@1.0.0', 'yauzl@3.4.0', 'yazl@3.3.1', 'pend@1.2.0', 'saxes@6.0.0', 'xmlchars@2.2.0']) assert.ok(notices.includes(dependency), `missing notice for ${dependency}`);
+  assert.ok(notices.includes('Three-Clause BSD License') || notices.includes('Permission is hereby granted, free of charge'), 'saxes license supplement must preserve its complete official text');
+  assert.ok(notices.includes(await readFile(path.join(root, 'docs/licenses/saxes-6.0.0-LICENSE.txt'), 'utf8')), 'saxes license supplement must be included verbatim');
   assert.ok(entries.includes('package-lock.json'));
   assert.ok(entries.includes('runtime'));
   assert.ok(entries.includes('cli'));
@@ -149,6 +151,12 @@ test('package_contains_only_runtime_deps_and_licenses', async () => {
     assert.ok(!stat.isSymbolicLink(), `${entry} must not be a symlink`);
   }
   const lock = JSON.parse(await readFile(path.join(packageRoot, 'package-lock.json'), 'utf8'));
+  assert.deepEqual(Object.keys(lock.packages).filter(name => name.startsWith('node_modules/')).sort(), [
+    'node_modules/buffer-crc32', 'node_modules/pend', 'node_modules/saxes',
+    'node_modules/xmlchars', 'node_modules/yauzl', 'node_modules/yazl',
+  ]);
+  assert.equal(lock.packages['node_modules/saxes'].version, '6.0.0');
+  assert.equal(lock.packages['node_modules/xmlchars'].version, '2.2.0');
   for (const name of Object.keys(lock.packages ?? {})) {
     assert.ok(!name.includes('/@playwright/'), `unexpected browser dependency ${name}`);
     assert.ok(!name.includes('/playwright'), `unexpected browser dependency ${name}`);

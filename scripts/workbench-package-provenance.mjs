@@ -3,12 +3,22 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const BRIDGE_RELATIVE = '_build/js/debug/build/cmd/bridge/bridge.js';
 export const BUILD_PROVENANCE = '_build/js/debug/build/cmd/bridge/bridge.provenance.json';
 export const PACKAGE_PROVENANCE = 'PACKAGE-PROVENANCE.json';
 export const VERSION = '0.2.0';
-export const EXPECTED = { 'buffer-crc32': '1.0.0', yauzl: '3.4.0', yazl: '3.3.1' };
+export const EXPECTED = { 'buffer-crc32': '1.0.0', saxes: '6.0.0', yauzl: '3.4.0', yazl: '3.3.1' };
+export const PINNED_TRANSITIVE = { xmlchars: '2.2.0' };
+export const PINNED_ARTIFACTS = {
+  saxes: { version: '6.0.0', integrity: 'sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==' },
+  xmlchars: { version: '2.2.0', integrity: 'sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==' },
+};
+export const SAXES_LICENSE = {
+  relativePath: 'docs/licenses/saxes-6.0.0-LICENSE.txt',
+  sha256: '0fac2374380621b22e6b50451057721a9c52935b02d16d106a9f04897f061d0e',
+};
 export const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const json = async (file) => JSON.parse(await fs.readFile(file, 'utf8'));
 
@@ -75,6 +85,7 @@ export async function buildInputs(root) {
 export async function sourceInputs(root) {
   return { ...await buildInputs(root), ...await namedFiles(root, [
     'cli', 'workbench', 'examples', 'package.json', 'package-lock.json', 'LICENSE',
+    SAXES_LICENSE.relativePath,
     'docs/workbench.md', 'docs/limitations.md', 'docs/workbench-start-here.md',
     'scripts/package-workbench.mjs', 'scripts/check-workbench-package.mjs',
     'scripts/workbench-package-lifecycle.mjs', 'scripts/workbench-package-network.mjs',
@@ -125,6 +136,8 @@ export async function packageContract(root) {
   const rootLock = await json(path.join(root, 'package-lock.json'));
   assert.equal(manifest.version, VERSION);
   assert.deepEqual(manifest.dependencies, EXPECTED, 'audit changed production dependency contract before packaging');
+  assert.deepEqual(manifest.overrides, PINNED_TRANSITIVE, 'audit changed the exact XML parser transitive pin');
+  assert.deepEqual(rootLock.packages?.['']?.dependencies, EXPECTED, 'lockfile root dependencies differ from manifest');
   const dependencies = { ...EXPECTED };
   const packages = { '': { name: 'moonreconcile-workbench', version: VERSION, dependencies, engines: { node: '>=22' } } };
   const visit = (name) => {
@@ -133,6 +146,11 @@ export async function packageContract(root) {
     const entry = rootLock.packages?.[key];
     assert.ok(entry, `missing locked dependency: ${name}`);
     if (dependencies[name]) assert.equal(entry.version, dependencies[name]);
+    if (PINNED_TRANSITIVE[name]) assert.equal(entry.version, PINNED_TRANSITIVE[name], `locked transitive dependency drift: ${name}`);
+    if (PINNED_ARTIFACTS[name]) {
+      assert.equal(entry.version, PINNED_ARTIFACTS[name].version, `locked candidate version drift: ${name}`);
+      assert.equal(entry.integrity, PINNED_ARTIFACTS[name].integrity, `locked candidate integrity drift: ${name}`);
+    }
     packages[key] = entry;
     Object.keys(entry.dependencies ?? {}).forEach(visit);
   };
@@ -147,7 +165,7 @@ export function packageGuide(source) {
   return source.replace('](workbench.md)', '](docs/workbench.md)').replace('](../cli/main.mjs)', '](cli/main.mjs)').replace('](limitations.md)', '](docs/limitations.md)');
 }
 
-export async function thirdPartyNotices(packageRoot, lock) {
+export async function thirdPartyNotices(packageRoot, lock, sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')) {
   const core = path.join(toolchainHome(), 'lib/core');
   const sections = ['# Third-party notices', '', 'The compiled MoonBit bridge contains MoonBit core runtime code.', 'MoonBit core is licensed under Apache License 2.0; its source NOTICE is included verbatim below.', '', '## MoonBit core LICENSE', '', await fs.readFile(path.join(core, 'LICENSE'), 'utf8'), '', '## MoonBit core NOTICE', '', await fs.readFile(path.join(core, 'NOTICE'), 'utf8')];
   for (const key of Object.keys(lock.packages).filter(Boolean).sort()) {
@@ -156,12 +174,19 @@ export async function thirdPartyNotices(packageRoot, lock) {
     const metadata = await json(path.join(directory, 'package.json'));
     assert.equal(metadata.version, lock.packages[key].version, `installed dependency version: ${name}`);
     let text;
+    let preservedSupplement = false;
     for (const file of ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license', 'license.md']) {
       try { text = await fs.readFile(path.join(directory, file), 'utf8'); break; } catch (error) { if (error.code !== 'ENOENT') throw error; }
     }
+    if (!text && name === 'saxes' && metadata.version === '6.0.0') {
+      const supplemental = await fs.readFile(path.join(sourceRoot, SAXES_LICENSE.relativePath));
+      assert.equal(digest(supplemental), SAXES_LICENSE.sha256, 'saxes v6.0.0 supplemental license source hash changed');
+      text = supplemental.toString('utf8');
+      preservedSupplement = true;
+    }
     assert.ok(text, `license text missing from production dependency: ${name}`);
     const license = typeof metadata.license === 'string' ? metadata.license : JSON.stringify(metadata.license);
-    sections.push('', `## ${name}@${metadata.version} (${license})`, '', text.trimEnd());
+    sections.push('', `## ${name}@${metadata.version} (${license})`, '', preservedSupplement ? text : text.trimEnd());
   }
   return `${sections.join('\n')}\n`;
 }
@@ -192,6 +217,6 @@ export async function verifyPackage(root, packageRoot) {
   }
   const guide = packageGuide(await fs.readFile(path.join(root, 'docs/workbench-start-here.md'), 'utf8'));
   for (const name of ['START-HERE.md', 'README.md']) assert.equal(await fs.readFile(path.join(packageRoot, name), 'utf8'), guide);
-  assert.equal(await fs.readFile(path.join(packageRoot, 'THIRD-PARTY-NOTICES'), 'utf8'), await thirdPartyNotices(packageRoot, contract.lock), 'license notices differ from current authoritative inputs');
+  assert.equal(await fs.readFile(path.join(packageRoot, 'THIRD-PARTY-NOTICES'), 'utf8'), await thirdPartyNotices(packageRoot, contract.lock, root), 'license notices differ from current authoritative inputs');
   return record;
 }
