@@ -2,11 +2,14 @@
 """Independent ElementTree and ZIP readback for restricted XLSX Task 1 fixtures."""
 
 import argparse
+import io
 import hashlib
 import json
 from pathlib import Path
 import posixpath
 import re
+import struct
+import tempfile
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -180,14 +183,183 @@ def check_genuine(manifest_path):
     return outputs
 
 
+def _write_copy(source, destination, mutate=None, extra=()):
+    with zipfile.ZipFile(source) as src, zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as dst:
+        for info in src.infolist():
+            if mutate and info.filename in mutate:
+                value = mutate[info.filename](src.read(info.filename))
+            else:
+                value = src.read(info.filename)
+            dst.writestr(info, value)
+        for item in extra:
+            info, value = item
+            dst.writestr(info, value)
+
+
+def _central_records(data):
+    result = []
+    offset = data.find(b"PK\x01\x02")
+    while offset >= 0 and offset + 46 <= len(data):
+        if data[offset:offset + 4] != b"PK\x01\x02":
+            break
+        name_len, extra_len, comment_len = struct.unpack_from("<HHH", data, offset + 28)
+        end = offset + 46 + name_len + extra_len + comment_len
+        if end > len(data):
+            break
+        result.append({"offset": offset, "name": data[offset + 46:offset + 46 + name_len], "end": end})
+        offset = data.find(b"PK\x01\x02", end)
+    return result
+
+
+def _mutate_raw(source, destination, mutation):
+    data = bytearray(source.read_bytes())
+    records = _central_records(data)
+    if not records:
+        raise AssertionError("base archive has no central directory")
+    if mutation == "local_central_name_mismatch":
+        first = records[0]
+        n = struct.unpack_from("<H", data, first["offset"] + 28)[0]
+        local = data.find(b"PK\x03\x04")
+        old = bytes(data[local + 30:local + 30 + n])
+        data[local + 30:local + 30 + n] = b"x" * n
+        require(data.find(old, first["offset"] + 46, first["end"]) >= 0, "central name disappeared")
+    elif mutation == "crc_mismatch":
+        local = data.find(b"PK\x03\x04")
+        old = struct.unpack_from("<I", data, local + 14)[0]
+        new = old ^ 0x01010101
+        struct.pack_into("<I", data, local + 14, new)
+        struct.pack_into("<I", data, records[0]["offset"] + 16, new)
+    elif mutation == "forged_uncompressed_size":
+        local = data.find(b"PK\x03\x04")
+        csize = struct.unpack_from("<I", data, local + 18)[0]
+        usize = struct.unpack_from("<I", data, local + 22)[0]
+        struct.pack_into("<I", data, local + 22, max(0, usize - 1))
+        struct.pack_into("<I", data, records[0]["offset"] + 24, max(0, usize - 1))
+    elif mutation == "overlapping_local_records":
+        require(len(records) > 1, "need two central members")
+        first_local = struct.unpack_from("<I", data, records[0]["offset"] + 42)[0]
+        struct.pack_into("<I", data, records[1]["offset"] + 42, first_local)
+    elif mutation == "encrypted_entry":
+        local = data.find(b"PK\x03\x04")
+        flags = struct.unpack_from("<H", data, local + 6)[0] | 1
+        struct.pack_into("<H", data, local + 6, flags)
+        struct.pack_into("<H", data, records[0]["offset"] + 8, flags)
+    elif mutation == "truncated_archive":
+        data = data[:-12]
+    else:
+        raise AssertionError(f"unknown raw mutation {mutation}")
+    destination.write_bytes(data)
+
+
+class _NonSeekable(io.BytesIO):
+    def seekable(self):
+        return False
+
+    def seek(self, *_args, **_kwargs):
+        raise io.UnsupportedOperation("non-seekable test output")
+
+
+def write_malicious_packages(source, destination):
+    destination.mkdir(parents=True, exist_ok=True)
+    base = source
+    outputs = {}
+    raw_cases = {"local_central_name_mismatch", "crc_mismatch", "forged_uncompressed_size",
+                 "overlapping_local_records", "encrypted_entry", "truncated_archive"}
+    for case in raw_cases:
+        out = destination / f"{case}.xlsx"
+        _mutate_raw(base, out, case)
+        outputs[case] = out
+
+    def info(name, mode=None, compression=zipfile.ZIP_STORED):
+        item = zipfile.ZipInfo(name)
+        item.compress_type = compression
+        if mode is not None:
+            item.create_system = 3
+            item.external_attr = mode << 16
+        return item
+
+    duplicate = destination / "duplicate_name.xlsx"
+    with zipfile.ZipFile(base) as src, zipfile.ZipFile(duplicate, "w", zipfile.ZIP_DEFLATED) as dst:
+        for item in src.infolist(): dst.writestr(item, src.read(item.filename))
+        dst.writestr("xl/workbook.xml", b"<workbook/>")
+    outputs["duplicate_name"] = duplicate
+
+    for case, extras in {
+        "case_alias": [(info("XL/WORKBOOK.XML"), b"x")],
+        "nfc_alias": [(info("xl/caf\u00e9.xml"), b"x"), (info("xl/cafe\u0301.xml"), b"y")],
+        "path_traversal": [(info("../escape.xml"), b"x")],
+        "symlink_entry": [(info("xl/link", 0o120777), b"xl/workbook.xml")],
+        "special_file_entry": [(info("xl/fifo", 0o010644), b"x")],
+        "unsupported_method": [(info("xl/bzip.bin", compression=zipfile.ZIP_BZIP2), b"x")],
+        "safe_inert_directory": [(info("inert/", 0o040755 | 0x10), b"")],
+    }.items():
+        out = destination / f"{case}.xlsx"
+        _write_copy(base, out, extra=extras)
+        outputs[case] = out
+
+    # A non-seekable writer forces bit 3 and writes a valid data descriptor.
+    sink = _NonSeekable()
+    with zipfile.ZipFile(sink, "w", zipfile.ZIP_DEFLATED) as archive, zipfile.ZipFile(base) as src:
+        for item in src.infolist():
+            archive.writestr(item.filename, src.read(item.filename))
+    descriptor = destination / "bit3_descriptor_valid.xlsx"
+    descriptor.write_bytes(sink.getvalue())
+    with zipfile.ZipFile(descriptor) as archive:
+        require(archive.infolist()[0].flag_bits & 8, "bit-3 fixture did not use a data descriptor")
+        require(archive.testzip() is None and archive.read("xl/workbook.xml"), "bit-3 XLSX fixture failed independent readback")
+    outputs["bit3_descriptor_valid"] = descriptor
+
+    for count in (2048, 2049):
+        out = destination / f"entry_count_{count}.xlsx"
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as archive:
+            for index in range(count):
+                archive.writestr(f"safe/{index:04}.txt", b"")
+        outputs[f"entry_count_{count}"] = out
+    return outputs
+
+
+def check_malicious(manifest_path, source, out_dir=None):
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    require(manifest.get("schema_version") == 1, "unsupported malicious fixture schema")
+    cases = manifest.get("zip_mutations")
+    require(isinstance(cases, list) and len(cases) >= 16, "malicious ZIP mutation list is incomplete")
+    with tempfile.TemporaryDirectory(prefix="xlsx-oracle-") as temporary:
+        directory = Path(out_dir) if out_dir else Path(temporary)
+        outputs = write_malicious_packages(source, directory)
+        require(set(cases) == set(outputs), "Python mutation set differs from manifest")
+        require(set(manifest.get("lower_limit_tests", [])) == {"compressed_bytes", "actual_unzip_bytes", "xml_bytes", "xml_depth"},
+                "lower-limit test list is incomplete")
+        result = []
+        for name in cases:
+            path = outputs[name]
+            if name not in {"local_central_name_mismatch", "crc_mismatch", "forged_uncompressed_size",
+                            "overlapping_local_records", "encrypted_entry", "truncated_archive"}:
+                with zipfile.ZipFile(path) as archive:
+                    if name == "safe_inert_directory":
+                        require(any(item.is_dir() for item in archive.infolist()), "directory mutation was not retained")
+                    elif name == "bit3_descriptor_valid":
+                        require(archive.infolist()[0].flag_bits & 8, "descriptor flag missing")
+            result.append({"id": name, "bytes": path.stat().st_size, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+        # Limits are exercised by the Node package tests with lower injected ceilings;
+        # production constants remain part of those exact-value assertions.
+        return result
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--xml-cases", required=True, type=Path)
     parser.add_argument("--genuine-manifest", required=True, type=Path)
+    parser.add_argument("--malicious-manifest", type=Path)
+    parser.add_argument("--write-malicious-dir", type=Path)
     args = parser.parse_args()
     xml_count, _cases = check_xml_cases(args.xml_cases)
     samples = check_genuine(args.genuine_manifest)
-    print(json.dumps({"status": "PASS", "xml_cases_checked": xml_count, "genuine_samples": samples}, ensure_ascii=False, indent=2))
+    malicious = []
+    if args.malicious_manifest:
+        source = args.genuine_manifest.parent / "lo-1904-values.xlsx"
+        malicious = check_malicious(args.malicious_manifest, source, args.write_malicious_dir)
+    print(json.dumps({"status": "PASS", "xml_cases_checked": xml_count, "genuine_samples": samples,
+                      "malicious_zip_mutations": malicious}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

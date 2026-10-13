@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "base_fixture": "lo-1904-values.xlsx",
+  "cases": [
+    {"id":"lo_wrong_uri","part":"xl/workbook.xml","find":"{7626C862-2A13-11E5-B345-FEFF819CDC9F}","replace":"{00000000-0000-0000-0000-000000000000}","expect":"unsupported_xlsx_feature"},
+    {"id":"lo_extra_attribute","part":"xl/workbook.xml","find":"stringRefSyntax=\"CalcA1ExcelA1\"","replace":"stringRefSyntax=\"CalcA1ExcelA1\" extra=\"x\"","expect":"unsupported_xlsx_feature"},
+    {"id":"lo_non_whitespace_text","part":"xl/workbook.xml","find":"<loext:extCalcPr stringRefSyntax=\"CalcA1ExcelA1\"/>","replace":"<loext:extCalcPr stringRefSyntax=\"CalcA1ExcelA1\">active</loext:extCalcPr>","expect":"unsupported_xlsx_feature"},
+    {"id":"lo_unknown_element","part":"xl/workbook.xml","find":"</ext>","replace":"<loext:extCalcPr stringRefSyntax=\"CalcA1ExcelA1\"/><loext:extra/></ext>","expect":"unsupported_xlsx_feature"},
+    {"id":"alternate_content","part":"xl/workbook.xml","find":"<sheets>","replace":"<mc:AlternateContent/><sheets>","expect":"unsupported_xlsx_feature"},
+    {"id":"unknown_default","part":"[Content_Types].xml","find":"<Default Extension=\"xml\"","replace":"<Default Extension=\"zzz\" ContentType=\"application/x-unknown\"/><Default Extension=\"xml\"","expect":"unsupported_xlsx_feature"},
+    {"id":"actual_png_under_unused_default","add_part":"xl/media/unused.png","bytes_base64":"iVBORw0KGgo=","expect":"unsupported_xlsx_feature"},
+    {"id":"actual_jpeg_under_unused_default","add_part":"xl/media/unused.jpeg","bytes_base64":"/9j/4AAQ","expect":"unsupported_xlsx_feature"},
+    {"id":"actual_fntdata_under_unused_default","add_part":"xl/theme/fontdata.fntdata","bytes_base64":"Zm9udA==","expect":"unsupported_xlsx_feature"},
+    {"id":"duplicate_default","part":"[Content_Types].xml","find":"<Default Extension=\"xml\"","replace":"<Default Extension=\"xml\" ContentType=\"application/xml\"/><Default Extension=\"xml\"","expect":"invalid_xlsx"},
+    {"id":"missing_workbook_override","part":"[Content_Types].xml","find":"<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>","replace":"","expect":"unsupported_xlsx_feature"},
+    {"id":"formula_on_worksheet","part":"xl/worksheets/sheet1.xml","find":"</sheetData>","replace":"<row r=\"9\"><c r=\"A9\"><f>1+1</f><v>2</v></c></row></sheetData>","expect":"xlsx_formula_rejected"},
+    {"id":"formula_shared","part":"xl/worksheets/sheet1.xml","find":"</sheetData>","replace":"<row r=\"9\"><c r=\"A9\"><f t=\"shared\" si=\"0\">A1</f></c></row></sheetData>","expect":"xlsx_formula_rejected"},
+    {"id":"formula_array","part":"xl/worksheets/sheet1.xml","find":"</sheetData>","replace":"<row r=\"9\"><c r=\"A9\"><f t=\"array\" ref=\"A9:A9\">1+1</f><v>2</v></c></row></sheetData>","expect":"xlsx_formula_rejected"},
+    {"id":"formula_dynamic","part":"xl/worksheets/sheet1.xml","find":"</sheetData>","replace":"<row r=\"9\"><c r=\"A9\"><f aca=\"1\" ca=\"1\">SEQUENCE(1)</f></c></row></sheetData>","expect":"xlsx_formula_rejected"},
+    {"id":"target_escape","part":"xl/_rels/workbook.xml.rels","find":"Target=\"worksheets/sheet1.xml\"","replace":"Target=\"../../../outside.xml\"","expect":"unsupported_xlsx_feature"},
+    {"id":"target_encoded","part":"xl/_rels/workbook.xml.rels","find":"Target=\"worksheets/sheet1.xml\"","replace":"Target=\"%2e%2e/worksheets/sheet1.xml\"","expect":"unsupported_xlsx_feature"},
+    {"id":"target_external","part":"xl/_rels/workbook.xml.rels","find":"Target=\"worksheets/sheet1.xml\"","replace":"Target=\"https://example.invalid/sheet.xml\" TargetMode=\"External\"","expect":"unsupported_xlsx_feature"},
+    {"id":"missing_sheet_relationship_id","part":"xl/workbook.xml","find":"r:id=\"rId3\"","replace":"","expect":"invalid_xlsx"},
+    {"id":"duplicate_relationship_id","part":"xl/_rels/workbook.xml.rels","find":"</Relationships>","replace":"<Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>","expect":"unsupported_xlsx_feature"}
+  ],
+  "zip_mutations": [
+    "local_central_name_mismatch", "bit3_descriptor_valid", "crc_mismatch", "truncated_archive",
+    "forged_uncompressed_size", "duplicate_name", "case_alias", "nfc_alias", "path_traversal",
+    "symlink_entry", "special_file_entry", "overlapping_local_records", "encrypted_entry",
+    "unsupported_method", "safe_inert_directory", "entry_count_2048", "entry_count_2049"
+  ],
+  "lower_limit_tests": ["compressed_bytes", "actual_unzip_bytes", "xml_bytes", "xml_depth"]
+}
