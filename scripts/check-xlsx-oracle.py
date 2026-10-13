@@ -2,6 +2,7 @@
 """Independent ElementTree and ZIP readback for restricted XLSX Task 1 fixtures."""
 
 import argparse
+import csv
 import io
 import zlib
 import hashlib
@@ -159,11 +160,11 @@ def check_genuine(manifest_path):
         require(not expected_name.is_absolute() and ".." not in expected_name.parts,
                 f"{name}: expected data path must be fixture-relative")
         require(expected_name.suffix == ".json", f"{name}: expected_cells_path must identify independent JSON, not workbook XML")
-        require(expected_name.as_posix() in {"genuine-save-expected.json", "native-filter-expected.json"},
+        require(expected_name.as_posix() in {"genuine-save-expected.json", "native-filter-expected.json", "conversion-expected.json"},
                 f"{name}: unexpected independent expected-data file")
-        if expected_name.as_posix() == "native-filter-expected.json":
+        if expected_name.as_posix() in {"native-filter-expected.json", "conversion-expected.json"}:
             extra = json.loads((manifest_path.parent / expected_name).read_text(encoding="utf-8"))
-            require(extra.get("schema_version") == 1, "unsupported sixth expected design")
+            require(extra.get("schema_version") == 1, "unsupported independent expected design")
             expected.update({item["id"]: item for item in extra["samples"]})
         require(name in expected, f"sample {name} lacks independent expected cells")
         file_path = manifest_path.parent / sample["path"]
@@ -207,6 +208,181 @@ def check_genuine(manifest_path):
                         "date_system": data["date_system"], "cells_read": len(data["cells"])})
     require(seen == set(expected), "genuine manifest must contain each planned sample exactly once")
     return outputs
+
+
+
+def _decode_xstring_once(value):
+    """Decode ST_Xstring escapes once, including escaped literal escape tokens."""
+    output = []
+    index = 0
+    while index < len(value):
+        match = re.match(r"_x([0-9A-Fa-f]{4})_", value[index:])
+        if match is None:
+            output.append(value[index]); index += 1; continue
+        unit = int(match.group(1), 16); end = index + len(match.group(0))
+        if unit == 0x5f:
+            tail = re.match(r"x([0-9A-Fa-f]{4})_", value[end:])
+            if tail:
+                output.append("_x" + tail.group(1) + "_"); index = end + len(tail.group(0)); continue
+        if 0xd800 <= unit <= 0xdbff:
+            low = re.match(r"_x([0-9A-Fa-f]{4})_", value[end:])
+            require(low is not None and 0xdc00 <= int(low.group(1), 16) <= 0xdfff, "unpaired high surrogate in Xstring")
+            low_unit = int(low.group(1), 16)
+            output.append(chr(0x10000 + ((unit - 0xd800) << 10) + low_unit - 0xdc00))
+            index = end + len(low.group(0)); continue
+        require(not 0xdc00 <= unit <= 0xdfff, "unpaired low surrogate in Xstring")
+        output.append(chr(unit)); index = end
+    return "".join(output)
+
+
+def _decimal_expand_oracle(raw):
+    from decimal import Decimal
+    require(re.fullmatch(r"[+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?", raw) is not None, "invalid numeric lexeme")
+    if "e" not in raw.lower(): return raw
+    sign = "-" if raw.startswith("-") else "+" if raw.startswith("+") else ""
+    body = raw[1:] if raw[:1] in "+-" else raw
+    mantissa, exponent = re.split(r"[eE]", body)
+    whole, dot, fraction = mantissa.partition(".")
+    exponent_value = int(exponent)
+    require(abs(exponent_value) <= 65536, "oracle exponent exceeds bounded-work contract")
+    digits = whole + fraction
+    point = len(whole) + exponent_value
+    if point <= 0: result = "0." + "0" * -point + digits
+    elif point >= len(digits): result = digits + "0" * (point - len(digits))
+    else: result = digits[:point] + "." + digits[point:]
+    expanded = sign + result
+    require(Decimal(raw) == Decimal(expanded), "string expansion changed Decimal value")
+    return expanded
+
+
+def _raw_workbook_for_adapter(archive, source_sha, worksheet_meta):
+    workbook = ET.fromstring(archive.read("xl/workbook.xml"))
+    sheets = workbook.find(f"{{{MAIN}}}sheets")
+    rel_path = "xl/_rels/workbook.xml.rels"
+    relroot = ET.fromstring(archive.read(rel_path))
+    rels = {item.get("Id"): item for item in relroot.findall(f"{{{PKG_REL}}}Relationship")}
+    chosen = None
+    for sheet in sheets:
+        rid = sheet.get(f"{{{REL}}}id")
+        rel = rels.get(rid)
+        if rel is None: continue
+        target = posixpath.normpath(posixpath.join("xl", rel.get("Target", "")))
+        if (source_sha + ":" + sheet.get("sheetId", "")) == worksheet_meta["sheet_id"]:
+            chosen = (sheet, rel, target); break
+    require(chosen is not None, "adapter worksheet sheet_id does not bind to workbook")
+    sheet, relation, worksheet_path = chosen
+    require(sheet.get("name") == worksheet_meta["name"] and relation.get("Id") == worksheet_meta["relationship_id"] and worksheet_path == worksheet_meta["part"],
+            "adapter worksheet identity differs from raw source")
+    require(relation.get("Type") == REL + "/worksheet" and relation.get("TargetMode", "Internal") == "Internal", "selected part is not an internal worksheet")
+    wb_pr = workbook.find(f"{{{MAIN}}}workbookPr")
+    date_system = "1904" if wb_pr is not None and wb_pr.get("date1904", "false").lower() in ("true", "1") else "1900"
+    ws = ET.fromstring(archive.read(worksheet_path))
+    shared=[]
+    if "xl/sharedStrings.xml" in archive.namelist():
+        sst=ET.fromstring(archive.read("xl/sharedStrings.xml"))
+        shared=[_decode_xstring_once("".join(node.text or "" for node in item.iter(f"{{{MAIN}}}t"))) for item in sst.findall(f"{{{MAIN}}}si")]
+    styles=ET.fromstring(archive.read("xl/styles.xml"))
+    custom={node.get("numFmtId"):node.get("formatCode") for node in styles.findall(f"{{{MAIN}}}numFmts/{{{MAIN}}}numFmt")}
+    xfs=styles.find(f"{{{MAIN}}}cellXfs")
+    formats=[custom.get(xf.get("numFmtId"),"General") for xf in xfs.findall(f"{{{MAIN}}}xf")]
+    cells={}; row_hidden={}
+    for row in ws.findall(f"{{{MAIN}}}sheetData/{{{MAIN}}}row"):
+        row_num=int(row.get("r")); row_hidden[row_num]=row.get("hidden","false") in ("true","1")
+        for cell in row.findall(f"{{{MAIN}}}c"):
+            ref=cell.get("r"); kind=cell.get("t","n"); v=cell.find(f"{{{MAIN}}}v"); raw="" if v is None else (v.text or "")
+            rich=0
+            if kind=="s": raw=shared[int(raw)]; typ="text"
+            elif kind=="inlineStr":
+                inline=cell.find(f"{{{MAIN}}}is")
+                rich=len(inline.findall(f"{{{MAIN}}}r")) if inline is not None else 0
+                raw=_decode_xstring_once("".join(node.text or "" for node in inline.iter(f"{{{MAIN}}}t"))) if inline is not None else ""
+                typ="text" if raw else "blank"
+            elif kind=="str": raw=_decode_xstring_once(raw);typ="text" if raw else "blank"
+            elif kind=="b": typ="boolean" if raw else "blank"
+            elif kind=="n": typ="numeric" if raw else "blank"
+            else: raise AssertionError("unexpected raw cell type in accepted source")
+            style=int(cell.get("s","0")); cells[ref]={"raw":raw,"type":typ,"style":style,"format":formats[style],"rich_runs":rich}
+    return {"cells":cells,"row_hidden":row_hidden,"date_system":date_system,"ws":ws}
+
+
+def _date_oracle(raw, date_system):
+    from datetime import date, timedelta
+    expanded=_decimal_expand_oracle(raw)
+    require(not expanded.startswith("-"), "negative Excel date serial")
+    days=int(expanded.split(".",1)[0])
+    if date_system=="1900":
+        require(days!=60 and days<=2958465, "rejected 1900 date serial")
+        base=date(1899,12,31); offset=days-1 if days>60 else days
+    else:
+        require(days<=2957003, "rejected 1904 date serial")
+        base=date(1904,1,1); offset=days
+    return (base+timedelta(days=offset)).isoformat()
+
+
+def check_adapter_output(manifest_path, output_root):
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    expected_doc=json.loads((manifest_path.parent/"genuine-save-expected.json").read_text(encoding="utf-8"))
+    expected={item["id"]:item for item in expected_doc["samples"]}
+    checked=[]
+    for name in ("lo-conversion-1900.xlsx","lo-conversion-1904.xlsx"):
+        sample=expected[name]; directory=output_root/name.removesuffix(".xlsx")
+        source=(manifest_path.parent/name).read_bytes(); source_sha=hashlib.sha256(source).hexdigest()
+        profile_bytes=(directory/"profile.json").read_bytes(); adapter_bytes=(directory/"adapter.json").read_bytes(); csv_bytes=(directory/"canonical.csv").read_bytes()
+        profile=json.loads(profile_bytes); adapter=json.loads(adapter_bytes)
+        require(set(profile)=={"schema_version","adapter_id","adapter_version","import_spec"}, "profile keys changed")
+        require(profile=={"schema_version":1,"adapter_id":"restricted-ooxml","adapter_version":"1.0.0","import_spec":profile["import_spec"]}, "profile version mismatch")
+        spec=profile["import_spec"]
+        require(spec["schema_version"]==1 and spec["source_sha256"]==source_sha and spec["formula_policy"]=="reject", "profile does not bind original source")
+        require(spec["header_row"]==sample["range"]["header_row"] and spec["column_start"]==sample["range"]["column_start"] and spec["column_end"]==sample["range"]["column_end"] and spec["last_row"]==sample["range"]["last_row"], "profile rectangle differs from independent reference")
+        require([item["mode"] for item in spec["columns"]]==sample["modes"], "profile modes differ from independent reference")
+        with zipfile.ZipFile(io.BytesIO(source)) as archive:
+            raw=_raw_workbook_for_adapter(archive,source_sha,adapter["worksheet"])
+        require(raw["date_system"]==sample["stored"]["date_system"], "raw XML date system differs from controller readback")
+        values=raw["cells"]; headers=[]
+        for col in range(spec["column_start"],spec["column_end"]+1):
+            letter="";n=col
+            while n: n,rem=divmod(n-1,26);letter=chr(65+rem)+letter
+            cell=values.get(f"{letter}{spec['header_row']}")
+            require(cell is not None and cell["type"]=="text" and cell["raw"]!="", "header is not stored text")
+            headers.append(cell["raw"])
+        rows=[]; counts={key:0 for key in ("blank","text","numeric_lexemes","expanded_exponents","booleans","dates","zero_padded_identifiers")}
+        for row in range(spec["header_row"]+1,spec["last_row"]+1):
+            output=[]
+            for item in spec["columns"]:
+                col=item["column"];letter="";n=col
+                while n: n,rem=divmod(n-1,26);letter=chr(65+rem)+letter
+                cell=values.get(f"{letter}{row}",{"raw":"","type":"blank","format":"General"})
+                raw_value=cell["raw"]; kind=cell["type"]; mode=item["mode"]
+                if kind=="blank" or raw_value=="": value="";category="blank"
+                elif kind=="text":
+                    require(mode=="stored_text", "text cell mode mismatch");value=raw_value;category="text"
+                elif kind=="boolean":
+                    require(mode=="stored_text", "boolean cell mode mismatch");value="TRUE" if raw_value=="1" else "FALSE";category="booleans"
+                elif mode=="stored_text": value=raw_value;category="text"
+                elif mode=="decimal_lexeme": value=_decimal_expand_oracle(raw_value);category="numeric_lexemes"
+                elif mode=="excel_date": value=_date_oracle(raw_value,raw["date_system"]);category="dates"
+                elif mode=="zero_padded_identifier":
+                    fmt=cell["format"];require(re.fullmatch(r"0+",fmt or "") is not None and re.fullmatch(r"(?:0|[1-9][0-9]*)",raw_value) is not None and len(raw_value)<=len(fmt), "zero format or stored value rejected")
+                    value=raw_value.zfill(len(fmt));category="zero_padded_identifiers"
+                else: raise AssertionError("unknown import mode")
+                counts[category]+=1
+                if category=="numeric_lexemes" and re.search(r"[eE]",raw_value):counts["expanded_exponents"]+=1
+                output.append(value)
+            rows.append(output)
+        stream=io.StringIO(newline="");writer=csv.writer(stream,lineterminator="\n",quoting=csv.QUOTE_MINIMAL);writer.writerow(headers);writer.writerows(rows)
+        oracle=stream.getvalue().encode("utf-8")
+        require(csv_bytes==oracle, f"{name}: adapter CSV differs from independent raw-cell/Decimal/date oracle")
+        require(csv_bytes==(manifest_path.parent/sample["expected_csv"]).read_bytes(), f"{name}: adapter CSV differs from controller reference")
+        require(hashlib.sha256(csv_bytes).hexdigest()==sample["csv_sha256"] and len(csv_bytes)==sample["csv_bytes"], "canonical CSV hash or length mismatch")
+        require(adapter["source"]=={"bytes":len(source),"sha256":source_sha}, "adapter source identity mismatch")
+        require(adapter["canonical_csv"]=={"bytes":len(csv_bytes),"sha256":hashlib.sha256(csv_bytes).hexdigest()}, "adapter CSV identity mismatch")
+        require(adapter["profile"]=={"bytes":len(profile_bytes),"sha256":hashlib.sha256(profile_bytes).hexdigest()}, "adapter profile identity mismatch")
+        require(adapter["row_mapping"]=={"kind":"rectangle","header_row":spec["header_row"],"data_first_row":spec["header_row"]+1,"row_count":sample["row_count"],"column_start":spec["column_start"],"column_end":spec["column_end"]}, "row mapping mismatch")
+        require(adapter["conversion_counts"]==counts, f"conversion counts mismatch: {adapter['conversion_counts']} != {counts}")
+        require(len(rows)==sample["row_count"] and rows==sample["rows"], "independent value rows mismatch")
+        require(adapter["warnings"]==[], "unexpected warnings for bounded native conversion sample")
+        checked.append({"path":name,"bytes":len(csv_bytes),"sha256":hashlib.sha256(csv_bytes).hexdigest(),"rows":len(rows),"counts":counts})
+    return checked
 
 
 def _write_copy(source, destination, mutate=None, extra=()):
@@ -453,15 +629,17 @@ def main():
     parser.add_argument("--genuine-manifest", required=True, type=Path)
     parser.add_argument("--malicious-manifest", type=Path)
     parser.add_argument("--write-malicious-dir", type=Path)
+    parser.add_argument("--adapter-output", type=Path, help="owned directory containing lo-conversion-1900/ and lo-conversion-1904/ adapter results")
     args = parser.parse_args()
     xml_count, _cases = check_xml_cases(args.xml_cases)
     samples = check_genuine(args.genuine_manifest)
+    adapter = check_adapter_output(args.genuine_manifest, args.adapter_output) if args.adapter_output else []
     malicious = []
     if args.malicious_manifest:
         source = args.genuine_manifest.parent / "lo-1904-values.xlsx"
         malicious = check_malicious(args.malicious_manifest, source, args.write_malicious_dir)
     print(json.dumps({"status": "PASS", "xml_cases_checked": xml_count, "genuine_samples": samples,
-                      "malicious_zip_mutations": malicious}, ensure_ascii=False, indent=2))
+                      "adapter_outputs": adapter, "malicious_zip_mutations": malicious}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

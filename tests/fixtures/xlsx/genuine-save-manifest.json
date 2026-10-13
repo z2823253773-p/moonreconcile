@@ -54,6 +54,24 @@
       "application_version": "26.2.4.2",
       "save_method": "LibreOffice isolated profile headless FODS to XLSX export; original controller receipt and input preserved under evidence/controller-native-filter",
       "expected_cells_path": "native-filter-expected.json"
+    },
+    {
+      "path": "lo-conversion-1900.xlsx",
+      "sha256": "4c3c8f2f19105df8702d52f0a16d092caa092959a54e2c3ff4bf37b94e755526",
+      "bytes": 5861,
+      "application": "LibreOffice",
+      "application_version": "26.2.4.2",
+      "save_method": "LibreOffice headless Calc XLSX export using an isolated UserInstallation profile per sample",
+      "expected_cells_path": "genuine-save-expected.json"
+    },
+    {
+      "path": "lo-conversion-1904.xlsx",
+      "sha256": "98dded72b9412239d51993b314ce49281a4735d61a3633399a069d12736d1b62",
+      "bytes": 5860,
+      "application": "LibreOffice",
+      "application_version": "26.2.4.2",
+      "save_method": "LibreOffice headless Calc XLSX export using an isolated UserInstallation profile per sample",
+      "expected_cells_path": "genuine-save-expected.json"
     }
   ]
 }
