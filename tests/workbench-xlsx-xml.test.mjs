@@ -257,3 +257,22 @@ test('rejects XML 1.1 declarations, non-UTF-8 declarations and invalid UTF-8', (
     }), error => error.code === 'invalid_xlsx');
   }
 });
+
+test('strict comment and PI option preserves default events and XML declaration', () => {
+ const source=Buffer.from('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!--before--><?task before?><r>x<!--inside--><?task inside?></r><!--after--><?task after?>');
+ const baseline=[];
+ parseXmlEvents(source,{onEvent:e=>baseline.push(e),limits:{xml_bytes:67108864,xml_depth:64}});
+ for(const option of [undefined,false]){const events=[];parseXmlEvents(source,{onEvent:e=>events.push(e),limits:{xml_bytes:67108864,xml_depth:64},rejectCommentsAndProcessingInstructions:option});assert.deepEqual(events,baseline);}
+ const events=[];parseXmlEvents(Buffer.from('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><r/>'),{onEvent:e=>events.push(e),limits:{xml_bytes:67108864,xml_depth:64},rejectCommentsAndProcessingInstructions:true});assert.equal(events.length,2);
+});
+for(const token of ['<!--comment-->','<?task value?>'])for(const where of ['before','inside','after','boundary'])test(`strict helper rejects real ${token} ${where}`,()=>{
+ const xml=where==='before'?`${token}<r/>`:where==='after'?`<r/>${token}`:where==='boundary'?`<r>${' '.repeat(4090)}${token}</r>`:`<r>${token}</r>`;
+ assert.throws(()=>parseXmlEvents(Buffer.from(xml),{onEvent:()=>{},limits:{xml_bytes:67108864,xml_depth:64},rejectCommentsAndProcessingInstructions:true}),e=>e.name==='XlsxXmlError'&&e.code==='unsupported_xlsx_feature'&&e.phase==='xlsx');
+});
+for(const option of [null,0,'true',{},[]])test(`strict helper invalid option ${JSON.stringify(option)} fails before events`,()=>{
+ let events=0;assert.throws(()=>parseXmlEvents(Buffer.from('<r/>'),{onEvent:()=>events++,limits:{xml_bytes:67108864,xml_depth:64},rejectCommentsAndProcessingInstructions:option}),e=>e.code==='invalid_xlsx');assert.equal(events,0);
+});
+test('strict helper does not confuse literal comment or PI strings with markup',()=>{
+ const events=[];parseXmlEvents(Buffer.from('<r><![CDATA[<!--literal--> <?literal?>]]>&lt;!--text--&gt;&lt;?text?&gt;</r>'),{onEvent:e=>events.push(e),limits:{xml_bytes:67108864,xml_depth:64},rejectCommentsAndProcessingInstructions:true});
+ assert.equal(events.filter(e=>['text','cdata'].includes(e.type)).map(e=>e.value).join(''),'<!--literal--> <?literal?>'+'<!--text--><?text?>');
+});

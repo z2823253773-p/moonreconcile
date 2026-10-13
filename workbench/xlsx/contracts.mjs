@@ -25,13 +25,14 @@ export function isXlsxErrorCode(value) { return XLSX_ERROR_CODES.includes(value)
 export function assertImportSpec(value, inventory) {
   const keys = ['schema_version','source_sha256','sheet_id','header_row','column_start','column_end','last_row','columns','formula_policy'];
   if (!exact(value, keys) || value.schema_version !== 1 || !sha(value.source_sha256) || value.formula_policy !== 'reject' ||
+      typeof value.sheet_id !== 'string' || !/^[0-9a-f]{64}:[1-9][0-9]*$/.test(value.sheet_id) ||
       !Number.isSafeInteger(value.header_row) || value.header_row < 1 || value.header_row > 1048576 ||
       !Number.isSafeInteger(value.column_start) || value.column_start < 1 || value.column_start > 16384 ||
       !Number.isSafeInteger(value.column_end) || value.column_end < value.column_start || value.column_end > 16384 ||
       value.column_end - value.column_start + 1 > XLSX_LIMITS.columns || !Number.isSafeInteger(value.last_row) ||
       value.last_row < value.header_row || value.last_row > 1048576 || value.last_row - value.header_row > XLSX_LIMITS.data_rows ||
       !Array.isArray(value.columns) || value.columns.length !== value.column_end - value.column_start + 1) throw fail('invalid_import_spec');
-  if (inventory?.source?.sha256 !== value.source_sha256) throw fail('xlsx_source_mismatch');
+  if (inventory?.source?.sha256 !== value.source_sha256 || value.sheet_id.slice(0,64) !== value.source_sha256) throw fail('xlsx_source_mismatch');
   const sheet = inventory?.sheets?.find(item => item.sheet_id === value.sheet_id);
   if (!sheet || !sheet.selectable) throw fail('invalid_import_spec');
   const modes = new Set(['stored_text','decimal_lexeme','excel_date','zero_padded_identifier']);
@@ -43,7 +44,7 @@ export function assertImportSpec(value, inventory) {
 }
 
 export function projectWorkbook(inventory, asset_id) {
-  if (!inventory || !inventory.source || typeof asset_id !== 'string') throw fail('invalid_xlsx');
+  if (!inventory || !inventory.source || typeof asset_id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(asset_id)) throw fail('invalid_xlsx');
   return {
     xlsx_api_version: 1,
     asset_id,
@@ -54,3 +55,25 @@ export function projectWorkbook(inventory, asset_id) {
     })),
   };
 }
+
+
+// Explicit OPC v1 identities, including only the approved empty-container type.
+export const OOXML_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+export const OOXML_OFFICE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+export const OOXML_DRAWING = 'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing';
+export const OOXML_TYPES = Object.freeze({
+  workbook: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml',
+  worksheet: 'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml',
+  chartsheet: 'application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml',
+  sharedStrings: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml',
+  styles: 'application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml',
+  theme: 'application/vnd.openxmlformats-officedocument.theme+xml',
+  'core-properties': 'application/vnd.openxmlformats-package.core-properties+xml',
+  'extended-properties': 'application/vnd.openxmlformats-officedocument.extended-properties+xml',
+  'custom-properties': 'application/vnd.openxmlformats-officedocument.custom-properties+xml',
+  relationships: 'application/vnd.openxmlformats-package.relationships+xml',
+  drawing: 'application/vnd.openxmlformats-officedocument.drawing+xml',
+});
+export const OOXML_RELATIONSHIPS = Object.freeze(Object.fromEntries(
+  ['officeDocument','worksheet','chartsheet','sharedStrings','styles','theme','hyperlink','extended-properties','custom-properties','drawing'].map(name => [name, `${OOXML_OFFICE}/${name}`]).concat([['core-properties','http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties']])
+));

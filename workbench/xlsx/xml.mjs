@@ -27,9 +27,9 @@ function xmlError(code, part, position = undefined) {
  * Character references are decoded by the XML tokenizer exactly once.
  * Caller limits may lower the frozen ceilings; raising either is invalid.
  */
-export function parseXmlEvents(bytes, { onEvent, limits, part } = {}) {
+export function parseXmlEvents(bytes, { onEvent, limits, part, rejectCommentsAndProcessingInstructions = false } = {}) {
   const partName = safePartName(part);
-  if (!(bytes instanceof Uint8Array) || typeof onEvent !== 'function' || !limits ||
+  if (typeof rejectCommentsAndProcessingInstructions !== 'boolean' || !(bytes instanceof Uint8Array) || typeof onEvent !== 'function' || !limits ||
       !Number.isSafeInteger(limits.xml_bytes) || limits.xml_bytes < 0 || limits.xml_bytes > MAX_XML_BYTES ||
       !Number.isSafeInteger(limits.xml_depth) || limits.xml_depth < 1 || limits.xml_depth > MAX_XML_DEPTH) {
     throw xmlError('invalid_xlsx', partName);
@@ -53,6 +53,8 @@ export function parseXmlEvents(bytes, { onEvent, limits, part } = {}) {
     }
   });
   parser.on('doctype', () => fail('unsupported_xlsx_feature'));
+  parser.on('comment', () => { if (rejectCommentsAndProcessingInstructions) fail('unsupported_xlsx_feature'); });
+  parser.on('processinginstruction', () => { if (rejectCommentsAndProcessingInstructions) fail('unsupported_xlsx_feature'); });
   parser.on('error', () => fail('invalid_xlsx'));
   parser.on('opentag', tag => {
     depth += 1;

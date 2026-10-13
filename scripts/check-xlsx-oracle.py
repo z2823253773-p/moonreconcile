@@ -3,6 +3,7 @@
 
 import argparse
 import io
+import zlib
 import hashlib
 import json
 from pathlib import Path
@@ -146,7 +147,6 @@ def check_genuine(manifest_path):
         name = Path(sample["path"]).name
         require(name not in seen, f"duplicate sample {name}")
         seen.add(name)
-        require(name in expected, f"sample {name} lacks independent expected cells")
         require(sample["application"] in ("LibreOffice", "Microsoft Excel"), f"{name}: unexpected save application")
         method = sample["save_method"].lower()
         if sample["application"] == "LibreOffice":
@@ -159,8 +159,13 @@ def check_genuine(manifest_path):
         require(not expected_name.is_absolute() and ".." not in expected_name.parts,
                 f"{name}: expected data path must be fixture-relative")
         require(expected_name.suffix == ".json", f"{name}: expected_cells_path must identify independent JSON, not workbook XML")
-        require(expected_name.as_posix() == "genuine-save-expected.json",
+        require(expected_name.as_posix() in {"genuine-save-expected.json", "native-filter-expected.json"},
                 f"{name}: unexpected independent expected-data file")
+        if expected_name.as_posix() == "native-filter-expected.json":
+            extra = json.loads((manifest_path.parent / expected_name).read_text(encoding="utf-8"))
+            require(extra.get("schema_version") == 1, "unsupported sixth expected design")
+            expected.update({item["id"]: item for item in extra["samples"]})
+        require(name in expected, f"sample {name} lacks independent expected cells")
         file_path = manifest_path.parent / sample["path"]
         raw = file_path.read_bytes()
         require(len(raw) == sample["bytes"], f"{name}: byte count mismatch")
@@ -174,6 +179,27 @@ def check_genuine(manifest_path):
         require(data["formula"] == wanted["formula"], f"{name}: formula presence mismatch")
         require(data["merge"] == wanted["merge"], f"{name}: merge presence mismatch")
         require(data["auto_filter"] == wanted["auto_filter"], f"{name}: autoFilter mismatch")
+        if "auto_filter_ref" in wanted:
+            with zipfile.ZipFile(file_path) as archive:
+                worksheet = first_worksheet_path(archive)
+                root = ET.fromstring(archive.read(worksheet))
+                filters = root.findall(f"{{{MAIN}}}autoFilter")
+                require(len(filters) == 1 and filters[0].attrib == {"ref": wanted["auto_filter_ref"]} and len(filters[0]) == 0, "native ref-only grammar mismatch")
+                markers = root.findall(f"{{{MAIN}}}drawing")
+                types = ET.fromstring(archive.read("[Content_Types].xml"))
+                drawing_type = "application/vnd.openxmlformats-officedocument.drawing+xml"
+                drawings = [node.get("PartName")[1:] for node in types if node.get("ContentType") == drawing_type]
+                require(len(markers) == len(drawings) == 1, "native drawing cardinality mismatch")
+                drawing = ET.fromstring(archive.read(drawings[0]))
+                require(drawing.tag == "{http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing}wsDr" and not drawing.attrib and len(drawing) == 0 and not (drawing.text or "").strip(" \t\r\n"), "native empty target mismatch")
+                inbound = []
+                for rel_path in archive.namelist():
+                    if not rel_path.endswith(".rels"): continue
+                    source = "" if rel_path == "_rels/.rels" else rel_path.replace("/_rels/", "/")[:-5]
+                    for relation in ET.fromstring(archive.read(rel_path)):
+                        target = posixpath.normpath(posixpath.join(posixpath.dirname(source), relation.get("Target", "")))
+                        if target == drawings[0]: inbound.append((source, relation.attrib))
+                require(len(inbound) == 1 and inbound[0][0] == worksheet and inbound[0][1]["Type"] == REL + "/drawing" and inbound[0][1]["Id"] == markers[0].get("{"+REL+"}id"), "native all-inbound binding mismatch")
         for coordinate, value in wanted["cells"].items():
             require(data["cells"].get(coordinate) == value,
                     f"{name}: {coordinate} expected {value!r}, got {data['cells'].get(coordinate)!r}")
@@ -235,10 +261,12 @@ def _mutate_raw(source, destination, mutation):
         usize = struct.unpack_from("<I", data, local + 22)[0]
         struct.pack_into("<I", data, local + 22, max(0, usize - 1))
         struct.pack_into("<I", data, records[0]["offset"] + 24, max(0, usize - 1))
-    elif mutation == "overlapping_local_records":
-        require(len(records) > 1, "need two central members")
-        first_local = struct.unpack_from("<I", data, records[0]["offset"] + 42)[0]
-        struct.pack_into("<I", data, records[1]["offset"] + 42, first_local)
+    elif mutation in {"local_flag_mismatch", "local_method_mismatch"}:
+        local = struct.unpack_from("<I", data, records[0]["offset"] + 42)[0]
+        field = 6 if mutation == "local_flag_mismatch" else 8
+        old = struct.unpack_from("<H", data, local + field)[0]
+        struct.pack_into("<H", data, local + field, old ^ (0x800 if field == 6 else 8))
+        require(struct.unpack_from("<H", data, local + field)[0] != struct.unpack_from("<H", data, records[0]["offset"] + (8 if field == 6 else 10))[0], "mismatch mutation missing")
     elif mutation == "encrypted_entry":
         local = data.find(b"PK\x03\x04")
         flags = struct.unpack_from("<H", data, local + 6)[0] | 1
@@ -264,7 +292,7 @@ def write_malicious_packages(source, destination):
     base = source
     outputs = {}
     raw_cases = {"local_central_name_mismatch", "crc_mismatch", "forged_uncompressed_size",
-                 "overlapping_local_records", "encrypted_entry", "truncated_archive"}
+                 "local_flag_mismatch", "local_method_mismatch", "encrypted_entry", "truncated_archive"}
     for case in raw_cases:
         out = destination / f"{case}.xlsx"
         _mutate_raw(base, out, case)
@@ -309,11 +337,85 @@ def write_malicious_packages(source, destination):
         require(archive.testzip() is None and archive.read("xl/workbook.xml"), "bit-3 XLSX fixture failed independent readback")
     outputs["bit3_descriptor_valid"] = descriptor
 
+    # Build valid stored records explicitly so descriptor/overlap probes cannot stop
+    # at an unrelated filename/CRC/size disagreement first.
+    def stored_zip(items, descriptor_form=None, overlap=False, truncate_deflate=False):
+        local_data, central = bytearray(), bytearray()
+        def local_record(name, payload, flags=0):
+            n = name.encode(); crc = zlib.crc32(payload) & 0xffffffff
+            return struct.pack("<IHHHHHIIIHH", 0x04034b50, 20, flags, 0, 0, 0,
+                0 if flags else crc, 0 if flags else len(payload), 0 if flags else len(payload), len(n), 0) + n + payload
+        def add(name, payload, offset, flags=0):
+            n = name.encode(); crc = zlib.crc32(payload) & 0xffffffff
+            central.extend(struct.pack("<IHHHHHHIIIHHHHHII", 0x02014b50, 20, 20, flags, 0, 0, 0,
+                crc, len(payload), len(payload), len(n), 0, 0, 0, 0, 0, offset) + n)
+        if overlap:
+            inside_name, inside_bytes = "xl/inside.bin", b"payload"
+            inner = local_record(inside_name, inside_bytes)
+            outer_name = "xl/overlap.bin"
+            outer = local_record(outer_name, inner)
+            add(outer_name, inner, 0)
+            add(inside_name, inside_bytes, 30 + len(outer_name))
+            local_data.extend(outer)
+            require(30 + len(outer_name) < len(outer), "overlap intervals do not overlap")
+        for index, (name, payload) in enumerate(items):
+            offset = len(local_data); flags = 8 if descriptor_form is not None else 0
+            if truncate_deflate and index == 0:
+                compressor = zlib.compressobj(wbits=-15)
+                compressed = (compressor.compress(payload) + compressor.flush())[:-2]
+                n = name.encode(); crc = zlib.crc32(payload) & 0xffffffff
+                local_data.extend(struct.pack("<IHHHHHIIIHH", 0x04034b50, 20, 0, 8, 0, 0, crc, len(compressed), len(payload), len(n), 0) + n + compressed)
+                central.extend(struct.pack("<IHHHHHHIIIHHHHHII", 0x02014b50, 20, 20, 0, 8, 0, 0, crc, len(compressed), len(payload), len(n), 0, 0, 0, 0, 0, offset) + n)
+                failed = False
+                try: zlib.decompress(compressed, -15)
+                except zlib.error: failed = True
+                require(failed, "truncated compressed fixture was not truncated")
+            else:
+                local_data.extend(local_record(name, payload, flags)); add(name, payload, offset, flags)
+            if flags:
+                desc = struct.pack("<III", zlib.crc32(payload) & 0xffffffff, len(payload), len(payload))
+                if descriptor_form != "unsigned": desc = b"PK\x07\x08" + desc
+                if index == 0 and descriptor_form == "corrupt": desc = desc[:-1] + bytes([desc[-1] ^ 1])
+                if index == len(items)-1 and descriptor_form == "truncated": desc = desc[:7]
+                local_data.extend(desc)
+        offset = len(local_data); count = len(items) + (2 if overlap else 0)
+        return bytes(local_data + central + struct.pack("<IHHHHIIH", 0x06054b50, 0, 0, count, count, len(central), offset, 0))
+    with zipfile.ZipFile(base) as src:
+        stored_items = [(i.filename, src.read(i.filename)) for i in src.infolist()]
+    for form in ("unsigned", "corrupt", "truncated"):
+        case = "bit3_descriptor_" + form; out = destination / (case + ".xlsx")
+        out.write_bytes(stored_zip(stored_items, form)); outputs[case] = out
+        if form == "unsigned":
+            with zipfile.ZipFile(out) as archive: require(archive.testzip() is None, "unsigned descriptor readback failed")
+        else:
+            require(b"PK\x05\x06" in out.read_bytes()[-22:], "descriptor truncation must retain EOCD")
+    out = destination / "overlapping_local_records.xlsx"
+    out.write_bytes(stored_zip(stored_items, overlap=True)); outputs["overlapping_local_records"] = out
+    raw = out.read_bytes(); records = _central_records(raw)
+    first, second = records[:2]
+    for record in records:
+        local = struct.unpack_from("<I", raw, record["offset"]+42)[0]
+        n = struct.unpack_from("<H", raw, local+26)[0]
+        require(raw[local+30:local+30+n] == record["name"], "overlap probe local name mismatch")
+        crc, csize, usize = struct.unpack_from("<III", raw, local+14)
+        require((crc,csize,usize) == struct.unpack_from("<III",raw,record["offset"]+16), "overlap probe metadata mismatch")
+        payload = raw[local+30+n:local+30+n+csize]
+        require(zlib.crc32(payload)&0xffffffff == crc, "overlap probe CRC mismatch")
+    out = destination / "truncated_deflate_stream.xlsx"
+    out.write_bytes(stored_zip(stored_items, truncate_deflate=True)); outputs["truncated_deflate_stream"] = out
+    require(out.read_bytes()[-22:-18] == b"PK\x05\x06", "stream truncation must retain EOCD")
+    with zipfile.ZipFile(out) as archive:
+        first = archive.infolist()[0]; raw = out.read_bytes(); local = first.header_offset
+        require(first.compress_type == struct.unpack_from("<H",raw,local+8)[0] == 8, "truncated stream local method mismatch")
+        require(first.compress_size == struct.unpack_from("<I",raw,local+18)[0], "truncated stream local size mismatch")
+        require(first.CRC == struct.unpack_from("<I",raw,local+14)[0], "truncated stream local CRC mismatch")
     for count in (2048, 2049):
         out = destination / f"entry_count_{count}.xlsx"
         with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as archive:
-            for index in range(count):
-                archive.writestr(f"safe/{index:04}.txt", b"")
+            for name, payload in stored_items: archive.writestr(name, payload)
+            for index in range(count-len(stored_items)): archive.writestr(f"safe/{index:04}/", b"")
+        with zipfile.ZipFile(out) as archive:
+            require(len(archive.infolist()) == count and archive.testzip() is None, "exact-count supported package invalid")
         outputs[f"entry_count_{count}"] = out
     return outputs
 
@@ -333,7 +435,7 @@ def check_malicious(manifest_path, source, out_dir=None):
         for name in cases:
             path = outputs[name]
             if name not in {"local_central_name_mismatch", "crc_mismatch", "forged_uncompressed_size",
-                            "overlapping_local_records", "encrypted_entry", "truncated_archive"}:
+                            "overlapping_local_records", "local_flag_mismatch", "local_method_mismatch", "encrypted_entry", "truncated_archive", "bit3_descriptor_corrupt", "bit3_descriptor_truncated"}:
                 with zipfile.ZipFile(path) as archive:
                     if name == "safe_inert_directory":
                         require(any(item.is_dir() for item in archive.infolist()), "directory mutation was not retained")

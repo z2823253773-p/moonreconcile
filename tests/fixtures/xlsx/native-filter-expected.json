@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "samples": [
+    {
+      "id": "lo-native-filter.xlsx",
+      "design_reference": {
+        "independent_design": "authored synthetic FODS + known actual LO single Xstring/LF save behavior, not JS converter output",
+        "source_sha256": "74dbde7450c6e56de05a54891e8c9b9f6240a8212c783c129473c1c5cb706d4e",
+        "selection": "A1:F3 explicit all stored_text",
+        "headers": [
+          "id",
+          "text",
+          "unicode",
+          "whitespace",
+          "literal",
+          "cr"
+        ],
+        "rows": [
+          [
+            "00123",
+            "hello",
+            "雪🙂",
+            "  keep  ",
+            "_x0061_",
+            "line\nbreak"
+          ],
+          [
+            "hidden",
+            "row",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ],
+        "expected_csv_bytes": 103,
+        "expected_csv_sha256": "36e301abdcc7141500954d79f4e1adb354f5e8caa9d91be68d4c9aa64b9265e2",
+        "warnings": [
+          {
+            "code": "hidden_rows_included",
+            "count": 1
+          },
+          {
+            "code": "filtered_rows_included",
+            "count": 2
+          },
+          {
+            "code": "rich_text_formatting_ignored",
+            "count": 1
+          }
+        ],
+        "row_mapping": "physical row2→logical1, row3→logical2; no skipped hidden row",
+        "predicate_claim": false,
+        "status": "reference only; not product adapter proof"
+      },
+      "stored": {
+        "date_system": "1900",
+        "cells": {
+          "A1": "id",
+          "B1": "text",
+          "C1": "unicode",
+          "D1": "whitespace",
+          "E1": "literal",
+          "F1": "cr",
+          "A2": "00123",
+          "B2": "hello",
+          "C2": "雪🙂",
+          "D2": "  keep  ",
+          "E2": "_x0061_",
+          "F2": "line\nbreak",
+          "A3": "hidden",
+          "B3": "row"
+        },
+        "hidden_rows": [
+          3
+        ],
+        "auto_filter": true,
+        "auto_filter_ref": "A1:F3",
+        "formula": false,
+        "merge": false
+      },
+      "drawing": {
+        "parts": 1,
+        "markers": 1,
+        "relations": 1,
+        "inbound": 1,
+        "empty": true
+      }
+    }
+  ]
+}

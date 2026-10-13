@@ -45,6 +45,15 @@
       "application_version": "16.113.4 (build 16.113.26100421)",
       "save_method": "Synthetic workbook saved through Microsoft Excel UI after AppleScript Save As timed out; CUA observed the Save dialog completion and the resulting file was independently read back from disk",
       "expected_cells_path": "genuine-save-expected.json"
+    },
+    {
+      "path": "lo-native-filter.xlsx",
+      "sha256": "74dbde7450c6e56de05a54891e8c9b9f6240a8212c783c129473c1c5cb706d4e",
+      "bytes": 6691,
+      "application": "LibreOffice",
+      "application_version": "26.2.4.2",
+      "save_method": "LibreOffice isolated profile headless FODS to XLSX export; original controller receipt and input preserved under evidence/controller-native-filter",
+      "expected_cells_path": "native-filter-expected.json"
     }
   ]
 }
