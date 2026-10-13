@@ -317,8 +317,10 @@ function storedText(node){
 }
 function worksheetInfo(root,cellLimits,limits,total){
   const data=child(root,MAIN,'sheetData');if(!data)throw xerr();
+  for(const col of children(child(root,MAIN,'cols')??{children:[]},MAIN,'col'))numericAttribute(col,'style',{max:cellLimits.styleCount-1});
   const coords=new Set(),rows=new Set();let cells=0,minRow=null,maxRow=null,minCol=null,maxCol=null;
   for(const row of children(data,MAIN,'row')){
+    numericAttribute(row,'s',{max:cellLimits.styleCount-1});
     numericAttribute(row,'r',{min:1,max:1048576});const rowNum=Number(getAttr(row,'r'));if(rows.has(rowNum))throw xerr();rows.add(rowNum);
     for(const c of children(row,MAIN,'c')){
       const ref=getAttr(c,'r'),pos=coordinate(ref);if(pos.row!==rowNum||coords.has(ref))throw xerr();coords.add(ref);

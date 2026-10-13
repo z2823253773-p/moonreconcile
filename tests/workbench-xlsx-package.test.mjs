@@ -546,3 +546,38 @@ for(const [count,code]of[[1000000,null],[1000001,'xlsx_limit_exceeded']])test(`a
 for(const key of ['invalid-ole-XLS','encrypted-OOXML'])test(`non-ZIP ${key} signature is rejected`,async()=>{
  const fsp=await import('node:fs/promises'),dir=await mkdtemp(path.join(os.tmpdir(),'xlsx-signature-'));try{const target=path.join(dir,'disguised.xlsx');await fsp.writeFile(target,Buffer.from('d0cf11e0a1b11ae100000000','hex'));await assert.rejects(inspectXlsxPackage({assetPath:target,stagingPath:dir}),e=>e.code==='invalid_xlsx');}finally{await rm(dir,{recursive:true,force:true});}
 });
+
+// N1: row/column references use the same relation-selected cellXfs index space
+// as c.s. The base native LO1904 styles has exactly two cellXfs (indices 0,1).
+function inheritedStyleSheet(kind, index, populated) {
+  const value = populated ? '<c r="A1"><v>1</v></c>' : '';
+  return kind === 'row'
+    ? minimalSheet(`<row r="1" s="${index}" customFormat="1" hidden="1">${value}</row>`)
+    : `<worksheet xmlns="${S}"><cols><col min="1" max="16384" style="${index}" hidden="1"/></cols><sheetData>${populated ? rowCell(value) : ''}</sheetData></worksheet>`;
+}
+async function inheritedStyleCase(kind, index, context, check) {
+  return mutation(`inherited-${kind}-${context}`, entries => {
+    const xml = inheritedStyleSheet(kind, index, context === 'visible-populated');
+    if (context === 'unused-empty') addTyped(entries, 'xl/unused-styled.XML', 'worksheet', xml);
+    else entries.set(sheetPath, Buffer.from(xml));
+    if (context === 'hidden-empty') setXml(entries, 'xl/workbook.xml', source => source.replace('state="visible"', 'state="hidden"'));
+  }, check);
+}
+for (const kind of ['row','column']) for (const context of ['visible-populated','hidden-empty','unused-empty']) {
+  for (const [label,index] of [
+    ['noninteger','not-an-index'], ['fraction','1.0'], ['negative','-1'],
+    ['noncanonical','01'], ['exponent','1e0'], ['one-past-last','2'],
+    ['out-of-range','999'], ['safe-large-outside','9007199254740991'], ['unsafe','9007199254740993'],
+  ]) test(`N1 rejects ${kind} ${label} ${context}`, async () => inheritedStyleCase(kind,index,context,rejects('invalid_xlsx')));
+  for (const index of ['0','1']) test(`N1 accepts ${kind} index ${index} ${context}`, async () => inheritedStyleCase(kind,index,context,async inspect => {
+    const inventory = await inspect();
+    try {
+      assert.equal(inventory.sheets[0].value_cells, context === 'visible-populated' ? 1 : context === 'unused-empty' ? 6 : 0);
+      if (context === 'hidden-empty') assert.equal(inventory.sheets[0].selectable, false);
+    } finally { await disposeXlsxPackage(inventory); }
+  }));
+}
+test('N1 inherited styles use relationship-selected renamed styles part',async()=>mutation('inherited-renamed',entries=>{
+ renamePart(entries,'xl/styles.xml','xl/selected-styles.bin','xl/_rels/workbook.xml.rels');
+ entries.set(sheetPath,Buffer.from(inheritedStyleSheet('row','1',true).replace('<sheetData>','<cols><col min="1" max="1" style="1"/></cols><sheetData>')));
+},accept));
