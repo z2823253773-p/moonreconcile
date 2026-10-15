@@ -23,7 +23,7 @@ export async function createJobManager({session,workerPath=DEFAULT_WORKER,bridge
     if(resetting)throw failure('session_busy','Session is resetting',409);
     if(active)throw failure('job_busy','A task is already active',409);
     if(jobs.size>=limits.jobs)throw failure('quota_exceeded','Job metadata quota exceeded',413);
-    if(!['import','preview','cell','draft','check','compare','example','review','branch','bundle','restore'].includes(kind))throw failure('invalid_task','Unsupported task kind');
+    if(!['import','preview','cell','xlsx_catalog','source_cell','draft','check','compare','example','review','branch','bundle','restore'].includes(kind))throw failure('invalid_task','Unsupported task kind');
     const job={job_id:randomUUID(),kind,state:'running',phase:'reading',output:null,error:null};jobs.set(job.job_id,job);
     const record={job,generation:session.generation,child:null,staging:null,blocked:false,cause:null,candidate:null,workerError:null,exited:false};active=record;
     let finish;record.done=new Promise(resolve=>finish=resolve);
@@ -44,7 +44,7 @@ export async function createJobManager({session,workerPath=DEFAULT_WORKER,bridge
           if(record.workerError)throw Object.assign(new Error(record.workerError.message),{error:record.workerError});
           if(code!==0||!record.candidate)throw failure('worker_failed','Worker exited without a valid result');
           job.phase='publishing';
-          if(['preview','cell'].includes(kind)){exact(record.candidate,[kind]);assertDto(kind,record.candidate[kind]);}
+          if(['preview','cell','source_cell'].includes(kind)){exact(record.candidate,[kind]);assertDto(kind,record.candidate[kind]);}
           const prepared=record.prepareOutput?await record.prepareOutput(record.candidate):{output:record.candidate,commit:()=>{}};
           fitOutput(job,prepared.output,limits.response_bytes);
           await session.checkQuota();

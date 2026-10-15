@@ -1,5 +1,6 @@
 export const APP_VERSION = '0.2.0';
 export const API_VERSION = 1;
+export const XLSX_LIMITS = Object.freeze({compressed_bytes:67108864,entries:2048,actual_unzip_bytes:268435456,xml_bytes:67108864,xml_depth:64,cell_bytes:65536,csv_bytes:67108864,data_rows:100000,columns:256});
 export const HOST_LIMITS = Object.freeze({
   session_bytes: 1073741824, assets: 64, imports: 64, revisions: 32, jobs: 256,
   uploads: 1, children: 1, upload_ms: 60000, job_ms: 180000, kill_ms: 1000,
@@ -26,7 +27,7 @@ export function exact(value,keys) {
   if(!object(value)||Object.keys(value).length!==keys.length||keys.some(k=>!Object.hasOwn(value,k)))throw failure('invalid_request','Unexpected or missing property');
   return value;
 }
-export const JOB_KINDS=['import','preview','cell','draft','check','compare','example','review','branch','restore','bundle'];
+export const JOB_KINDS=['import','preview','cell','xlsx_catalog','source_cell','draft','check','compare','example','review','branch','restore','bundle'];
 export const PHASES=['reading','validating','comparing','resolving','packing','restoring','publishing'];
 const shapes={
   asset:['asset_id','kind','name','bytes','sha256'],
@@ -36,6 +37,7 @@ const shapes={
   error:['code','message','phase','side','record','field'],
   preview:['side','headers','row_count','column_count','offset','limit','rows','next_offset','has_more'],
   cell:['side','record','column','value','utf8_bytes','truncated'],
+  source_cell:['side','record','column','sheet_name','coordinate','cell_type','stored_value','imported_value','mode','style_index','number_format'],
 };
 const hash=v=>typeof v==='string'&&/^[0-9a-f]{64}$/.test(v);
 const text=v=>typeof v==='string';
@@ -43,13 +45,25 @@ const side=v=>['left','right'].includes(v);
 const strings=v=>Array.isArray(v)&&v.every(text);
 export function assertDto(kind,v) {
   if(!shapes[kind])throw failure('invalid_request','Unknown DTO');
-  exact(v,shapes[kind]);let valid=false;
+  if(kind==='import'&&object(v)&&Object.hasOwn(v,'adapter'))exact(v,[...shapes.import,'adapter']);else exact(v,shapes[kind]);let valid=false;
   if(kind==='error')valid=text(v.code)&&text(v.message)&&text(v.phase)&&[null,'left','right','decisions'].includes(v.side)&&(v.record===null||integer(v.record,1))&&(v.field===null||text(v.field));
-  if(kind==='asset')valid=isId(v.asset_id)&&['csv','config','decisions','run'].includes(v.kind)&&text(v.name)&&[...v.name].length<=255&&integer(v.bytes,0,Number.MAX_SAFE_INTEGER)&&hash(v.sha256);
-  if(kind==='import')valid=isId(v.import_id)&&isId(v.asset_id)&&side(v.side)&&v.format==='csv'&&v.status==='ready'&&strings(v.headers)&&integer(v.row_count,0,100000)&&integer(v.column_count,1,256)&&v.column_count===v.headers.length&&hash(v.sha256);
+  if(kind==='asset')valid=isId(v.asset_id)&&['csv','xlsx','config','decisions','run'].includes(v.kind)&&text(v.name)&&[...v.name].length<=255&&integer(v.bytes,0,Number.MAX_SAFE_INTEGER)&&hash(v.sha256);
+  if(kind==='import') {
+    const csv=Object.keys(v).length===9&&!Object.hasOwn(v,'adapter');
+    const xlsx=Object.keys(v).length===10&&object(v.adapter);
+    valid=isId(v.import_id)&&isId(v.asset_id)&&side(v.side)&&(['csv','xlsx'].includes(v.format))&&(v.format==='csv'?csv:xlsx)&&v.status==='ready'&&strings(v.headers)&&integer(v.row_count,0,100000)&&integer(v.column_count,1,256)&&v.column_count===v.headers.length&&hash(v.sha256);
+    if(valid&&v.format==='xlsx') {
+      exact(v.adapter,['adapter_id','adapter_version','profile_schema_version','profile_sha256','import_manifest_sha256','source_sha256','canonical_csv_sha256']);
+      valid=v.adapter.adapter_id==='restricted-ooxml'&&v.adapter.adapter_version==='1.0.0'&&v.adapter.profile_schema_version===1&&hash(v.adapter.profile_sha256)&&hash(v.adapter.import_manifest_sha256)&&hash(v.adapter.source_sha256)&&hash(v.adapter.canonical_csv_sha256)&&v.sha256===v.adapter.canonical_csv_sha256;
+    }
+  }
   if(kind==='revision')valid=isId(v.revision_id)&&(v.parent_revision_id===null||isId(v.parent_revision_id))&&isId(v.baseline_revision_id)&&hash(v.run_id)&&hash(v.report_sha256)&&hash(v.decisions_sha256)&&isId(v.left_import_id)&&isId(v.right_import_id)&&isId(v.config_asset_id)&&[0,1,3].includes(v.exit_code);
   if(kind==='job')valid=isId(v.job_id)&&JOB_KINDS.includes(v.kind)&&['running','cancelling','succeeded','failed','cancelled'].includes(v.state)&&PHASES.includes(v.phase)&&(v.output===null||object(v.output))&&(v.error===null||assertDto('error',v.error))&&(v.state==='succeeded'?object(v.output)&&v.error===null:v.output===null);
   if(kind==='cell')valid=side(v.side)&&integer(v.record,1,100000)&&text(v.column)&&text(v.value)&&integer(v.utf8_bytes,0,65536)&&v.truncated===false;
+  if(kind==='source_cell') {
+    const modes=['stored_text','decimal_lexeme','excel_date','zero_padded_identifier'];
+    valid=side(v.side)&&integer(v.record,1,100000)&&text(v.column)&&text(v.sheet_name)&&text(v.coordinate)&&/^[A-Z]{1,3}[1-9][0-9]{0,6}$/.test(v.coordinate)&&['blank','text','numeric','boolean'].includes(v.cell_type)&&text(v.stored_value)&&Buffer.byteLength(v.stored_value,'utf8')<=65536&&text(v.imported_value)&&Buffer.byteLength(v.imported_value,'utf8')<=65536&&modes.includes(v.mode)&&(v.style_index===null||integer(v.style_index))&&(v.number_format===null||text(v.number_format)&&Buffer.byteLength(v.number_format,'utf8')<=65536);
+  }
   if(kind==='preview') {
     valid=side(v.side)&&strings(v.headers)&&integer(v.row_count,0,100000)&&integer(v.column_count,1,256)&&v.column_count===v.headers.length&&integer(v.offset)&&integer(v.limit,1,100)&&Array.isArray(v.rows)&&v.rows.length<=v.limit&&integer(v.next_offset)&&typeof v.has_more==='boolean';
     if(valid)valid=v.next_offset===v.offset+v.rows.length&&v.has_more===(v.next_offset<v.row_count)&&v.rows.every((row,i)=>{exact(row,['record','cells']);return row.record===v.offset+i+1&&Array.isArray(row.cells)&&row.cells.length===v.column_count&&row.cells.every((c,j)=>{exact(c,['column','value','utf8_bytes','truncated']);return c.column===v.headers[j]&&text(c.value)&&integer(c.utf8_bytes,0,65536)&&typeof c.truncated==='boolean';});});
@@ -57,7 +71,7 @@ export function assertDto(kind,v) {
   if(!valid)throw failure('invalid_request',`Invalid ${kind} DTO`);
   return v;
 }
-export function project(kind,entry) {return assertDto(kind,Object.fromEntries(shapes[kind].map(k=>[k,entry[k]])));}
+export function project(kind,entry) {const keys=kind==='import'&&entry.format==='xlsx'?[...shapes.import,'adapter']:shapes[kind];return assertDto(kind,Object.fromEntries(keys.map(k=>[k,entry[k]])));}
 export function sanitizeError(value,paths=[]) {
   let e=value?.error??value;
   try{assertDto('error',e);}catch{e=errorDto(value?.code??'host_failure','Local task failed');}

@@ -57,6 +57,18 @@ export async function createSession({rootParent,limits:overrides={}}={}) {
   }
   function commitAsset(asset) {if(assets.size>=limits.assets)throw failure('quota_exceeded','Asset count quota exceeded',413);assets.set(asset.asset_id,asset);}
   function commitImport(entry) {if(imports.size>=limits.imports)throw failure('quota_exceeded','Import count quota exceeded',413);project('import',entry);imports.set(entry.import_id,entry);}
+  function checkImportBatch({newAssets,newImport}) {
+    if(!Array.isArray(newAssets)||newAssets.length!==1||newImport?.format!=='xlsx')throw failure('invalid_import','Incomplete XLSX import batch',422,'publishing');
+    const canonical=newAssets[0],source=assets.get(newImport.asset_id);
+    if(!source||source.kind!=='xlsx'||canonical.kind!=='csv'||!isId(canonical.asset_id)||!isId(newImport.canonical_asset_id)||newImport.canonical_asset_id!==canonical.asset_id||newImport.path!==canonical.path||newImport.sha256!==canonical.sha256||newImport.adapter?.source_sha256!==source.sha256)throw failure('invalid_import','XLSX source or canonical binding changed',422,'publishing');
+    if(assets.size+1>limits.assets||imports.size+1>limits.imports)throw failure('quota_exceeded','Import registry quota exceeded',413,'publishing');
+    if(assets.has(canonical.asset_id)||imports.has(newImport.import_id))throw failure('invalid_import','Duplicate import registration',409,'publishing');
+    project('asset',canonical);project('import',newImport);
+  }
+  function commitImportBatch(batch) {
+    checkImportBatch(batch);
+    const [canonical]=batch.newAssets;assets.set(canonical.asset_id,canonical);imports.set(batch.newImport.import_id,batch.newImport);
+  }
   async function saveAsset(kind,name,data) {
     const key=randomUUID(),dir=await staging('asset');
     try{await reserve(key,Buffer.byteLength(data),dir);const file=path.join(dir,'data');await fs.writeFile(file,data,{mode:0o600,flag:'wx'});const entry=await prepareAsset(kind,name,file);await checkQuota();commitAsset(entry);return entry;}
@@ -103,5 +115,5 @@ export async function createSession({rootParent,limits:overrides={}}={}) {
     resetting=true;try{await owned();await fs.rm(root,{recursive:true});await newRoot();generation++;for(const m of [assets,imports,revisions,heads,bindings])m.clear();}finally{resetting=false;}
   }
   async function close() {if(closed)return;if(reservations.size)throw failure('session_busy','Active writes prevent cleanup',409);await owned();await fs.rm(root,{recursive:true});closed=true;generation++;}
-  return {get root(){return root;},get generation(){return generation;},get closed(){return closed;},limits,assets,imports,revisions,heads,bindings,reservations,owned,bytes,checkQuota,reserve,release,staging,remove,hashFile,prepareAsset,commitAsset,commitImport,registerImport:commitImport,prepareRevision,checkRestoreCapacity,commitRestored,checkRevision,commitRevision,publishRevision,saveAsset,getAsset:id=>get(assets,id),getImport:id=>get(imports,id),getRevision:id=>get(revisions,id),reset,close};
+  return {get root(){return root;},get generation(){return generation;},get closed(){return closed;},limits,assets,imports,revisions,heads,reservations,bindings,owned,bytes,checkQuota,reserve,release,staging,remove,hashFile,prepareAsset,commitAsset,commitImport,checkImportBatch,commitImportBatch,registerImport:commitImport,prepareRevision,checkRestoreCapacity,commitRestored,checkRevision,commitRevision,publishRevision,saveAsset,getAsset:id=>get(assets,id),getImport:id=>get(imports,id),getRevision:id=>get(revisions,id),reset,close};
 }

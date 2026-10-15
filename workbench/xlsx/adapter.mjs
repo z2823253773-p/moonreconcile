@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { renderCsv } from '../../cli/render.mjs';
 import { canonicalJsonStringify } from '../../cli/io.mjs';
-import { inspectImport } from '../engine-host.mjs';
+import { inspectImport, callEngine } from '../engine-host.mjs';
 import { inspectXlsxPackage, disposeXlsxPackage } from './package.mjs';
 import { assertImportSpec, XLSX_LIMITS, OOXML_TYPES, OOXML_MAIN, OOXML_OFFICE } from './contracts.mjs';
 import { parseXmlEvents } from './xml.mjs';
@@ -215,4 +215,51 @@ export async function convertXlsx({assetPath,importSpec,side,stagingPath,invoke,
     if(error?.code&&String(error.code).startsWith('xlsx_')||error?.code==='invalid_xlsx'||error?.code==='unsupported_xlsx_feature'||error?.code==='invalid_import_spec')throw error;
     throw FAIL('invalid_xlsx');
   } finally { if(inventory)await disposeXlsxPackage(inventory); }
+}
+
+/** Resolve one logical imported cell back to its verified physical workbook cell. */
+export async function readSourceCell({assetPath,profilePath,canonicalCsvPath,side,record,column,invoke,stagingPath,limits=XLSX_LIMITS,signal}={}) {
+  if(!['left','right'].includes(side)||!Number.isSafeInteger(record)||record<1||typeof column!=='string'||typeof invoke!=='function')throw FAIL('invalid_import_spec');
+  let inventory;
+  try {
+    const profile=JSON.parse(await fs.readFile(profilePath,'utf8'));
+    if(!profile||Object.keys(profile).sort().join(',')!=='adapter_id,adapter_version,import_spec,schema_version'||profile.schema_version!==1||profile.adapter_id!=='restricted-ooxml'||profile.adapter_version!=='1.0.0')throw FAIL('invalid_import_spec');
+    const csv=await fs.readFile(canonicalCsvPath);
+    const inspected=callEngine({op:'inspect_csv',csv:csv.toString('utf8'),side,cell:{record,column}},invoke);
+    const cell=inspected.cell;
+    const packageStaging=path.join(stagingPath,'source-cell-parts');await fs.mkdir(packageStaging,{recursive:true,mode:0o700});
+    inventory=await inspectXlsxPackage({assetPath,stagingPath:packageStaging,limits,signal});
+    assertImportSpec(profile.import_spec,inventory);
+    const spec=profile.import_spec;
+    if(record>spec.last_row-spec.header_row||cell.side!==side||cell.record!==record||cell.column!==column)throw FAIL('xlsx_source_mismatch');
+    const csvCheck=callEngine({op:'inspect_csv',csv:csv.toString('utf8'),side,offset:0,limit:1},invoke).preview;
+    const physicalIndex=csvCheck.headers.indexOf(column);
+    if(physicalIndex<0||physicalIndex>=spec.columns.length||csvCheck.row_count!==spec.last_row-spec.header_row)throw FAIL('xlsx_source_mismatch');
+    const physicalColumn=spec.columns[physicalIndex].column,physicalRow=spec.header_row+record;
+    const sheet=inventory.sheets.find(item=>item.sheet_id===spec.sheet_id),part=inventory.parts.get(sheet.part);
+    const tree=parseTree(await fs.readFile(part.path),sheet.part,{xml_bytes:limits.xml_bytes,xml_depth:limits.xml_depth});
+    const sharedPart=[...inventory.parts.values()].find(item=>item.content_type===OOXML_TYPES.sharedStrings),stylesPart=[...inventory.parts.values()].find(item=>item.content_type===OOXML_TYPES.styles);
+    const shared=readShared(sharedPart?parseTree(await fs.readFile(sharedPart.path),'sharedStrings.xml',{xml_bytes:limits.xml_bytes,xml_depth:limits.xml_depth}):null,limits);
+    const formats=readFormats(stylesPart?parseTree(await fs.readFile(stylesPart.path),'styles.xml',{xml_bytes:limits.xml_bytes,xml_depth:limits.xml_depth}):null);
+    const data=first(tree,MAIN,'sheetData');if(!data)throw FAIL('invalid_xlsx');
+    let found=null;const rowStyles=new Map(),columnStyles=[];
+    const cols=first(tree,MAIN,'cols');
+    for(const colNode of cols?children(cols,MAIN,'col'):[])columnStyles.push({min:Number(attr(colNode,'min')),max:Number(attr(colNode,'max')),style:Number(attr(colNode,'style')??'0')});
+    for(const rowNode of children(data,MAIN,'row')) {
+      const row=Number(attr(rowNode,'r')),rowStyle=attr(rowNode,'s');if(rowStyle!==undefined)rowStyles.set(row,Number(rowStyle));
+      if(row!==physicalRow)continue;
+      for(const node of children(rowNode,MAIN,'c')) {
+        const item=cellValue(node,shared,limits,sheet.part);if(item.row===physicalRow&&item.column===physicalColumn)found=item;
+      }
+    }
+    const coordinateValue=coordinateText(physicalRow,physicalColumn);
+    const source=found??{row:physicalRow,column:physicalColumn,coordinate:coordinateValue,type:'blank',stored_value:'',style_index:null,has_style:false};
+    const styleIndex=styleIndexFor(source,rowStyles,columnStyles);
+    if(!Number.isSafeInteger(styleIndex)||styleIndex<0||styleIndex>=formats.length)throw FAIL('invalid_xlsx',physicalRow,coordinateValue);
+    return {side,record,column,sheet_name:sheet.name,coordinate:coordinateValue,cell_type:source.type,stored_value:source.stored_value,imported_value:cell.value,mode:spec.columns[physicalIndex].mode,style_index:source.has_style?source.style_index:styleIndex,number_format:formats[styleIndex]??'General'};
+  } catch(error) {
+    if(error?.error)throw error;
+    if(error?.code&&String(error.code).startsWith('xlsx_')||['invalid_xlsx','unsupported_xlsx_feature','invalid_import_spec'].includes(error?.code))throw error;
+    throw FAIL('invalid_xlsx');
+  } finally {if(inventory)await disposeXlsxPackage(inventory);}
 }

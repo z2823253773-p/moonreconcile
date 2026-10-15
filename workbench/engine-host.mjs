@@ -4,6 +4,9 @@ import { run } from '../cli/main.mjs';
 import { canonicalJsonStringify, decodeUtf8Fatal, parseJsonText } from '../cli/io.mjs';
 import { assertDto, exact, failure, sanitizeError, errorDto } from './contracts.mjs';
 import { readRunBundle, writeRunBundle } from './archive.mjs';
+import { inspectXlsxPackage, disposeXlsxPackage, projectWorkbook } from './xlsx/package.mjs';
+import { convertXlsx, readSourceCell } from './xlsx/adapter.mjs';
+import { XLSX_LIMITS } from './xlsx/contracts.mjs';
 
 function engineError(error,paths=[]) {const safe=sanitizeError(error,paths);return Object.assign(new Error(safe.message),{code:safe.code,error:safe});}
 export function callEngine(request,invoke) {
@@ -25,12 +28,31 @@ async function runCli(argv,invoke,cwd) {
   }
   throw engineError(error??errorDto('cli_failure','CLI failed without a valid machine error'),[cwd,...argv.filter(x=>path.isAbsolute(x))]);
 }
-const kinds=new Set(['import','preview','cell','draft','check','compare','example','review','branch','restore','bundle']);
+const kinds=new Set(['import','preview','cell','xlsx_catalog','source_cell','draft','check','compare','example','review','branch','restore','bundle']);
 export async function executeTask(task,{invoke,signal}={}) {
   if(!kinds.has(task.kind))throw failure('invalid_task',`unknown task kind: ${task.kind}`);
   if(signal?.aborted)throw failure('cancelled','Task cancelled');
   const p=task.payload??{},paths=task.paths??{};
   try {
+    if(task.kind==='xlsx_catalog') {
+      const activeLimits={...XLSX_LIMITS,...p.limits};
+      const packageStaging=path.join(paths.staging,'catalog-parts');await fs.mkdir(packageStaging,{recursive:true,mode:0o700});
+      const inventory=await inspectXlsxPackage({assetPath:paths.xlsx,stagingPath:packageStaging,limits:activeLimits,signal});
+      try {
+        const workbook=projectWorkbook(inventory,p.asset_id),catalogPath=path.join(paths.staging,'workbook.json');
+        await fs.writeFile(catalogPath,canonicalJsonStringify(workbook),{mode:0o600,flag:'wx'});
+        return {catalog_path:catalogPath};
+      } finally {await disposeXlsxPackage(inventory);}
+    }
+    if(task.kind==='import'&&p.format==='xlsx') {
+      const result=await convertXlsx({assetPath:paths.xlsx,importSpec:p.import_spec,side:p.side,stagingPath:paths.staging,invoke,limits:{...XLSX_LIMITS,...p.limits},signal});
+      await fs.rename(result.csv_path,paths.csv);await fs.rename(result.profile_path,paths.profile);await fs.rename(result.adapter_manifest_path,paths.adapter_manifest);
+      return {csv_path:paths.csv,profile_path:paths.profile,adapter_manifest_path:paths.adapter_manifest,preview:result.preview};
+    }
+    if(task.kind==='source_cell') {
+      const source_cell=await readSourceCell({assetPath:paths.xlsx,profilePath:paths.profile,canonicalCsvPath:paths.csv,side:p.side,record:p.record,column:p.column,invoke,stagingPath:paths.staging,limits:{...XLSX_LIMITS,...p.limits},signal});
+      assertDto('source_cell',source_cell);return {source_cell};
+    }
     if(['import','preview','cell'].includes(task.kind)) {
       const csv=decodeUtf8Fatal(await fs.readFile(paths.csv),{phase:'input',side:p.side});
       const request=task.kind==='cell'?{op:'inspect_csv',csv,side:p.side,cell:{record:p.record,column:p.column}}:{op:'inspect_csv',csv,side:p.side,offset:p.offset??0,limit:p.limit??20};
