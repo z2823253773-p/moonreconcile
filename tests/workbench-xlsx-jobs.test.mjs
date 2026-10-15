@@ -67,10 +67,13 @@ test('import_batch_projects_capacity_before_atomic_asset_and_import_commit',asyn
   const csv=await session.saveAsset('csv','prior.csv','id\n1\n');
   const prior={import_id:randomUUID(),asset_id:csv.asset_id,side:'left',format:'csv',status:'ready',headers:['id'],row_count:1,column_count:1,sha256:csv.sha256,path:csv.path};session.commitImport(prior);
   const stage=await session.staging('batch'),canonicalPath=path.join(stage,'canonical.csv');await fs.writeFile(canonicalPath,'id\n1\n',{mode:0o600});
-  const canonical=await session.prepareAsset('csv','canonical.csv',canonicalPath),entry={import_id:randomUUID(),asset_id:source.asset_id,canonical_asset_id:canonical.asset_id,side:'right',format:'xlsx',status:'ready',headers:['id'],row_count:1,column_count:1,sha256:canonical.sha256,path:canonical.path,profile_path:path.join(stage,'profile.json'),adapter_manifest_path:path.join(stage,'adapter.json'),adapter:{adapter_id:'restricted-ooxml',adapter_version:'1.0.0',profile_schema_version:1,profile_sha256:'1'.repeat(64),import_manifest_sha256:'2'.repeat(64),source_sha256:source.sha256,canonical_csv_sha256:canonical.sha256}};
+  const canonical=await session.prepareAsset('csv','canonical.csv',canonicalPath),entry={import_id:randomUUID(),asset_id:source.asset_id,canonical_asset_id:canonical.asset_id,side:'right',format:'xlsx',status:'ready',headers:['id'],row_count:1,column_count:1,sha256:canonical.sha256,path:canonical.path,source_path:source.path,profile_path:path.join(stage,'profile.json'),adapter_manifest_path:path.join(stage,'adapter.json'),adapter:{adapter_id:'restricted-ooxml',adapter_version:'1.0.0',profile_schema_version:1,profile_sha256:'1'.repeat(64),import_manifest_sha256:'2'.repeat(64),source_sha256:source.sha256,canonical_csv_sha256:canonical.sha256}};
   assert.throws(()=>session.checkImportBatch({newAssets:[canonical],newImport:entry}),error=>error.code==='quota_exceeded');
   assert.equal(session.assets.has(canonical.asset_id),false);assert.equal(session.imports.has(entry.import_id),false);
   session.limits.imports=2;session.checkImportBatch({newAssets:[canonical],newImport:entry});
+  for(const source_path of [undefined,canonical.path,csv.path,path.join(os.tmpdir(),'unregistered.xlsx')]) {
+    assert.throws(()=>session.checkImportBatch({newAssets:[canonical],newImport:{...entry,source_path}}),error=>error.code==='invalid_import','source_path must equal the registered original XLSX path');
+  }
   assert.equal(session.assets.has(canonical.asset_id),false);assert.equal(session.imports.has(entry.import_id),false);
   session.commitImportBatch({newAssets:[canonical],newImport:entry});
   assert.equal(session.assets.get(canonical.asset_id),canonical);assert.equal(session.imports.get(entry.import_id),entry);

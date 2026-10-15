@@ -167,20 +167,22 @@ export async function startWorkbench({bridgePath,workerPath,rootParent,limits:ov
               const profileDoc=JSON.parse(profileBytes.toString('utf8')),manifest=JSON.parse(manifestBytes.toString('utf8'));
               const [profileHash,manifestHash,csvHash]=await Promise.all([sha256(profile),sha256(adapterManifest),sha256(csv)]);
               const mapping=manifest?.row_mapping,counts=manifest?.conversion_counts,worksheet=manifest?.worksheet;
+              const rectangleCells=(spec.last_row-spec.header_row)*(spec.column_end-spec.column_start+1);
               const validManifest=keySet(manifest,['schema_version','adapter_id','adapter_version','profile','source','canonical_csv','worksheet','row_mapping','warnings','conversion_counts'])&&
                 keySet(manifest.profile,['bytes','sha256'])&&keySet(manifest.source,['bytes','sha256'])&&keySet(manifest.canonical_csv,['bytes','sha256'])&&
                 keySet(worksheet,['sheet_id','name','relationship_id','part','date_system'])&&keySet(mapping,['kind','header_row','data_first_row','row_count','column_start','column_end'])&&
                 keySet(counts,['blank','text','numeric_lexemes','expanded_exponents','booleans','dates','zero_padded_identifiers'])&&Array.isArray(manifest.warnings)&&
                 manifest.warnings.every(item=>keySet(item,['code','count'])&&['hidden_rows_included','filtered_rows_included','outside_range_value_cells','outside_range_merges','rich_text_formatting_ignored'].includes(item.code)&&integer(item.count,1,1000000))&&
-                Object.values(counts).every(value=>integer(value,0,1000000))&&manifest.schema_version===1&&manifest.adapter_id==='restricted-ooxml'&&manifest.adapter_version==='1.0.0'&&
+                Object.values(counts).every(value=>integer(value,0,rectangleCells))&&counts.blank+counts.text+counts.numeric_lexemes+counts.booleans+counts.dates+counts.zero_padded_identifiers===rectangleCells&&counts.expanded_exponents<=counts.numeric_lexemes&&
+                manifest.schema_version===1&&manifest.adapter_id==='restricted-ooxml'&&manifest.adapter_version==='1.0.0'&&
                 worksheet.sheet_id===spec.sheet_id&&typeof worksheet.name==='string'&&typeof worksheet.relationship_id==='string'&&typeof worksheet.part==='string'&&['1900','1904'].includes(worksheet.date_system)&&
                 mapping.kind==='rectangle'&&mapping.header_row===spec.header_row&&mapping.data_first_row===spec.header_row+1&&mapping.row_count===o.preview.row_count&&mapping.row_count===spec.last_row-spec.header_row&&mapping.column_start===spec.column_start&&mapping.column_end===spec.column_end&&
                 manifest.profile.sha256===profileHash&&manifest.profile.bytes===profileBytes.length&&manifest.source.sha256===asset.sha256&&manifest.source.bytes===asset.bytes&&manifest.canonical_csv.sha256===csvHash&&manifest.canonical_csv.bytes===csvStat.size;
               if(!keySet(profileDoc,['schema_version','adapter_id','adapter_version','import_spec'])||profileDoc.schema_version!==1||profileDoc.adapter_id!=='restricted-ooxml'||profileDoc.adapter_version!=='1.0.0'||canonicalJsonStringify(profileDoc.import_spec)!==canonicalJsonStringify(spec)||!validManifest)throw failure('invalid_worker_output','XLSX source or material hash changed');
-              const canonical=await session.prepareAsset('csv',asset.name+'.canonical.csv',csv);
+              const canonical=await session.prepareAsset('csv','canonical.csv',csv);
               if(canonical.sha256!==csvHash||canonical.bytes!==csvStat.size)throw failure('invalid_worker_output','Canonical CSV hash changed');
               const adapter={adapter_id:'restricted-ooxml',adapter_version:'1.0.0',profile_schema_version:1,profile_sha256:profileHash,import_manifest_sha256:manifestHash,source_sha256:asset.sha256,canonical_csv_sha256:csvHash};
-              const entry={import_id:randomUUID(),asset_id:asset.asset_id,side:b.side,format:'xlsx',status:'ready',headers:o.preview.headers,row_count:o.preview.row_count,column_count:o.preview.column_count,sha256:csvHash,adapter,canonical_asset_id:canonical.asset_id,path:canonical.path,profile_path:profile,adapter_manifest_path:adapterManifest};
+              const entry={import_id:randomUUID(),asset_id:asset.asset_id,side:b.side,format:'xlsx',status:'ready',headers:o.preview.headers,row_count:o.preview.row_count,column_count:o.preview.column_count,sha256:csvHash,adapter,canonical_asset_id:canonical.asset_id,path:canonical.path,source_path:asset.path,profile_path:profile,adapter_manifest_path:adapterManifest};
               session.checkImportBatch({newAssets:[canonical],newImport:entry});
               return {output:{import:project('import',entry),preview:o.preview},commit:()=>session.commitImportBatch({newAssets:[canonical],newImport:entry})};
             }};

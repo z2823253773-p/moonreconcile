@@ -60,7 +60,7 @@ export async function createSession({rootParent,limits:overrides={}}={}) {
   function checkImportBatch({newAssets,newImport}) {
     if(!Array.isArray(newAssets)||newAssets.length!==1||newImport?.format!=='xlsx')throw failure('invalid_import','Incomplete XLSX import batch',422,'publishing');
     const canonical=newAssets[0],source=assets.get(newImport.asset_id);
-    if(!source||source.kind!=='xlsx'||canonical.kind!=='csv'||!isId(canonical.asset_id)||!isId(newImport.canonical_asset_id)||newImport.canonical_asset_id!==canonical.asset_id||newImport.path!==canonical.path||newImport.sha256!==canonical.sha256||newImport.adapter?.source_sha256!==source.sha256)throw failure('invalid_import','XLSX source or canonical binding changed',422,'publishing');
+    if(!source||source.kind!=='xlsx'||newImport.source_path!==source.path||canonical.kind!=='csv'||!isId(canonical.asset_id)||!isId(newImport.canonical_asset_id)||newImport.canonical_asset_id!==canonical.asset_id||newImport.path!==canonical.path||newImport.sha256!==canonical.sha256||newImport.adapter?.source_sha256!==source.sha256)throw failure('invalid_import','XLSX source or canonical binding changed',422,'publishing');
     if(assets.size+1>limits.assets||imports.size+1>limits.imports)throw failure('quota_exceeded','Import registry quota exceeded',413,'publishing');
     if(assets.has(canonical.asset_id)||imports.has(newImport.import_id))throw failure('invalid_import','Duplicate import registration',409,'publishing');
     project('asset',canonical);project('import',newImport);
