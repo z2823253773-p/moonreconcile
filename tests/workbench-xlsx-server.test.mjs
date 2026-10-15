@@ -89,7 +89,9 @@ test('quota_during_conversion_keeps_registered_state_and_removes_candidates',asy
 });
 
 test('timeout_kills_xlsx_child_releases_materials_and_allows_followup_csv',async t=>{
-  const bridge=await slowBridge(t,1200),app=await startWorkbench({bridgePath:bridge,xlsxEnabled:true,limits:{job_ms:1000,kill_ms:50}});t.after(()=>app.close());const c=await client(app);
+  // Keep this injected host budget below the normal contract while giving the
+  // deliberate XLSX bridge stall a clear 2 s margin before timeout.
+  const bridge=await slowBridge(t,3000),app=await startWorkbench({bridgePath:bridge,xlsxEnabled:true,limits:{job_ms:1000,kill_ms:50}});t.after(()=>app.close());const c=await client(app);
   const bytes=await fs.readFile(fixture('lo-conversion-1900.xlsx')),xlsx=await c.upload('xlsx',bytes);
   const catalog=await c.job('/api/xlsx/catalog',{asset_id:xlsx.asset.asset_id});assert.equal(catalog.state,'succeeded',JSON.stringify(catalog.error));const sheet=catalog.output.workbook.sheets.find(item=>item.selectable);
   const spec={schema_version:1,source_sha256:catalog.output.workbook.source_sha256,sheet_id:sheet.sheet_id,header_row:1,column_start:1,column_end:6,last_row:5,columns:['stored_text','decimal_lexeme','stored_text','excel_date','zero_padded_identifier','stored_text'].map((mode,index)=>({column:index+1,mode})),formula_policy:'reject'};
