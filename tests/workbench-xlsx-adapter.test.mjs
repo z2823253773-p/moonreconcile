@@ -160,3 +160,49 @@ test('adapter rejects a selected merge and obeys lowered CSV byte bounds', async
   await assert.rejects(fs.stat(path.join(stagingPath,'canonical.csv')),e=>e.code==='ENOENT');
   await assert.rejects(convertFor(t,fixture('lo-conversion-1904.xlsx'),{last_row:1,column_start:1,column_end:6,limits:{...XLSX_LIMITS,csv_bytes:16}}),e=>e.code==='xlsx_limit_exceeded'&&e.phase==='xlsx');
 });
+
+// Synthetic edge inputs are distinct from the unchanged application-saved workbooks.
+const edgeVectors=JSON.parse(await fs.readFile(fixture('conversion-edge-vectors.json'),'utf8')).cases;
+for(const vector of edgeVectors) {
+  test(`repair edge ${vector.id}`, async t => {
+    const temporary=await fs.mkdtemp(path.join(os.tmpdir(),'xlsx-repair-edge-'));
+    t.after(()=>fs.rm(temporary,{recursive:true,force:true}));
+    const directory=process.env.TASK3_EDGE_OUTPUT?path.join(path.resolve(process.env.TASK3_EDGE_OUTPUT),vector.id):temporary;
+    await fs.mkdir(directory,{recursive:true});
+    const source=path.join(directory,'source.xlsx');
+    const mutation=String.raw`import re,json,sys,zipfile
+source,destination,vector_json=sys.argv[1:];v=json.loads(vector_json)
+with zipfile.ZipFile(source) as a,zipfile.ZipFile(destination,'w',zipfile.ZIP_DEFLATED) as b:
+ for info in a.infolist():
+  name=info.filename;data=a.read(name)
+  if name=='xl/worksheets/sheet1.xml':data=v['sheet_xml'].encode()
+  if name=='xl/workbook.xml' and 'date_system' in v:data=data.replace(b'date1904="true"',b'date1904="false"' if v['date_system']=='1900' else b'date1904="true"')
+  if v.get('no_styles'):
+   if name=='xl/styles.xml':continue
+   if name=='xl/_rels/workbook.xml.rels':data=re.sub(rb'<Relationship\b[^>]*Type="[^"]*/styles"[^>]*/>',b'',data)
+   if name=='[Content_Types].xml':data=re.sub(rb'<Override\b[^>]*PartName="/xl/styles.xml"[^>]*/>',b'',data)
+  if name=='xl/styles.xml':
+   if 'format' in v:data=re.sub(rb'(<numFmt numFmtId="165" formatCode=")[^"]*',lambda m:m[1]+v['format'].encode(),data)
+   if v.get('builtin_zero'):data=re.sub(rb'<numFmt numFmtId="165"[^>]*/>',b'',data).replace(b'<numFmts count="2">',b'<numFmts count="1">').replace(b'numFmtId="165"',b'numFmtId="1"')
+  if name=='xl/sharedStrings.xml' and 'shared_xml' in v:data=v['shared_xml'].encode()
+  b.writestr(info,data)
+`;
+    execFileSync('python3',['-c',mutation,fixture('lo-conversion-1904.xlsx'),source,JSON.stringify(vector)]);
+    const sourceSha=await hashFile(source);
+    const spec={schema_version:1,source_sha256:sourceSha,sheet_id:`${sourceSha}:1`,header_row:vector.header_row,column_start:vector.column_start,column_end:vector.column_end,last_row:vector.last_row,columns:vector.modes.map((mode,index)=>({column:vector.column_start+index,mode})),formula_policy:'reject'};
+    await fs.writeFile(path.join(directory,'import-spec.json'),JSON.stringify(spec));
+    let result,error;
+    try { result=await convertXlsx({assetPath:source,importSpec:spec,side:'left',stagingPath:directory,invoke:await loadBridgeInvoke(),limits:{...XLSX_LIMITS,...vector.limits}}); }
+    catch(e){const diagnostic=e.error??e;error={code:diagnostic.code,phase:diagnostic.phase,record:diagnostic.record??null,field:diagnostic.field??null};await fs.writeFile(path.join(directory,'error.json'),JSON.stringify(error));}
+    if(vector.error) {
+      assert.deepEqual(error,vector.error);
+      if(vector.no_csv)await assert.rejects(fs.stat(path.join(directory,'canonical.csv')),e=>e.code==='ENOENT');
+    } else {
+      assert.equal(error,undefined);
+      assert.equal(await fs.readFile(result.csv_path,'utf8'),vector.csv);
+      const manifest=JSON.parse(await fs.readFile(result.adapter_manifest_path,'utf8'));
+      assert.deepEqual(manifest.warnings,vector.warnings??(vector.id==='header-rich'||vector.id==='header-s'?[{code:'rich_text_formatting_ignored',count:1}]:[]));
+      assert.equal(Object.entries(manifest.conversion_counts).filter(([key])=>key!=='expanded_exponents').reduce((n,[,value])=>n+value,0),(vector.last_row-vector.header_row)*vector.modes.length);
+    }
+  });
+}

@@ -68,7 +68,7 @@ def workbook_readback(archive, worksheet_path):
     if "xl/sharedStrings.xml" in names:
         shared_root = ET.fromstring(archive.read("xl/sharedStrings.xml"))
         for item in shared_root.findall(f"{{{MAIN}}}si"):
-            shared.append("".join(node.text or "" for node in item.iter(f"{{{MAIN}}}t")))
+            shared.append(_text_runs(item)[0])
     cells = {}
     hidden_rows = []
     for row in sheet_root.findall(f".//{{{MAIN}}}row"):
@@ -80,7 +80,7 @@ def workbook_readback(archive, worksheet_path):
             kind = cell.get("t", "n")
             value_node = cell.find(f"{{{MAIN}}}v")
             if kind == "inlineStr":
-                value = "".join(node.text or "" for node in cell.iter(f"{{{MAIN}}}t"))
+                value = _text_runs(cell.find(f"{{{MAIN}}}is"))[0]
             elif kind == "s":
                 value = decode_xstring(shared[int(value_node.text)])
             elif kind == "b":
@@ -235,153 +235,268 @@ def _decode_xstring_once(value):
     return "".join(output)
 
 
-def _decimal_expand_oracle(raw):
+class OracleRejection(Exception):
+    def __init__(self, code, record=None, field=None, phase="xlsx"):
+        self.diagnostic = {"code":code,"phase":phase,"record":record,"field":field}
+        super().__init__(code)
+
+
+def _numeric_decimal(raw):
     from decimal import Decimal
-    require(re.fullmatch(r"[+-]?[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?", raw) is not None, "invalid numeric lexeme")
+    if (len(raw.encode("utf-8")) > 65536 or
+        re.fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?",raw) is None):
+        raise OracleRejection("xlsx_numeric_limit")
+    exponent = re.split("[eE]",raw)[1] if re.search("[eE]",raw) else "0"
+    magnitude=exponent.lstrip("+-").lstrip("0") or "0"
+    if len(magnitude)>5 or len(magnitude)==5 and magnitude>"65536":
+        raise OracleRejection("xlsx_numeric_limit")
+    return Decimal(raw)
+
+
+def _decimal_expand_oracle(raw):
+    decimal = _numeric_decimal(raw)
     if "e" not in raw.lower(): return raw
-    sign = "-" if raw.startswith("-") else "+" if raw.startswith("+") else ""
-    body = raw[1:] if raw[:1] in "+-" else raw
+    # Decimal provides the value oracle; original coefficient padding is part of
+    # the lexical contract and is independently retained from the XML spelling.
+    sign = raw[0] if raw[:1] in "+-" else ""
+    body = raw[len(sign):]
     mantissa, exponent = re.split(r"[eE]", body)
     whole, dot, fraction = mantissa.partition(".")
-    exponent_value = int(exponent)
-    require(abs(exponent_value) <= 65536, "oracle exponent exceeds bounded-work contract")
-    digits = whole + fraction
-    point = len(whole) + exponent_value
+    exponent_digits=exponent.lstrip("+-").lstrip("0") or "0"
+    shift=int(exponent_digits)*(-1 if exponent.startswith("-") else 1)
+    digits=whole+fraction;point=len(whole)+shift
+    length=(2-point+len(digits) if point<=0 else max(point,len(digits)+(point<len(digits))))+len(sign)
+    if length>65536: raise OracleRejection("xlsx_numeric_limit")
     if point <= 0: result = "0." + "0" * -point + digits
     elif point >= len(digits): result = digits + "0" * (point - len(digits))
     else: result = digits[:point] + "." + digits[point:]
-    expanded = sign + result
-    require(Decimal(raw) == Decimal(expanded), "string expansion changed Decimal value")
+    expanded=sign+result
+    from decimal import Decimal
+    require(decimal==Decimal(expanded),"lexical expansion differs from Decimal value")
     return expanded
 
 
-def _raw_workbook_for_adapter(archive, source_sha, worksheet_meta):
-    workbook = ET.fromstring(archive.read("xl/workbook.xml"))
-    sheets = workbook.find(f"{{{MAIN}}}sheets")
-    rel_path = "xl/_rels/workbook.xml.rels"
-    relroot = ET.fromstring(archive.read(rel_path))
-    rels = {item.get("Id"): item for item in relroot.findall(f"{{{PKG_REL}}}Relationship")}
-    chosen = None
-    for sheet in sheets:
-        rid = sheet.get(f"{{{REL}}}id")
-        rel = rels.get(rid)
-        if rel is None: continue
-        target = posixpath.normpath(posixpath.join("xl", rel.get("Target", "")))
-        if (source_sha + ":" + sheet.get("sheetId", "")) == worksheet_meta["sheet_id"]:
-            chosen = (sheet, rel, target); break
-    require(chosen is not None, "adapter worksheet sheet_id does not bind to workbook")
-    sheet, relation, worksheet_path = chosen
-    require(sheet.get("name") == worksheet_meta["name"] and relation.get("Id") == worksheet_meta["relationship_id"] and worksheet_path == worksheet_meta["part"],
-            "adapter worksheet identity differs from raw source")
-    require(relation.get("Type") == REL + "/worksheet" and relation.get("TargetMode", "Internal") == "Internal", "selected part is not an internal worksheet")
-    wb_pr = workbook.find(f"{{{MAIN}}}workbookPr")
-    date_system = "1904" if wb_pr is not None and wb_pr.get("date1904", "false").lower() in ("true", "1") else "1900"
-    ws = ET.fromstring(archive.read(worksheet_path))
-    shared=[]
-    if "xl/sharedStrings.xml" in archive.namelist():
-        sst=ET.fromstring(archive.read("xl/sharedStrings.xml"))
-        shared=[_decode_xstring_once("".join(node.text or "" for node in item.iter(f"{{{MAIN}}}t"))) for item in sst.findall(f"{{{MAIN}}}si")]
-    styles=ET.fromstring(archive.read("xl/styles.xml"))
-    custom={node.get("numFmtId"):node.get("formatCode") for node in styles.findall(f"{{{MAIN}}}numFmts/{{{MAIN}}}numFmt")}
-    xfs=styles.find(f"{{{MAIN}}}cellXfs")
-    formats=[custom.get(xf.get("numFmtId"),"General") for xf in xfs.findall(f"{{{MAIN}}}xf")]
-    cells={}; row_hidden={}
+def _text_runs(item):
+    """Expanded-name traversal of the supported string content, excluding rPh."""
+    parts=[];runs=0
+    for child in item if item is not None else ():
+        if child.tag==f"{{{MAIN}}}t":parts.append(child.text or "")
+        elif child.tag==f"{{{MAIN}}}r":
+            runs+=1
+            parts.extend(node.text or "" for node in child if node.tag==f"{{{MAIN}}}t")
+    return "".join(parts),runs
+
+
+def _related_path(source, relation):
+    return posixpath.normpath(posixpath.join(posixpath.dirname(source),relation.get("Target","")))
+
+
+def _raw_workbook_for_adapter(archive, source_sha, worksheet_meta=None, sheet_id=None):
+    root_rels=ET.fromstring(archive.read("_rels/.rels"))
+    office=next(node for node in root_rels if node.tag==f"{{{PKG_REL}}}Relationship" and node.get("Type")==REL+"/officeDocument")
+    workbook_path=_related_path("",office)
+    workbook=ET.fromstring(archive.read(workbook_path))
+    relpath=posixpath.join(posixpath.dirname(workbook_path),"_rels",posixpath.basename(workbook_path)+".rels")
+    relations=ET.fromstring(archive.read(relpath))
+    rels={node.get("Id"):node for node in relations if node.tag==f"{{{PKG_REL}}}Relationship"}
+    wanted=sheet_id or worksheet_meta["sheet_id"]
+    sheet=next(node for node in workbook.find(f"{{{MAIN}}}sheets") if source_sha+":"+node.get("sheetId","")==wanted)
+    rid=sheet.get(f"{{{REL}}}id");relation=rels[rid];worksheet_path=_related_path(workbook_path,relation)
+    require(relation.get("Type")==REL+"/worksheet","oracle selection is not ordinary worksheet")
+    pr=workbook.find(f"{{{MAIN}}}workbookPr")
+    date_system="1904" if pr is not None and pr.get("date1904","false") in ("true","1") else "1900"
+    metadata={"sheet_id":wanted,"name":sheet.get("name"),"relationship_id":rid,"part":worksheet_path,"date_system":date_system}
+    if worksheet_meta is not None:require(metadata==worksheet_meta,"adapter worksheet identity differs from raw relation graph")
+    def related_root(kind):
+        candidates=[node for node in relations if node.get("Type")==REL+"/"+kind]
+        return ET.fromstring(archive.read(_related_path(workbook_path,candidates[0]))) if candidates else None
+    sst=related_root("sharedStrings");shared=[_text_runs(item) for item in sst.findall(f"{{{MAIN}}}si")] if sst is not None else []
+    styles=related_root("styles")
+    if styles is None:formats=["General"]
+    else:
+        custom={node.get("numFmtId"):node.get("formatCode") for node in styles.findall(f"{{{MAIN}}}numFmts/{{{MAIN}}}numFmt")}
+        formats=[custom.get(node.get("numFmtId"),"0" if node.get("numFmtId")=="1" else "General") for node in styles.findall(f"{{{MAIN}}}cellXfs/{{{MAIN}}}xf")]
+    ws=ET.fromstring(archive.read(worksheet_path));cells={};hidden={}
+    columns=ws.findall(f"{{{MAIN}}}cols/{{{MAIN}}}col")
     for row in ws.findall(f"{{{MAIN}}}sheetData/{{{MAIN}}}row"):
-        row_num=int(row.get("r")); row_hidden[row_num]=row.get("hidden","false") in ("true","1")
-        for cell in row.findall(f"{{{MAIN}}}c"):
-            ref=cell.get("r"); kind=cell.get("t","n"); v=cell.find(f"{{{MAIN}}}v"); raw="" if v is None else (v.text or "")
-            rich=0
-            if kind=="s": raw=shared[int(raw)]; typ="text"
-            elif kind=="inlineStr":
-                inline=cell.find(f"{{{MAIN}}}is")
-                rich=len(inline.findall(f"{{{MAIN}}}r")) if inline is not None else 0
-                raw=_decode_xstring_once("".join(node.text or "" for node in inline.iter(f"{{{MAIN}}}t"))) if inline is not None else ""
-                typ="text" if raw else "blank"
-            elif kind=="str": raw=_decode_xstring_once(raw);typ="text" if raw else "blank"
-            elif kind=="b": typ="boolean" if raw else "blank"
-            elif kind=="n": typ="numeric" if raw else "blank"
-            else: raise AssertionError("unexpected raw cell type in accepted source")
-            style=int(cell.get("s","0")); cells[ref]={"raw":raw,"type":typ,"style":style,"format":formats[style],"rich_runs":rich}
-    return {"cells":cells,"row_hidden":row_hidden,"date_system":date_system,"ws":ws}
+        rownum=int(row.get("r"));hidden[rownum]=row.get("hidden","false") in ("true","1")
+        for node in row.findall(f"{{{MAIN}}}c"):
+            ref=node.get("r");column,_=_coordinate_oracle(ref);kind=node.get("t","n")
+            raw=node.findtext(f"{{{MAIN}}}v","");rich=0
+            if kind=="s":raw,rich=shared[int(raw)];typ="text"
+            elif kind=="inlineStr":raw,rich=_text_runs(node.find(f"{{{MAIN}}}is"));typ="text" if raw else "blank"
+            elif kind=="str":typ="text" if raw else "blank"
+            elif kind=="b":typ="boolean" if raw else "blank"
+            elif kind=="n":typ="numeric" if raw else "blank"
+            else:raise AssertionError("unsupported raw edge-domain type")
+            inherited=next((col.get("style","0") for col in columns if int(col.get("min"))<=column<=int(col.get("max"))),"0")
+            style=int(node.get("s",row.get("s",inherited)))
+            cells[ref]={"raw":raw,"type":typ,"style":style,"format":formats[style],"rich_runs":rich}
+    return {"cells":cells,"row_hidden":hidden,"date_system":date_system,"ws":ws,"worksheet":metadata}
 
 
 def _date_oracle(raw, date_system):
-    from datetime import date, timedelta
-    expanded=_decimal_expand_oracle(raw)
-    require(not expanded.startswith("-"), "negative Excel date serial")
-    days=int(expanded.split(".",1)[0])
-    if date_system=="1900":
-        require(days!=60 and days<=2958465, "rejected 1900 date serial")
-        base=date(1899,12,31); offset=days-1 if days>60 else days
-    else:
-        require(days<=2957003, "rejected 1904 date serial")
-        base=date(1904,1,1); offset=days
-    return (base+timedelta(days=offset)).isoformat()
+    from datetime import date,timedelta
+    value=_numeric_decimal(raw)
+    _decimal_expand_oracle(raw)  # enforce bounded normalization before date arithmetic
+    if raw.startswith("-") or value!=value.to_integral_value():raise OracleRejection("xlsx_date_rejected")
+    base=date(1899,12,31) if date_system=="1900" else date(1904,1,1)
+    maximum=(date(9999,12,31)-base).days+(1 if date_system=="1900" else 0)
+    if value>maximum or date_system=="1900" and value==60:raise OracleRejection("xlsx_date_rejected")
+    days=int(value)
+    return (base+timedelta(days=days-(1 if date_system=="1900" and days>60 else 0))).isoformat()
 
 
-def check_adapter_output(manifest_path, output_root):
-    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
-    expected_doc=json.loads((manifest_path.parent/"genuine-save-expected.json").read_text(encoding="utf-8"))
-    expected={item["id"]:item for item in expected_doc["samples"]}
-    checked=[]
+def _zero_oracle(raw,fmt):
+    value=_numeric_decimal(raw)
+    if (not isinstance(fmt,str) or re.fullmatch("0{1,256}",fmt) is None or
+        raw.startswith("-") or value!=value.to_integral_value()):raise OracleRejection("xlsx_value_mode_mismatch")
+    _decimal_expand_oracle(raw)  # enforce the same frozen expansion budget
+    integral=format(value,"f").partition(".")[0].lstrip("+").lstrip("0") or "0"
+    return integral.zfill(len(fmt))
+
+
+def _coordinate_oracle(ref):
+    match=re.fullmatch(r"([A-Z]+)([0-9]+)",ref);col=0
+    for char in match[1]:col=26*col+ord(char)-64
+    return col,int(match[2])
+
+
+def _coordinate_text(column,row):
+    letters=""
+    while column:column,rem=divmod(column-1,26);letters=chr(65+rem)+letters
+    return letters+str(row)
+
+
+def _csv_compat(rows):
+    # Existing core encoder quotes CR as well as LF and leaves a sole empty
+    # field unquoted. Python csv.writer's defaults differ in these two cases.
+    stream=io.StringIO(newline="")
+    for row in rows:
+        if row==[""]:stream.write("\n")
+        else:
+            record=io.StringIO(newline="");csv.writer(record,lineterminator="\r\n",quoting=csv.QUOTE_MINIMAL).writerow(row)
+            stream.write(record.getvalue()[:-2]+"\n")
+    return stream.getvalue().encode("utf-8")
+
+
+def _convert_oracle(cell,mode,date_system):
+    raw=cell["raw"];typ=cell["type"]
+    if typ=="blank" or raw=="":return "","blank"
+    if typ=="text":
+        if mode!="stored_text":raise OracleRejection("xlsx_value_mode_mismatch")
+        try:return _decode_xstring_once(raw),"text"
+        except AssertionError:raise OracleRejection("xlsx_value_mode_mismatch")
+    if typ=="boolean":
+        if mode!="stored_text":raise OracleRejection("xlsx_value_mode_mismatch")
+        return ("TRUE" if raw=="1" else "FALSE"),"booleans"
+    _numeric_decimal(raw)
+    if mode=="stored_text":return raw,"text"
+    if mode=="decimal_lexeme":return _decimal_expand_oracle(raw),"numeric_lexemes"
+    if mode=="excel_date":return _date_oracle(raw,date_system),"dates"
+    if mode=="zero_padded_identifier":return _zero_oracle(raw,cell["format"]),"zero_padded_identifiers"
+    raise AssertionError("unknown mode")
+
+
+def _derive_adapter(source,spec,limits=None):
+    require(set(spec)=={"schema_version","source_sha256","sheet_id","header_row","column_start","column_end","last_row","columns","formula_policy"},"import spec keys mismatch")
+    require(spec["schema_version"]==1 and spec["formula_policy"]=="reject","import spec version/policy mismatch")
+    require([item["column"] for item in spec["columns"]]==list(range(spec["column_start"],spec["column_end"]+1)) and all(set(item)=={"column","mode"} for item in spec["columns"]),"import spec columns mismatch")
+    source_sha=hashlib.sha256(source).hexdigest();require(spec["source_sha256"]==source_sha,"oracle source binding mismatch")
+    width=spec["column_end"]-spec["column_start"]+1;height=spec["last_row"]-spec["header_row"]
+    limits=limits or {}
+    if width>limits.get("columns",256) or height>limits.get("data_rows",100000):raise OracleRejection("xlsx_limit_exceeded")
+    with zipfile.ZipFile(io.BytesIO(source)) as archive:raw=_raw_workbook_for_adapter(archive,source_sha,sheet_id=spec["sheet_id"])
+    cells=raw["cells"];headers=[]
+    for col in range(spec["column_start"],spec["column_end"]+1):
+        ref=_coordinate_text(col,spec["header_row"]);cell=cells.get(ref)
+        require(cell and cell["type"]=="text","oracle invalid header type")
+        try:header=_decode_xstring_once(cell["raw"])
+        except AssertionError:raise OracleRejection("xlsx_value_mode_mismatch",spec["header_row"],ref)
+        if not header:raise OracleRejection("xlsx_value_mode_mismatch",spec["header_row"],ref)
+        headers.append(header)
+    if len(set(headers))!=len(headers):raise OracleRejection("invalid_import_spec",spec["header_row"])
+    counts={k:0 for k in ("blank","text","numeric_lexemes","expanded_exponents","booleans","dates","zero_padded_identifiers")};rows=[]
+    for row in range(spec["header_row"]+1,spec["last_row"]+1):
+        values=[]
+        for column in spec["columns"]:
+            ref=_coordinate_text(column["column"],row);cell=cells.get(ref,{"raw":"","type":"blank","format":"General"})
+            try:value,category=_convert_oracle(cell,column["mode"],raw["date_system"])
+            except OracleRejection as error:raise OracleRejection(error.diagnostic["code"],row,ref)
+            counts[category]+=1
+            if category=="numeric_lexemes" and re.search("[eE]",cell["raw"]):counts["expanded_exponents"]+=1
+            values.append(value)
+        rows.append(values)
+    # Core's existing blank-header check happens after CSV conversion.
+    for index,header in enumerate(headers):
+        if not header.strip():raise OracleRejection("invalid_header",1,"column_"+str(index+1),"input")
+    warnings={k:0 for k in ("hidden_rows_included","filtered_rows_included","outside_range_value_cells","outside_range_merges","rich_text_formatting_ignored")}
+    def selected(col,row):return spec["header_row"]<=row<=spec["last_row"] and spec["column_start"]<=col<=spec["column_end"]
+    for ref,cell in cells.items():
+        col,row=_coordinate_oracle(ref)
+        if cell["raw"] and not selected(col,row):warnings["outside_range_value_cells"]+=1
+        if selected(col,row) and cell["type"]=="text" and cell["rich_runs"]>1:warnings["rich_text_formatting_ignored"]+=1
+    for row,hidden in raw["row_hidden"].items():
+        if spec["header_row"]<row<=spec["last_row"] and hidden:warnings["hidden_rows_included"]+=1
+    ws=raw["ws"];auto=ws.find(f"{{{MAIN}}}autoFilter")
+    if auto is not None:
+        start,end=map(_coordinate_oracle,auto.get("ref").split(":"));left,top=start;right,bottom=end
+        if left<=spec["column_end"] and right>=spec["column_start"]:warnings["filtered_rows_included"]=max(0,min(bottom,spec["last_row"])-max(top,spec["header_row"]+1)+1)
+    for merge in ws.findall(f"{{{MAIN}}}mergeCells/{{{MAIN}}}mergeCell"):
+        (left,top),(right,bottom)=map(_coordinate_oracle,merge.get("ref").split(":"))
+        if left<=spec["column_end"] and right>=spec["column_start"] and top<=spec["last_row"] and bottom>=spec["header_row"]:raise OracleRejection("unsupported_xlsx_feature")
+        warnings["outside_range_merges"]+=1
+    return {"csv":_csv_compat([headers]+rows),"rows":rows,"counts":counts,"warnings":[{"code":k,"count":v} for k,v in warnings.items() if v],"worksheet":raw["worksheet"]}
+
+
+def _canonical_json(value):
+    return (json.dumps(value,sort_keys=True,ensure_ascii=False,separators=(",",":"))+"\n").encode("utf-8")
+
+
+def _check_actual(directory,source,spec,derived):
+    csv_bytes=(directory/"canonical.csv").read_bytes();profile_bytes=(directory/"profile.json").read_bytes();adapter_bytes=(directory/"adapter.json").read_bytes()
+    require(csv_bytes==derived["csv"],f"{directory.name}: actual CSV differs from independent XML/Decimal/datetime/CSV oracle")
+    expected_profile={"schema_version":1,"adapter_id":"restricted-ooxml","adapter_version":"1.0.0","import_spec":spec}
+    require(profile_bytes==_canonical_json(expected_profile),"profile schema or canonical bytes mismatch")
+    def identity(data):return {"bytes":len(data),"sha256":hashlib.sha256(data).hexdigest()}
+    expected_manifest={"schema_version":1,"adapter_id":"restricted-ooxml","adapter_version":"1.0.0","profile":identity(profile_bytes),"source":identity(source),"canonical_csv":identity(csv_bytes),"worksheet":derived["worksheet"],"row_mapping":{"kind":"rectangle","header_row":spec["header_row"],"data_first_row":spec["header_row"]+1,"row_count":spec["last_row"]-spec["header_row"],"column_start":spec["column_start"],"column_end":spec["column_end"]},"warnings":derived["warnings"],"conversion_counts":derived["counts"]}
+    require(adapter_bytes==_canonical_json(expected_manifest),f"{directory.name}: adapter schema/counts/warnings/mapping/hash canonical bytes mismatch")
+    return {"path":directory.name,**identity(csv_bytes),"rows":len(derived["rows"]),"counts":derived["counts"],"warnings":derived["warnings"]}
+
+
+def check_adapter_output(manifest_path,output_root):
+    expected_doc=json.loads((manifest_path.parent/"genuine-save-expected.json").read_text(encoding="utf-8"));expected={v["id"]:v for v in expected_doc["samples"]};checked=[]
     for name in ("lo-conversion-1900.xlsx","lo-conversion-1904.xlsx"):
-        sample=expected[name]; directory=output_root/name.removesuffix(".xlsx")
-        source=(manifest_path.parent/name).read_bytes(); source_sha=hashlib.sha256(source).hexdigest()
-        profile_bytes=(directory/"profile.json").read_bytes(); adapter_bytes=(directory/"adapter.json").read_bytes(); csv_bytes=(directory/"canonical.csv").read_bytes()
-        profile=json.loads(profile_bytes); adapter=json.loads(adapter_bytes)
-        require(set(profile)=={"schema_version","adapter_id","adapter_version","import_spec"}, "profile keys changed")
-        require(profile=={"schema_version":1,"adapter_id":"restricted-ooxml","adapter_version":"1.0.0","import_spec":profile["import_spec"]}, "profile version mismatch")
-        spec=profile["import_spec"]
-        require(spec["schema_version"]==1 and spec["source_sha256"]==source_sha and spec["formula_policy"]=="reject", "profile does not bind original source")
-        require(spec["header_row"]==sample["range"]["header_row"] and spec["column_start"]==sample["range"]["column_start"] and spec["column_end"]==sample["range"]["column_end"] and spec["last_row"]==sample["range"]["last_row"], "profile rectangle differs from independent reference")
-        require([item["mode"] for item in spec["columns"]]==sample["modes"], "profile modes differ from independent reference")
-        with zipfile.ZipFile(io.BytesIO(source)) as archive:
-            raw=_raw_workbook_for_adapter(archive,source_sha,adapter["worksheet"])
-        require(raw["date_system"]==sample["stored"]["date_system"], "raw XML date system differs from controller readback")
-        values=raw["cells"]; headers=[]
-        for col in range(spec["column_start"],spec["column_end"]+1):
-            letter="";n=col
-            while n: n,rem=divmod(n-1,26);letter=chr(65+rem)+letter
-            cell=values.get(f"{letter}{spec['header_row']}")
-            require(cell is not None and cell["type"]=="text" and cell["raw"]!="", "header is not stored text")
-            headers.append(cell["raw"])
-        rows=[]; counts={key:0 for key in ("blank","text","numeric_lexemes","expanded_exponents","booleans","dates","zero_padded_identifiers")}
-        for row in range(spec["header_row"]+1,spec["last_row"]+1):
-            output=[]
-            for item in spec["columns"]:
-                col=item["column"];letter="";n=col
-                while n: n,rem=divmod(n-1,26);letter=chr(65+rem)+letter
-                cell=values.get(f"{letter}{row}",{"raw":"","type":"blank","format":"General"})
-                raw_value=cell["raw"]; kind=cell["type"]; mode=item["mode"]
-                if kind=="blank" or raw_value=="": value="";category="blank"
-                elif kind=="text":
-                    require(mode=="stored_text", "text cell mode mismatch");value=raw_value;category="text"
-                elif kind=="boolean":
-                    require(mode=="stored_text", "boolean cell mode mismatch");value="TRUE" if raw_value=="1" else "FALSE";category="booleans"
-                elif mode=="stored_text": value=raw_value;category="text"
-                elif mode=="decimal_lexeme": value=_decimal_expand_oracle(raw_value);category="numeric_lexemes"
-                elif mode=="excel_date": value=_date_oracle(raw_value,raw["date_system"]);category="dates"
-                elif mode=="zero_padded_identifier":
-                    fmt=cell["format"];require(re.fullmatch(r"0+",fmt or "") is not None and re.fullmatch(r"(?:0|[1-9][0-9]*)",raw_value) is not None and len(raw_value)<=len(fmt), "zero format or stored value rejected")
-                    value=raw_value.zfill(len(fmt));category="zero_padded_identifiers"
-                else: raise AssertionError("unknown import mode")
-                counts[category]+=1
-                if category=="numeric_lexemes" and re.search(r"[eE]",raw_value):counts["expanded_exponents"]+=1
-                output.append(value)
-            rows.append(output)
-        stream=io.StringIO(newline="");writer=csv.writer(stream,lineterminator="\n",quoting=csv.QUOTE_MINIMAL);writer.writerow(headers);writer.writerows(rows)
-        oracle=stream.getvalue().encode("utf-8")
-        require(csv_bytes==oracle, f"{name}: adapter CSV differs from independent raw-cell/Decimal/date oracle")
-        require(csv_bytes==(manifest_path.parent/sample["expected_csv"]).read_bytes(), f"{name}: adapter CSV differs from controller reference")
-        require(hashlib.sha256(csv_bytes).hexdigest()==sample["csv_sha256"] and len(csv_bytes)==sample["csv_bytes"], "canonical CSV hash or length mismatch")
-        require(adapter["source"]=={"bytes":len(source),"sha256":source_sha}, "adapter source identity mismatch")
-        require(adapter["canonical_csv"]=={"bytes":len(csv_bytes),"sha256":hashlib.sha256(csv_bytes).hexdigest()}, "adapter CSV identity mismatch")
-        require(adapter["profile"]=={"bytes":len(profile_bytes),"sha256":hashlib.sha256(profile_bytes).hexdigest()}, "adapter profile identity mismatch")
-        require(adapter["row_mapping"]=={"kind":"rectangle","header_row":spec["header_row"],"data_first_row":spec["header_row"]+1,"row_count":sample["row_count"],"column_start":spec["column_start"],"column_end":spec["column_end"]}, "row mapping mismatch")
-        require(adapter["conversion_counts"]==counts, f"conversion counts mismatch: {adapter['conversion_counts']} != {counts}")
-        require(len(rows)==sample["row_count"] and rows==sample["rows"], "independent value rows mismatch")
-        require(adapter["warnings"]==[], "unexpected warnings for bounded native conversion sample")
-        checked.append({"path":name,"bytes":len(csv_bytes),"sha256":hashlib.sha256(csv_bytes).hexdigest(),"rows":len(rows),"counts":counts})
+        sample=expected[name];directory=output_root/name.removesuffix(".xlsx");source=(manifest_path.parent/name).read_bytes()
+        profile=json.loads((directory/"profile.json").read_bytes());spec=profile["import_spec"]
+        require(spec["schema_version"]==1 and spec["formula_policy"]=="reject","profile schema/policy mismatch")
+        require(all(spec[k]==sample["range"][k] for k in ("header_row","column_start","column_end","last_row")),"native oracle range mismatch")
+        require([v["mode"] for v in spec["columns"]]==sample["modes"],"native oracle modes mismatch")
+        derived=_derive_adapter(source,spec);checked.append(_check_actual(directory,source,spec,derived))
+        require(derived["rows"]==sample["rows"] and len(derived["rows"])==sample["row_count"],"native independent stored values mismatch")
+        require(derived["csv"]==(manifest_path.parent/sample["expected_csv"]).read_bytes(),"native independent reference bytes mismatch")
+        require(len(derived["csv"])==sample["csv_bytes"] and hashlib.sha256(derived["csv"]).hexdigest()==sample["csv_sha256"],"native reference identity mismatch")
+    return checked
+
+
+def check_edge_output(vectors_path,output_root):
+    document=json.loads(vectors_path.read_text(encoding="utf-8"));require(document["schema_version"]==1,"edge domain schema mismatch");checked=[]
+    for vector in document["cases"]:
+        require(vector["label"]=="synthetic","edge inputs must remain synthetic")
+        directory=output_root/vector["id"];source=(directory/"source.xlsx").read_bytes();spec=json.loads((directory/"import-spec.json").read_bytes())
+        require(all(spec[k]==vector[k] for k in ("header_row","column_start","column_end","last_row")),"edge rectangle mismatch")
+        require([v["mode"] for v in spec["columns"]]==vector["modes"],"edge modes mismatch")
+        try:derived=_derive_adapter(source,spec,vector.get("limits"))
+        except OracleRejection as error:
+            require(error.diagnostic==vector.get("error"),f"{vector['id']}: independent rejection differs from frozen expectation: {error.diagnostic}")
+            require(json.loads((directory/"error.json").read_bytes())==error.diagnostic,f"{vector['id']}: actual adapter rejection differs from independent oracle")
+            require(not (directory/"profile.json").exists() and not (directory/"adapter.json").exists(),"failed conversion produced successful materials")
+            if vector.get("no_csv"):require(not (directory/"canonical.csv").exists(),"lower rectangle limit allocated CSV")
+            checked.append({"id":vector["id"],"rejection":error.diagnostic,"source_sha256":hashlib.sha256(source).hexdigest()});continue
+        require("error" not in vector,f"{vector['id']}: independent oracle wrongly accepted rejection case")
+        require(derived["csv"]==vector["csv"].encode(),"independent edge CSV differs from explicit expected bytes")
+        require(not (directory/"error.json").exists(),"successful adapter output has an error receipt")
+        checked.append({"id":vector["id"],**_check_actual(directory,source,spec,derived)})
     return checked
 
 
@@ -630,16 +745,20 @@ def main():
     parser.add_argument("--malicious-manifest", type=Path)
     parser.add_argument("--write-malicious-dir", type=Path)
     parser.add_argument("--adapter-output", type=Path, help="owned directory containing lo-conversion-1900/ and lo-conversion-1904/ adapter results")
+    parser.add_argument("--edge-vectors", type=Path)
+    parser.add_argument("--edge-output", type=Path)
     args = parser.parse_args()
+    require(bool(args.edge_vectors)==bool(args.edge_output),"edge vectors and actual output directory are required together")
     xml_count, _cases = check_xml_cases(args.xml_cases)
     samples = check_genuine(args.genuine_manifest)
     adapter = check_adapter_output(args.genuine_manifest, args.adapter_output) if args.adapter_output else []
+    edge=check_edge_output(args.edge_vectors,args.edge_output) if args.edge_vectors else []
     malicious = []
     if args.malicious_manifest:
         source = args.genuine_manifest.parent / "lo-1904-values.xlsx"
         malicious = check_malicious(args.malicious_manifest, source, args.write_malicious_dir)
     print(json.dumps({"status": "PASS", "xml_cases_checked": xml_count, "genuine_samples": samples,
-                      "adapter_outputs": adapter, "malicious_zip_mutations": malicious}, ensure_ascii=False, indent=2))
+                      "adapter_outputs": adapter, "edge_outputs":edge, "malicious_zip_mutations": malicious}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

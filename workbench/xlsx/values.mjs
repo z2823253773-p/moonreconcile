@@ -10,31 +10,40 @@ function validateLimits(limits) {
       Object.keys(XLSX_LIMITS).some(key => !Object.hasOwn(limits,key) || !Number.isSafeInteger(limits[key]) || limits[key] < 1 || limits[key] > XLSX_LIMITS[key])) throw fail('invalid_xlsx');
 }
 
+// Grammar validation and exponent bounds apply even when stored_text preserves bytes.
+function numericParts(value, limits) {
+  if (typeof value !== 'string' || utf8Length(value) > limits.cell_bytes) throw fail('xlsx_numeric_limit');
+  const match = /^([+-]?)(?:([0-9]+)(?:\.([0-9]*))?|\.([0-9]+))(?:[eE]([+-]?[0-9]+))?$/.exec(value);
+  if (!match) throw fail('xlsx_numeric_limit');
+  const [, sign, whole = '', fractionWithWhole, fractionWithoutWhole, exponentText = '0'] = match;
+  // Strip lexical padding before bounded integer conversion; never convert significands.
+  const exponentDigits = exponentText.replace(/^[+-]/, '').replace(/^0+/, '') || '0';
+  if (exponentDigits.length > 5 || exponentDigits.length === 5 && exponentDigits > '65536') throw fail('xlsx_numeric_limit');
+  const exponent = Number(exponentDigits) * (exponentText.startsWith('-') ? -1 : 1);
+  return {sign,whole,fraction:fractionWithWhole ?? fractionWithoutWhole ?? '',exponent};
+}
+
 /** Expand an XML numeric cell lexeme using bounded string operations only. */
 export function expandDecimalLexeme(value, limits = XLSX_LIMITS) {
   validateLimits(limits);
-  if (typeof value !== 'string' || utf8Length(value) > limits.cell_bytes) throw fail('xlsx_numeric_limit');
-  const match = /^([+-]?)([0-9]+)(?:\.([0-9]*))?(?:[eE]([+-]?[0-9]+))?$/.exec(value);
-  if (!match || match[2] === '' ) throw fail('xlsx_numeric_limit');
-  const [, sign, whole, fraction = '', exponentText = '0'] = match;
-  if (value.includes('.') && fraction.length === 0 && !/[eE]/.test(value)) { if (utf8Length(value) > limits.cell_bytes) throw fail('xlsx_numeric_limit'); return value; }
+  const {sign,whole,fraction,exponent} = numericParts(value,limits);
   if (!/[eE]/.test(value)) return value;
-  if (exponentText.length > 7) throw fail('xlsx_numeric_limit');
-  const exponentBig = BigInt(exponentText);
-  if (exponentBig > 65536n || exponentBig < -65536n) throw fail('xlsx_numeric_limit');
-  const exponent = Number(exponentBig);
   const digits = whole + fraction;
   const point = whole.length + exponent;
   const resultLength = point <= 0 ? 2 + -point + digits.length : point >= digits.length ? point : digits.length + 1;
-  const signLength = sign ? 1 : 0;
-  if (resultLength + signLength > limits.cell_bytes) throw fail('xlsx_numeric_limit');
+  if (resultLength + sign.length > limits.cell_bytes) throw fail('xlsx_numeric_limit');
   let output;
   if (point <= 0) output = `0.${'0'.repeat(-point)}${digits}`;
   else if (point >= digits.length) output = `${digits}${'0'.repeat(point - digits.length)}`;
   else output = `${digits.slice(0,point)}.${digits.slice(point)}`;
-  output = `${sign}${output}`;
-  if (utf8Length(output) > limits.cell_bytes) throw fail('xlsx_numeric_limit');
-  return output;
+  return `${sign}${output}`;
+}
+
+function nonnegativeIntegral(value, limits, code) {
+  const expanded = expandDecimalLexeme(value,limits);
+  const [whole,fraction=''] = expanded.replace(/^\+/, '').split('.');
+  if (expanded.startsWith('-') || /[1-9]/.test(fraction)) throw fail(code);
+  return whole.replace(/^0+/, '') || '0';
 }
 
 /** Decode the SpreadsheetML Xstring escape layer once, after XML parsing. */
@@ -72,10 +81,9 @@ function dateParts(year, month, day) {
 
 export function excelSerialDate(value, dateSystem, limits = XLSX_LIMITS) {
   if (!['1900','1904'].includes(dateSystem)) throw fail('xlsx_date_rejected');
-  const expanded = expandDecimalLexeme(value, limits);
-  if (expanded.startsWith('-')) throw fail('xlsx_date_rejected');
-  const dayLexeme = expanded.split('.',1)[0];
-  const dayBig = BigInt(dayLexeme || '0');
+  const dayLexeme = nonnegativeIntegral(value,limits,'xlsx_date_rejected');
+  if (dayLexeme.length > 7) throw fail('xlsx_date_rejected');
+  const dayBig = BigInt(dayLexeme);
   const max = dateSystem === '1900' ? 2958465n : 2957003n;
   if (dayBig > max || dateSystem === '1900' && dayBig === 60n) throw fail('xlsx_date_rejected');
   const days = Number(dayBig);
@@ -107,6 +115,7 @@ export function convertCell(cell, mode, context) {
     return {value:stored === '1' ? 'TRUE' : 'FALSE',category:'booleans',expanded:false};
   }
   if (type !== 'numeric') throw fail('xlsx_value_mode_mismatch');
+  numericParts(stored,limits);
   if (mode === 'stored_text') return {value:stored,category:'text',expanded:false};
   if (mode === 'decimal_lexeme') {
     const value=expandDecimalLexeme(stored,limits);
@@ -115,8 +124,9 @@ export function convertCell(cell, mode, context) {
   if (mode === 'excel_date') return {value:excelSerialDate(stored,context.date_system,limits),category:'dates',expanded:false};
   if (mode === 'zero_padded_identifier') {
     const format=context.number_format;
-    if (typeof format !== 'string' || !/^0+$/.test(format) || !/^(0|[1-9][0-9]*)$/.test(stored) || stored.length > format.length) throw fail('xlsx_value_mode_mismatch');
-    const value=`${'0'.repeat(format.length-stored.length)}${stored}`;
+    if (typeof format !== 'string' || format.length < 1 || format.length > 256 || !/^0+$/.test(format)) throw fail('xlsx_value_mode_mismatch');
+    const integral=nonnegativeIntegral(stored,limits,'xlsx_value_mode_mismatch');
+    const value=integral.padStart(format.length,'0');
     if (utf8Length(value)>limits.cell_bytes) throw fail('xlsx_numeric_limit');
     return {value,category:'zero_padded_identifiers',expanded:false};
   }

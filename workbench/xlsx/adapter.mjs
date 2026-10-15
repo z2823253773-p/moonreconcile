@@ -7,7 +7,7 @@ import { inspectImport } from '../engine-host.mjs';
 import { inspectXlsxPackage, disposeXlsxPackage } from './package.mjs';
 import { assertImportSpec, XLSX_LIMITS, OOXML_TYPES, OOXML_MAIN, OOXML_OFFICE } from './contracts.mjs';
 import { parseXmlEvents } from './xml.mjs';
-import { convertCell } from './values.mjs';
+import { convertCell, decodeSpreadsheetText } from './values.mjs';
 
 const MAIN=OOXML_MAIN, REL=OOXML_OFFICE;
 const FAIL = (code, record=null, field=null) => Object.assign(new Error('Workbook conversion failed.'), {code,phase:'xlsx',record,field});
@@ -60,11 +60,11 @@ function readShared(root,limits) {
   return items.map(item=>{const joined=textRuns(item);total+=Buffer.byteLength(joined.value,'utf8');if(total>67108864||Buffer.byteLength(joined.value,'utf8')>limits.cell_bytes)throw FAIL('xlsx_limit_exceeded');return joined;});
 }
 function readFormats(root) {
-  if(!root)return [];
+  if(!root)return ['General'];
   const custom=new Map();const numFmts=first(root,MAIN,'numFmts');
   for(const item of numFmts?children(numFmts,MAIN,'numFmt'):[])custom.set(attr(item,'numFmtId'),attr(item,'formatCode'));
   const xfs=first(root,MAIN,'cellXfs');
-  return (xfs?children(xfs,MAIN,'xf'):[]).map(xf=>custom.get(attr(xf,'numFmtId'))??'General');
+  return (xfs?children(xfs,MAIN,'xf'):[]).map(xf=>custom.get(attr(xf,'numFmtId'))??(attr(xf,'numFmtId')==='1'?'0':'General'));
 }
 function parseRef(ref) {
   const m=/^([A-Z]{1,3})([1-9][0-9]*):([A-Z]{1,3})([1-9][0-9]*)$/.exec(ref??'');
@@ -104,6 +104,12 @@ function styleIndexFor(cell,rowStyles,columnStyles) {
   return 0;
 }
 
+// Only failures attributable to this cell acquire physical worksheet origins.
+function cellFailure(error,cell) {
+  if(error?.phase==='xlsx')return Object.assign(error,{record:cell.row,field:cell.coordinate});
+  return error;
+}
+
 /** Convert a verified OOXML package into the existing core's canonical CSV. */
 export async function convertXlsx({assetPath,importSpec,side,stagingPath,invoke,limits=XLSX_LIMITS,signal}={}) {
   if(!['left','right'].includes(side)||typeof invoke!=='function'||typeof assetPath!=='string'||typeof stagingPath!=='string')throw FAIL('invalid_import_spec');
@@ -114,6 +120,7 @@ export async function convertXlsx({assetPath,importSpec,side,stagingPath,invoke,
     if(signal?.aborted)throw signal.reason??FAIL('invalid_xlsx');
     inventory=await inspectXlsxPackage({assetPath,stagingPath:partsDir,limits:activeLimits,signal});
     assertImportSpec(importSpec,inventory);
+    if(rangeRows(importSpec)>activeLimits.data_rows||importSpec.column_end-importSpec.column_start+1>activeLimits.columns)throw FAIL('xlsx_limit_exceeded');
     const sheet=inventory.sheets.find(item=>item.sheet_id===importSpec.sheet_id);
     const worksheetPart=inventory.parts.get(sheet.part);
     const tree=parseTree(await fs.readFile(worksheetPart.path),sheet.part,{xml_bytes:activeLimits.xml_bytes,xml_depth:activeLimits.xml_depth});
@@ -141,7 +148,11 @@ export async function convertXlsx({assetPath,importSpec,side,stagingPath,invoke,
     for(let col=importSpec.column_start;col<=importSpec.column_end;col++) {
       const cell=byPosition.get(`${importSpec.header_row}:${col}`);
       if(!cell||cell.type!=='text'||cell.stored_value==='')throw FAIL('xlsx_value_mode_mismatch',importSpec.header_row,coordinateText(importSpec.header_row,col));
-      header.push(cell.stored_value);
+      let value;
+      try {value=decodeSpreadsheetText(cell.stored_value);}
+      catch(error){throw cellFailure(error,cell);}
+      if(value==='')throw FAIL('xlsx_value_mode_mismatch',cell.row,cell.coordinate);
+      header.push(value);
     }
     if(!exactUnique(header))throw FAIL('invalid_import_spec',importSpec.header_row);
     const canonicalCsv=path.join(stagingPath,'canonical.csv'),profilePath=path.join(stagingPath,'profile.json'),manifestPath=path.join(stagingPath,'adapter.json');
@@ -159,7 +170,7 @@ export async function convertXlsx({assetPath,importSpec,side,stagingPath,invoke,
     }
     for(const cell of cells) {
       if(cell.stored_value!==''&&!overlaps(cell,importSpec))addCount(warningCounts,'outside_range_value_cells');
-      if(overlaps(cell,importSpec)&&cell.row>importSpec.header_row&&cell.type==='text'&&cell.rich_runs>1)addCount(warningCounts,'rich_text_formatting_ignored');
+      if(overlaps(cell,importSpec)&&cell.type==='text'&&cell.rich_runs>1)addCount(warningCounts,'rich_text_formatting_ignored');
     }
     try {
     csvHandle=await fs.open(canonicalCsv,'wx',0o600);
@@ -175,7 +186,9 @@ export async function convertXlsx({assetPath,importSpec,side,stagingPath,invoke,
         const styleIndex=styleIndexFor(cell,rowStyles,columnStyles);
         if(!Number.isSafeInteger(styleIndex)||styleIndex<0||styleIndex>=formats.length)throw FAIL('invalid_xlsx',row,cell.coordinate);
         const storedCell={coordinate:cell.coordinate,row:cell.row,column:cell.column,type:cell.type,stored_value:cell.stored_value,style_index:cell.has_style?cell.style_index:styleIndex};
-        const converted=convertCell(storedCell,importSpec.columns[index].mode,{date_system:inventory.date_system,number_format:formats[styleIndex]??'General',limits:activeLimits});
+        let converted;
+        try {converted=convertCell(storedCell,importSpec.columns[index].mode,{date_system:inventory.date_system,number_format:formats[styleIndex]??'General',limits:activeLimits});}
+        catch(error){throw cellFailure(error,cell);}
         if(Buffer.byteLength(converted.value,'utf8')>activeLimits.cell_bytes)throw FAIL('xlsx_limit_exceeded',row,cell.coordinate);
         addCount(counts,converted.category);
         if(converted.expanded)addCount(counts,'expanded_exponents');
@@ -184,7 +197,6 @@ export async function convertXlsx({assetPath,importSpec,side,stagingPath,invoke,
       await write(renderCsv([], [output]).slice(1));
       rowCount++;
     }
-    if(rowCount>activeLimits.data_rows||header.length>activeLimits.columns)throw FAIL('xlsx_limit_exceeded');
     } finally {if(csvHandle)await csvHandle.close();}
     const csvData=await fs.readFile(canonicalCsv);
     const preview=await inspectImport(csvData,{invoke,side});

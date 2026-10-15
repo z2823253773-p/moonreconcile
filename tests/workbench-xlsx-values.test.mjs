@@ -34,7 +34,7 @@ test('Excel serial conversion honors both systems, leap-day bug and year ceiling
   assert.equal(excelSerialDate('59','1900'), '1900-02-28');
   assert.throws(() => excelSerialDate('60','1900'), e => e.code === 'xlsx_date_rejected');
   assert.equal(excelSerialDate('61','1900'), '1900-03-01');
-  assert.equal(excelSerialDate('0.5','1900'), '1899-12-31');
+  assert.throws(() => excelSerialDate('0.5','1900'), e => e.code === 'xlsx_date_rejected');
   assert.equal(excelSerialDate('0','1904'), '1904-01-01');
   assert.equal(excelSerialDate('59','1904'), '1904-02-29');
   assert.equal(excelSerialDate('61','1904'), '1904-03-02');
@@ -67,8 +67,8 @@ test('mode and type matrix keeps blanks empty and rejects every incompatible con
   }
 });
 
-test('date conversions bound the Gregorian year and ignore fractional day parts', () => {
-  assert.equal(excelSerialDate('61.999','1900'),'1900-03-01');
+test('date conversions bound the Gregorian year and reject fractional day parts', () => {
+  assert.throws(() => excelSerialDate('61.999','1900'), e => e.code === 'xlsx_date_rejected');
   assert.equal(excelSerialDate('60','1904'),'1904-03-01');
   assert.equal(excelSerialDate('2958465','1900'),'9999-12-31');
   assert.equal(excelSerialDate('2957003','1904'),'9999-12-31');
@@ -79,4 +79,34 @@ test('Xstring decoding combines valid surrogate pairs and never recurses', () =>
   assert.equal(decodeSpreadsheetText('_x005F_x003C_'),'_x003C_');
   assert.equal(decodeSpreadsheetText('&lt;b&gt;'),'&lt;b&gt;');
   assert.throws(() => decodeSpreadsheetText('_xD800_'),e=>e.code==='xlsx_value_mode_mismatch');
+});
+
+for (const value of ['NaN','Infinity','-','+','1e',' 1','.']) {
+  test(`I2 numeric stored_text validates grammar: ${value}`, () => {
+    assert.throws(() => convertCell(cell('numeric',value),'stored_text',context()), e => e.code==='xlsx_numeric_limit');
+  });
+}
+test('I2 numeric grammar permits leading points and zero-leading bounded exponents', () => {
+  for (const [input,output] of [['.5','.5'],['+.5E+1','+5'],['1e00000000','1'],['1.e+00000002','100']]) assert.equal(expandDecimalLexeme(input),output);
+  assert.deepEqual(convertCell(cell('numeric','+.50e00000000'),'stored_text',context()),{value:'+.50e00000000',category:'text',expanded:false});
+  assert.throws(() => convertCell(cell('numeric','1e65537'),'stored_text',context()),e=>e.code==='xlsx_numeric_limit');
+});
+test('I1 dates normalize exact integral values without dropping time', () => {
+  for (const value of ['61.000','6.1e1','+00061.0']) assert.equal(excelSerialDate(value,'1900'),'1900-03-01');
+  for (const value of ['.5','61.0001','-0','-0.0']) assert.throws(()=>excelSerialDate(value,'1900'),e=>e.code==='xlsx_date_rejected');
+});
+for (const [input,output] of [['123456','123456'],['00123','00123'],['123.0','00123'],['1.23e2','00123'],['+123','00123'],['.0','00000']]) {
+  test(`I3 zero identifiers normalize exact integral value ${input}`,()=>assert.equal(convertCell(cell('numeric',input),'zero_padded_identifier',context('00000')).value,output));
+}
+test('I3 zero identifier format and nonnegative integral domain are bounded',()=>{
+  assert.throws(()=>convertCell(cell('numeric','1'),'zero_padded_identifier',context('0'.repeat(257))),e=>e.code==='xlsx_value_mode_mismatch');
+  assert.equal(convertCell(cell('numeric','1'),'zero_padded_identifier',context('0'.repeat(256))).value.length,256);
+  for(const input of ['-1','-0','1.001'])assert.throws(()=>convertCell(cell('numeric',input),'zero_padded_identifier',context('00000')),e=>e.code==='xlsx_value_mode_mismatch');
+});
+
+test('I2 numeric grammar consumes the complete lexeme including line endings',()=>{
+  for(const input of ['1\n','1\r','1\u2028','1\u2029'])assert.throws(()=>convertCell(cell('numeric',input),'stored_text',context()),e=>e.code==='xlsx_numeric_limit');
+});
+test('I3 zero-only number formats reject trailing line endings',()=>{
+  for(const format of ['0\n','0\r','0\u2028','0\u2029'])assert.throws(()=>convertCell(cell('numeric','1'),'zero_padded_identifier',context(format)),e=>e.code==='xlsx_value_mode_mismatch');
 });
