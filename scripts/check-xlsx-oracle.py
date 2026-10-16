@@ -738,16 +738,227 @@ def check_malicious(manifest_path, source, out_dir=None):
         return result
 
 
+def _sha256(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def check_run_bundle(path):
+    raw = path.read_bytes()
+    with zipfile.ZipFile(path) as archive:
+        require(archive.testzip() is None, f"{path.name}: corrupt bundle member")
+        names = archive.namelist()
+        require(len(names) == len(set(names)), f"{path.name}: duplicate member")
+        sidecar = json.loads(archive.read("workbench.json"))
+        core_manifest = json.loads(archive.read("run/manifest.json"))
+        require(core_manifest.get("schema_version") == 1, f"{path.name}: core manifest changed")
+        run_names = {"run/" + name for name in ("manifest.json", "input/left.csv", "input/right.csv", "config.json", "report.json", "pairs.csv", "fields.csv", "candidates.csv", "decisions.csv", "unresolved.csv", "summary.md")}
+        require(run_names.issubset(set(names)), f"{path.name}: missing run member")
+        for item in sidecar["files"]:
+            require(item["path"] in names, f"{path.name}: sidecar path missing")
+            data = archive.read(item["path"])
+            require(len(data) == item["bytes"] and _sha256(data) == item["sha256"], f"{path.name}: sidecar material hash mismatch")
+        if sidecar["schema_version"] == 1:
+            require(len(names) == 12 and set(names) == run_names | {"workbench.json"}, f"{path.name}: v1 inventory is not exact 12")
+            require("import/manifest.json" not in names and len(sidecar["files"]) == 11, f"{path.name}: v1 gained import material metadata")
+            return {"path": str(path), "bytes": len(raw), "sha256": _sha256(raw), "schema_version": 1, "entries": len(names), "core_manifest_schema": core_manifest["schema_version"]}
+        require(sidecar["schema_version"] == 2, f"{path.name}: unsupported outer schema")
+        manifest_bytes = archive.read("import/manifest.json")
+        import_manifest = json.loads(manifest_bytes)
+        require((json.dumps(import_manifest, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n").encode() == manifest_bytes,
+                f"{path.name}: import manifest is not canonical JSON")
+        require(import_manifest["schema_version"] == import_manifest["adapter_manifest_schema_version"] == 1, f"{path.name}: invalid import manifest versions")
+        require([item["side"] for item in import_manifest["sides"]] == ["left", "right"], f"{path.name}: unordered sides")
+        xlsx_sides = 0
+        expected_names = run_names | {"workbench.json", "import/manifest.json"}
+        for side in import_manifest["sides"]:
+            if side["format"] == "csv":
+                expected = side["source"]
+                require(expected["path"] == f"run/input/{side['side']}.csv", f"{path.name}: CSV side path changed")
+                source_csv = archive.read(expected["path"])
+                require(len(source_csv) == expected["bytes"] and _sha256(source_csv) == expected["sha256"], f"{path.name}: CSV source identity mismatch")
+                continue
+            require(side["format"] == "xlsx", f"{path.name}: unknown side format")
+            xlsx_sides += 1
+            for key, suffix in (("source", ".xlsx"), ("profile", ".profile.json"), ("adapter_manifest", ".adapter.json")):
+                member = side[key]
+                require(member["path"] == f"import/{side['side']}{suffix}", f"{path.name}: noncanonical material path")
+                data = archive.read(member["path"])
+                require(len(data) == member["bytes"] and _sha256(data) == member["sha256"], f"{path.name}: {key} independent hash mismatch")
+                expected_names.add(member["path"])
+            canonical = side["canonical_csv"]
+            require(canonical["path"] == f"run/input/{side['side']}.csv", f"{path.name}: canonical CSV path changed")
+            canonical_bytes = archive.read(canonical["path"])
+            require(len(canonical_bytes) == canonical["bytes"] and _sha256(canonical_bytes) == canonical["sha256"], f"{path.name}: canonical CSV hash mismatch")
+            profile = json.loads(archive.read(side["profile"]["path"]))
+            adapter = json.loads(archive.read(side["adapter_manifest"]["path"]))
+            require(set(profile) == {"schema_version", "adapter_id", "adapter_version", "import_spec"}, f"{path.name}: profile gained fields")
+            require(profile["schema_version"] == 1 and profile["adapter_id"] == "restricted-ooxml" and profile["adapter_version"] == "1.0.0", f"{path.name}: profile version changed")
+            require(adapter["schema_version"] == 1 and adapter["adapter_id"] == "restricted-ooxml" and adapter["adapter_version"] == "1.0.0", f"{path.name}: adapter version changed")
+            require(adapter["source"]["sha256"] == side["source"]["sha256"] and adapter["canonical_csv"]["sha256"] == canonical["sha256"], f"{path.name}: adapter binding mismatch")
+            require(adapter["profile"]["sha256"] == side["profile"]["sha256"], f"{path.name}: adapter profile hash mismatch")
+            source_bytes = archive.read(side["source"]["path"])
+            with zipfile.ZipFile(io.BytesIO(source_bytes)) as source_zip:
+                require(source_zip.testzip() is None, f"{path.name}: original workbook ZIP corrupt")
+                workbook = ET.fromstring(source_zip.read("xl/workbook.xml"))
+                require(len(workbook.findall(f"{{{MAIN}}}sheets/{{{MAIN}}}sheet")) > 0, f"{path.name}: source workbook has no sheets")
+            mapping = adapter["row_mapping"]
+            require(mapping["kind"] == "rectangle" and mapping["data_first_row"] == mapping["header_row"] + 1, f"{path.name}: row mapping mismatch")
+            require(mapping["row_count"] == profile["import_spec"]["last_row"] - profile["import_spec"]["header_row"], f"{path.name}: profile and adapter row counts differ")
+            spec = profile["import_spec"]
+            require(mapping["header_row"] == spec["header_row"] and mapping["column_start"] == spec["column_start"] and mapping["column_end"] == spec["column_end"], f"{path.name}: profile and adapter rectangle differ")
+            try: actual_rows = list(csv.reader(io.StringIO(canonical_bytes.decode("utf-8"), newline=""), strict=True))
+            except (UnicodeDecodeError, csv.Error) as error: raise AssertionError(f"{path.name}: canonical CSV cannot be independently parsed: {error}")
+            expected_width = spec["column_end"] - spec["column_start"] + 1
+            expected_rows = spec["last_row"] - spec["header_row"] + 1
+            require(len(actual_rows) == expected_rows and len(actual_rows) - 1 == mapping["row_count"], f"{path.name}: independently read CSV row count differs from profile")
+            require(all(len(row) == expected_width for row in actual_rows), f"{path.name}: independently read CSV column count differs from profile")
+            fixture_root = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "xlsx"
+            known_samples = {"lo-conversion-1900.xlsx", "lo-conversion-1904.xlsx"}
+            for sample_name in known_samples:
+                sample_path = fixture_root / sample_name
+                if source_bytes == sample_path.read_bytes():
+                    with zipfile.ZipFile(io.BytesIO(source_bytes)) as workbook_zip:
+                        workbook_doc = ET.fromstring(workbook_zip.read("xl/workbook.xml"))
+                        properties = workbook_doc.find(f"{{{MAIN}}}workbookPr")
+                        stored_system = "1904" if properties is not None and properties.get("date1904", "false").lower() in ("true", "1") else "1900"
+                    expected_doc = json.loads((fixture_root / "genuine-save-expected.json").read_text(encoding="utf-8"))
+                    expected_system = next(item["stored"]["date_system"] for item in expected_doc["samples"] if item["id"] == sample_name)
+                    require(stored_system == expected_system == adapter["worksheet"]["date_system"], f"{path.name}: independent workbook date system mismatch")
+        require(xlsx_sides in (1, 2), f"{path.name}: v2 must carry XLSX materials")
+        require(len(names) == 12 + xlsx_sides * 3 + 1 and set(names) == expected_names, f"{path.name}: expected exact {15 + xlsx_sides} v2 entries")
+        require(len(sidecar["files"]) == 12 + xlsx_sides * 3, f"{path.name}: outer v2 files list mismatch")
+        return {"path": str(path), "bytes": len(raw), "sha256": _sha256(raw), "schema_version": 2, "entries": len(names), "xlsx_sides": xlsx_sides, "core_manifest_schema": core_manifest["schema_version"]}
+
+
+def _rewrite_bundle(source, destination, transform):
+    with zipfile.ZipFile(source) as archive:
+        members = {name: archive.read(name) for name in archive.namelist()}
+    transform(members)
+    with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in members.items():
+            archive.writestr(name, data)
+
+
+def _refresh_outer(members):
+    sidecar = json.loads(members["workbench.json"])
+    for item in sidecar["files"]:
+        data = members[item["path"]]
+        item["bytes"] = len(data)
+        item["sha256"] = _sha256(data)
+    report = members["run/report.json"]
+    sidecar["revision"]["report_sha256"] = _sha256(report)
+    members["workbench.json"] = (json.dumps(sidecar, separators=(",", ":")) + "\n").encode()
+
+
+def write_task6_mutations(source, alternate_source, output_dir):
+    output_dir.mkdir(parents=True, exist_ok=True)
+    cases = []
+
+    def edit_json(members, path, edit):
+        value = json.loads(members[path]); edit(value); members[path] = (json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n").encode()
+
+    def update_material(members, kind, side="left"):
+        manifest = json.loads(members["import/manifest.json"])
+        item = next(value for value in manifest["sides"] if value["side"] == side)
+        rel = item[kind]["path"]
+        item[kind]["bytes"] = len(members[rel]); item[kind]["sha256"] = _sha256(members[rel])
+        members["import/manifest.json"] = (json.dumps(manifest, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n").encode()
+
+    def mutation(name, edit, expected):
+        dest = output_dir / f"{name}.zip"
+        def transform(members):
+            edit(members); _refresh_outer(members)
+        _rewrite_bundle(source, dest, transform)
+        with zipfile.ZipFile(dest) as archive: require(archive.testzip() is None, f"{name}: generated mutation ZIP invalid")
+        cases.append({"id": name, "path": str(dest), "sha256": _sha256(dest.read_bytes()), "expected_code": expected, "outer_hashes_consistent": True})
+
+    mutation("profile_mode_changed", lambda m: (edit_json(m, "import/left.profile.json", lambda p: p["import_spec"]["columns"][3].update(mode="stored_text")), update_material(m, "profile")), "xlsx_conversion_mismatch")
+    mutation("profile_schema_changed", lambda m: (edit_json(m, "import/left.profile.json", lambda p: p.update(schema_version=2)), update_material(m, "profile")), "invalid_bundle")
+    with zipfile.ZipFile(source) as archive:
+        source_manifest = json.loads(archive.read("import/manifest.json"))
+    if source_manifest["sides"][1]["format"] == "xlsx":
+        mutation("profile_mode_changed_right", lambda m: (edit_json(m, "import/right.profile.json", lambda p: p["import_spec"]["columns"][3].update(mode="stored_text")), update_material(m, "profile", side="right")), "xlsx_conversion_mismatch")
+    mutation("adapter_mapping_changed", lambda m: (edit_json(m, "import/left.adapter.json", lambda a: a["row_mapping"].update(data_first_row=a["row_mapping"]["data_first_row"] + 1)), update_material(m, "adapter_manifest")), "xlsx_conversion_mismatch")
+    mutation("adapter_warning_changed", lambda m: (edit_json(m, "import/left.adapter.json", lambda a: a["warnings"].append({"code":"outside_range_value_cells","count":1})), update_material(m, "adapter_manifest")), "xlsx_conversion_mismatch")
+    mutation("adapter_counts_changed", lambda m: (edit_json(m, "import/left.adapter.json", lambda a: a["conversion_counts"].update(dates=a["conversion_counts"]["dates"] + 1)), update_material(m, "adapter_manifest")), "xlsx_conversion_mismatch")
+    mutation("adapter_version_changed", lambda m: (edit_json(m, "import/left.adapter.json", lambda a: a.update(adapter_version="1.0.1")), update_material(m, "adapter_manifest")), "xlsx_conversion_mismatch")
+
+    def change_canonical_csv(members):
+        manifest = json.loads(members["import/manifest.json"]); item = manifest["sides"][0]
+        rel = item["canonical_csv"]["path"]; data = members[rel] + b"\n"; members[rel] = data
+        item["canonical_csv"] = {"path": rel, "bytes": len(data), "sha256": _sha256(data)}
+        adapter_path = item["adapter_manifest"]["path"]; adapter = json.loads(members[adapter_path])
+        adapter["canonical_csv"] = {"bytes": len(data), "sha256": _sha256(data)}
+        members[adapter_path] = (json.dumps(adapter, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n").encode()
+        item["adapter_manifest"] = {"path": adapter_path, "bytes": len(members[adapter_path]), "sha256": _sha256(members[adapter_path])}
+        members["import/manifest.json"] = (json.dumps(manifest, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n").encode()
+    mutation("canonical_csv_changed", change_canonical_csv, "xlsx_conversion_mismatch")
+
+    if alternate_source:
+        def replace_source(members):
+            source_path = "import/left.xlsx"; source_bytes = alternate_source.read_bytes(); members[source_path] = source_bytes
+            spec_path = "import/left.profile.json"
+            spec = json.loads(members[spec_path]); spec["import_spec"]["source_sha256"] = _sha256(source_bytes)
+            suffix = spec["import_spec"]["sheet_id"].rsplit(":", 1)[-1]; spec["import_spec"]["sheet_id"] = _sha256(source_bytes) + ":" + suffix
+            members[spec_path] = (json.dumps(spec, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n").encode()
+            adapter_path = "import/left.adapter.json"
+            adapter = json.loads(members[adapter_path])
+            adapter["source"] = {"bytes": len(source_bytes), "sha256": _sha256(source_bytes)}
+            adapter["profile"] = {"bytes": len(members[spec_path]), "sha256": _sha256(members[spec_path])}
+            members[adapter_path] = (json.dumps(adapter, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n").encode()
+            for kind in ("source", "profile", "adapter_manifest"): update_material(members, kind)
+        mutation("date_system_rebound", replace_source, "xlsx_conversion_mismatch")
+
+    mutation("forged_core_report", lambda m: m.update({"run/report.json": m["run/report.json"] + b" "}), "replay_mismatch")
+    return cases
+
+
+def check_task6_bundles(v1, mixed, two_xlsx, output_dir, alternate_source=None):
+    paths = [Path(v1), Path(mixed), Path(two_xlsx)]
+    receipts = [check_run_bundle(path) for path in paths]
+    require([item["entries"] for item in receipts] == [12, 16, 19], "actual product bundle counts must be 12/16/19")
+    require([item["schema_version"] for item in receipts] == [1, 2, 2], "CSV v1 and XLSX v2 boundary changed")
+    require([item.get("xlsx_sides", 0) for item in receipts] == [0, 1, 2], "mixed XLSX side counts changed")
+    mutations = write_task6_mutations(paths[1], Path(alternate_source) if alternate_source else None, Path(output_dir) / "mutations")
+    receipt = {"status": "PASS", "actual_product_bundles": receipts, "deep_mutations": mutations}
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    (Path(output_dir) / "task6-independent-python-receipt.json").write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return receipt
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--xml-cases", required=True, type=Path)
-    parser.add_argument("--genuine-manifest", required=True, type=Path)
+    parser.add_argument("--xml-cases", type=Path)
+    parser.add_argument("--genuine-manifest", type=Path)
     parser.add_argument("--malicious-manifest", type=Path)
     parser.add_argument("--write-malicious-dir", type=Path)
     parser.add_argument("--adapter-output", type=Path, help="owned directory containing lo-conversion-1900/ and lo-conversion-1904/ adapter results")
     parser.add_argument("--edge-vectors", type=Path)
     parser.add_argument("--edge-output", type=Path)
+    parser.add_argument("--task6-v1-bundle", type=Path)
+    parser.add_argument("--task6-mixed-bundle", type=Path)
+    parser.add_argument("--task6-two-xlsx-bundle", type=Path)
+    parser.add_argument("--task6-alternate-source", type=Path)
+    parser.add_argument("--task6-output", type=Path)
+    parser.add_argument("--task6-mutate-from", type=Path)
+    parser.add_argument("--task6-mutations-output", type=Path)
     args = parser.parse_args()
+    require(bool(args.task6_mutate_from) == bool(args.task6_mutations_output),
+            "Task6 mutation input and output directory are required together")
+    if args.task6_mutate_from:
+        mutations = write_task6_mutations(args.task6_mutate_from, args.task6_alternate_source,
+                                          args.task6_mutations_output)
+        print(json.dumps({"status": "PASS", "deep_mutations": mutations}, ensure_ascii=False, indent=2))
+        return
+    task6_args = [args.task6_v1_bundle, args.task6_mixed_bundle, args.task6_two_xlsx_bundle, args.task6_output]
+    require(all(value is None for value in task6_args) or all(value is not None for value in task6_args),
+            "all task6 bundle paths and output directory are required together")
+    if args.task6_output and not args.xml_cases and not args.genuine_manifest:
+        receipt = check_task6_bundles(args.task6_v1_bundle, args.task6_mixed_bundle, args.task6_two_xlsx_bundle,
+                                      args.task6_output, args.task6_alternate_source)
+        print(json.dumps(receipt, ensure_ascii=False, indent=2))
+        return
+    require(args.xml_cases is not None and args.genuine_manifest is not None, "XML cases and genuine manifest are required outside task6-only mode")
     require(bool(args.edge_vectors)==bool(args.edge_output),"edge vectors and actual output directory are required together")
     xml_count, _cases = check_xml_cases(args.xml_cases)
     samples = check_genuine(args.genuine_manifest)

@@ -7,6 +7,7 @@ import { readRunBundle, writeRunBundle } from './archive.mjs';
 import { inspectXlsxPackage, disposeXlsxPackage, projectWorkbook } from './xlsx/package.mjs';
 import { convertXlsx, readSourceCell } from './xlsx/adapter.mjs';
 import { XLSX_LIMITS } from './xlsx/contracts.mjs';
+import { verifyAndRegenerateImports } from './xlsx-bundle.mjs';
 
 function engineError(error,paths=[]) {const safe=sanitizeError(error,paths);return Object.assign(new Error(safe.message),{code:safe.code,error:safe});}
 export function callEngine(request,invoke) {
@@ -80,11 +81,13 @@ export async function executeTask(task,{invoke,signal}={}) {
     }
     if(task.kind==='bundle') {
       const sidecar=parseJsonText(decodeUtf8Fatal(await fs.readFile(paths.sidecar),{phase:'input',what:'workbench bundle metadata'}),{phase:'input',what:'workbench bundle metadata'});
-      const bundle=await writeRunBundle({runPath:paths.run,sidecar,destPath:paths.bundle,limits:p.limits});
+      const bundle=await writeRunBundle({runPath:paths.run,sidecar,destPath:paths.bundle,limits:p.limits,importMaterials:paths.importMaterials});
       return {bundle_path:paths.bundle,...bundle};
     }
     if(task.kind==='restore') {
-      const {runPath,sidecar}=await readRunBundle({assetPath:paths.bundle,stagingPath:paths.restore,limits:p.limits});
+      const {runPath,sidecar,importMaterials}=await readRunBundle({assetPath:paths.bundle,stagingPath:paths.restore,limits:p.limits});
+      if(importMaterials&&!p.xlsxEnabled)throw failure('unsupported_format','XLSX bundle restore is not enabled',422,'restoring');
+      const restoredImports=importMaterials?await verifyAndRegenerateImports({runPath,materials:importMaterials,stagingPath:paths.restore,invoke,limits:{...XLSX_LIMITS,...p.xlsxLimits},signal}):null;
       const replay=path.join(paths.restore,'replayed-run'),decisions=path.join(runPath,'decisions.csv');
       const exit_code=await runCli(['resolve',runPath,'--decisions',decisions,'--out',replay],invoke,paths.restore);
       const expected=await fs.readFile(path.join(runPath,'report.json'));
@@ -92,7 +95,7 @@ export async function executeTask(task,{invoke,signal}={}) {
       if(!expected.equals(replayed))throw failure('replay_mismatch','Replayed report does not match the archived report',422,'restoring');
       const left=await executeTask({kind:'import',payload:{side:'left',offset:0,limit:20},paths:{csv:path.join(runPath,'input','left.csv')}},{invoke,signal});
       const right=await executeTask({kind:'import',payload:{side:'right',offset:0,limit:20},paths:{csv:path.join(runPath,'input','right.csv')}},{invoke,signal});
-      return {run_path:replay,source_run_path:runPath,sidecar,exit_code,left_preview:left.preview,right_preview:right.preview};
+      return {run_path:replay,source_run_path:runPath,sidecar,exit_code,left_preview:restoredImports?.left.preview??left.preview,right_preview:restoredImports?.right.preview??right.preview,...(restoredImports?{restored_imports:restoredImports}:{})};
     }
     if(task.kind==='example') {
       const left=await executeTask({kind:'import',payload:{side:'left'},paths:{csv:paths.left}},{invoke,signal});

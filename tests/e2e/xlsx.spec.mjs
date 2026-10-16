@@ -256,6 +256,32 @@ test('mixed CSV XLSX review branch rebind preserves original materials profile s
   await fs.writeFile(testInfo.outputPath('mixed-lifecycle-receipt.json'),JSON.stringify({initialImport,swapImports:imports.slice(calls,calls+2),reviewedId,materialReads,originalSheet:'Synthetic',coordinate:'D2',stored:'0',imported:'1904-01-01'},null,2));
 });
 
+test('browser downloads mixed XLSX materials, resets, restores source provenance and branches from restored decisions',async({page},testInfo)=>{
+  await mixedCompare(page,testInfo);
+  const records=page.locator('.result-host .evidence-section').filter({has:page.getByRole('heading',{name:/记录状态与来源格值/})});
+  const extra=records.locator('.evidence-item').filter({has:page.getByRole('heading',{name:/records\[.*R2$/})});
+  await extra.getByLabel('unmatched理由 R2').fill('Persist this reviewed decision through the materials bundle restore');
+  await extra.getByRole('button',{name:'right_unmatched',exact:true}).click();await page.getByRole('button',{name:'应用待处理决定',exact:true}).click();
+  const original=await saveReport(page,testInfo.outputPath('xlsx-bundle-original-report.json'));
+  const downloadPending=page.waitForEvent('download');await page.getByRole('button',{name:'下载完整运行 ZIP'}).click();
+  const download=await downloadPending,bundlePath=testInfo.outputPath('mixed-xlsx-run-bundle.zip');await download.saveAs(bundlePath);
+  await expect(page.locator('.export-panel')).toContainText('下载完整运行 ZIP');
+  acceptConfirmContaining(page,'清空本机工作台中的来源、规则、报告和任务历史');
+  await page.getByRole('button',{name:'重置本机工作台'}).click();await expect(page.locator('#imports')).not.toContainText('lo-conversion-1904.xlsx');
+  await page.getByLabel('选择 MoonReconcile ZIP 工作包').setInputFiles(bundlePath);
+  await page.getByRole('button',{name:'恢复 ZIP 工作包'}).click();await expect(page.locator('.export-panel')).toContainText('ZIP 已重放验证并恢复', {timeout:30000});
+  await expect(page.locator('#imports')).toContainText('当前分支原始快照');await expect(page.locator('#imports')).toContainText('原始文件 SHA-256');
+  await expect(page.locator('#imports')).toContainText('规范 CSV SHA-256');await expect(page.locator('#imports')).toContainText('行映射：物理第');
+  expect(await saveReport(page,testInfo.outputPath('xlsx-bundle-restored-report.json'))).toEqual(original);
+  const provenance=await originalDateProvenance(page);await expect(provenance).toContainText('1904-01-01');await provenance.getByRole('button',{name:'关闭',exact:true}).click();
+  acceptConfirmContaining(page,'新建分支');await page.getByRole('button',{name:'从原始比较新建分支',exact:true}).click();
+  await expect.poll(()=>page.locator('.result-host h3').first().innerText()).not.toContain('处理中');
+  const branched=JSON.parse(await saveReport(page,testInfo.outputPath('xlsx-bundle-restored-branch-report.json')));
+  expect(branched.decisions).toEqual([]);expect(branched.records.find(item=>item.id==='R2').status).toBe('pending_review');
+  const branchCell=await originalDateProvenance(page);await expect(branchCell).toContainText('存储的原值');await branchCell.getByRole('button',{name:'关闭',exact:true}).click();
+  await fs.writeFile(testInfo.outputPath('xlsx-bundle-browser-receipt.json'),JSON.stringify({bundlePath,source:'lo-conversion-1904.xlsx',decisionCount:JSON.parse(original).decisions.length,restoredReportBytes:original.length,branchDecisions:branched.decisions.length,sourceCell:'D2'},null,2));
+});
+
 test('real XLSX conversion physical error and null package rejection preserve old source and report',async({page},testInfo)=>{
   await mixedCompare(page,testInfo);const before=await saveReport(page,testInfo.outputPath('errors-before-report.json'));
   const failures=[];page.on('response',async response=>{if(!new URL(response.url()).pathname.startsWith('/api/jobs/'))return;const data=await response.json().catch(()=>null);if(data?.job?.state==='failed')failures.push(data.job.error);});

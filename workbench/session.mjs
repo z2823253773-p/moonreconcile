@@ -97,13 +97,31 @@ export async function createSession({rootParent,limits:overrides={}}={}) {
     if(assets.size+newAssets.length>limits.assets||imports.size+newImports.length>limits.imports||revisions.size+1>limits.revisions)throw failure('quota_exceeded','Restore would exceed registry capacity',413,'publishing');
     const assetIds=new Set();for(const asset of newAssets){project('asset',asset);if(assets.has(asset.asset_id)||assetIds.has(asset.asset_id))throw failure('invalid_restore','Duplicate restored asset');assetIds.add(asset.asset_id);}
     const importIds=new Set();for(const entry of newImports){project('import',entry);if(imports.has(entry.import_id)||importIds.has(entry.import_id))throw failure('invalid_restore','Duplicate restored import');if(!assets.has(entry.asset_id)&&!assetIds.has(entry.asset_id))throw failure('invalid_restore','Restored import has no asset');importIds.add(entry.import_id);}
-    if(newImports.length!==2||newAssets.length!==3||!revision)throw failure('invalid_restore','Incomplete restored registry batch');
+    const left=newImports.find(entry=>entry.side==='left'),right=newImports.find(entry=>entry.side==='right');
+    if(newImports.length!==2||!left||!right||newAssets.length<3||newAssets.length>5||!revision)throw failure('invalid_restore','Incomplete restored registry batch');
+    const xlsxCount=newImports.filter(entry=>entry.format==='xlsx').length;
+    if(newAssets.length!==3+xlsxCount||newImports.some(entry=>!['csv','xlsx'].includes(entry.format))||left.import_id!==revision.left_import_id||right.import_id!==revision.right_import_id)throw failure('invalid_restore','Restore batch format does not match its assets');
+    const ownedPath=target=>typeof target==='string'&&path.isAbsolute(target)&&!path.relative(root,path.resolve(target)).startsWith('..')&&!path.isAbsolute(path.relative(root,path.resolve(target)));
+    const available=new Map(newAssets.map(asset=>[asset.asset_id,asset]));
+    const expectedAssetIds=new Set([revision.config_asset_id]);
+    for(const entry of newImports){
+      if(entry.format==='csv'){
+        const asset=available.get(entry.asset_id);
+        if(!asset||asset.kind!=='csv'||entry.canonical_asset_id!==undefined||entry.path!==asset.path||entry.sha256!==asset.sha256)throw failure('invalid_restore','Restored CSV import does not match its asset');
+        expectedAssetIds.add(asset.asset_id);
+      }else{
+        const source=available.get(entry.asset_id),canonical=available.get(entry.canonical_asset_id);
+        if(!source||source.kind!=='xlsx'||!canonical||canonical.kind!=='csv'||entry.source_path!==source.path||entry.path!==canonical.path||entry.sha256!==canonical.sha256||entry.adapter?.source_sha256!==source.sha256||entry.adapter?.canonical_csv_sha256!==canonical.sha256||!ownedPath(entry.profile_path)||!ownedPath(entry.adapter_manifest_path))throw failure('invalid_restore','Restored XLSX import is not fully owned and bound');
+        expectedAssetIds.add(source.asset_id);expectedAssetIds.add(canonical.asset_id);
+      }
+    }
+    if(newAssets.filter(asset=>asset.kind==='config').length!==1||newAssets.some(asset=>!expectedAssetIds.has(asset.asset_id))||expectedAssetIds.size!==newAssets.length)throw failure('invalid_restore','Restore batch contains an unbound asset');
     checkRevision(revision);
   }
   function commitRestored({newAssets,newImports,configAssetId,revision}) {
     checkRestoreCapacity({newAssets,newImports,revision});
     const config=newAssets.find(asset=>asset.asset_id===configAssetId),left=newImports.find(entry=>entry.side==='left'),right=newImports.find(entry=>entry.side==='right');
-    if(!config||config.kind!=='config'||!left||!right)throw failure('invalid_restore','Restored config binding is incomplete');
+    if(!config||config.kind!=='config'||!left||!right||revision.config_asset_id!==configAssetId)throw failure('invalid_restore','Restored config binding is incomplete');
     for(const asset of newAssets)assets.set(asset.asset_id,asset);
     for(const entry of newImports)imports.set(entry.import_id,entry);
     bindings.set(configAssetId,[left.import_id,right.import_id]);

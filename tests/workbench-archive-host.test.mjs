@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { startWorkbench } from '../workbench/server.mjs';
 import { mutateZip } from './helpers/zip-mutations.mjs';
+const task6Evidence=path.resolve(import.meta.dirname,'../.superpowers/sdd/2026-10-08-restricted-xlsx/evidence/task-6');
 
 function client(app) {
   const headers={authorization:`Bearer ${app.token}`,'content-type':'application/json'};
@@ -39,6 +40,7 @@ for(const kind of ['local-path','local-encrypted','local-flags','local-compressi
 
 test('bundle export, reset, upload, CLI replay restore, and fresh local registration are atomic',async t=>{
   const app=await startWorkbench();t.after(()=>app.close());const c=client(app),saved=await makeBundle(app,c),oldIds={revision:saved.revision.revision_id,left:saved.revision.left_import_id,right:saved.revision.right_import_id,config:saved.revision.config_asset_id};
+  await fs.mkdir(task6Evidence,{recursive:true});await fs.writeFile(path.join(task6Evidence,'actual-csv-v1.zip'),saved.bundle);
   assert.deepEqual((await c.request('/api/sessions/reset',{confirm:true})).status,200);assert.equal(app.session.assets.size,0);assert.equal(app.session.revisions.size,0);
   assert.equal((await c.request(`/api/bundles/${saved.bundle_asset_id}/export`)).status,404);
   const asset=await c.upload('run',saved.bundle,'orders.zip');assert.equal((await fetch(`${app.origin}/api/bundles/${asset.asset_id}/export`,{headers:c.headers})).status,404);

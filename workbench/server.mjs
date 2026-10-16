@@ -256,11 +256,22 @@ export async function startWorkbench({bridgePath,workerPath,rootParent,limits:ov
           const file=path.join(revision.path,name),stat=await fs.stat(file);reservation+=stat.size;
           metadata.push({path:`run/${name}`,bytes:stat.size,sha256:await session.hashFile(file)});
         }
+        const registeredMaterials=[];
+        for(const side of ['left','right']){
+          const entry=session.getImport(side==='left'?revision.left_import_id:revision.right_import_id);
+          if(entry.format==='xlsx'){
+            for(const file of [entry.source_path,entry.profile_path,entry.adapter_manifest_path])reservation+=(await fs.stat(file)).size;
+            registeredMaterials.push({side,format:'xlsx',sourcePath:entry.source_path,profilePath:entry.profile_path,adapterManifestPath:entry.adapter_manifest_path});
+          }else registeredMaterials.push({side,format:'csv',sourcePath:path.join(revision.path,'input',`${side}.csv`)});
+        }
         const sidecar={schema_version:1,app_version:APP_VERSION,engine_version:'0.1.0',revision:{revision_id:revision.revision_id,parent_revision_id:revision.parent_revision_id,baseline_revision_id:revision.baseline_revision_id,run_id:revision.run_id,report_sha256:revision.report_sha256,decisions_sha256:revision.decisions_sha256},files:metadata};
         return accepted(startJob('bundle',{reservation,prepare:async({staging})=>{
           const sidecarPath=path.join(staging,'workbench.json'),bundlePath=path.join(staging,'bundle.zip');
           await fs.writeFile(sidecarPath,JSON.stringify(sidecar)+'\n',{mode:0o600,flag:'wx'});
-          return {task:{payload:{limits:{zip_bytes:limits.zip_bytes,unzip_bytes:limits.unzip_bytes,zip_entries:limits.zip_entries}},paths:{run:revision.path,sidecar:sidecarPath,bundle:bundlePath}},prepareOutput:async result=>{
+          const xlsxPresent=registeredMaterials.some(item=>item.format==='xlsx');
+          const importMaterials=xlsxPresent?{manifestPath:path.join(staging,'import','manifest.json'),sides:registeredMaterials}:null;
+          if(importMaterials)await fs.mkdir(path.dirname(importMaterials.manifestPath),{recursive:true,mode:0o700});
+          return {task:{payload:{limits:{zip_bytes:limits.zip_bytes,unzip_bytes:limits.unzip_bytes,zip_entries:limits.zip_entries}},paths:{run:revision.path,sidecar:sidecarPath,bundle:bundlePath,importMaterials}},prepareOutput:async result=>{
             if(result.bundle_path!==bundlePath||!Number.isSafeInteger(result.bytes)||result.bytes<1||! /^[0-9a-f]{64}$/.test(result.sha256))throw failure('invalid_worker_output','Invalid bundle candidate');
             const asset=await session.prepareAsset('run','moonreconcile-bundle.zip',bundlePath);
             if(asset.bytes!==result.bytes||asset.sha256!==result.sha256)throw failure('invalid_worker_output','Bundle hash or byte count changed');
@@ -278,14 +289,31 @@ export async function startWorkbench({bridgePath,workerPath,rootParent,limits:ov
         if(source.kind!=='run')throw failure('invalid_request','Run ZIP asset required');
         return accepted(startJob('restore',{reservation:source.bytes,prepare:async({staging})=>{
           const restorePath=path.join(staging,'restore');
-          return {task:{payload:{limits:{zip_bytes:limits.zip_bytes,unzip_bytes:limits.unzip_bytes,zip_entries:limits.zip_entries}},paths:{bundle:source.path,restore:restorePath}},prepareOutput:async result=>{
+          return {task:{payload:{limits:{zip_bytes:limits.zip_bytes,unzip_bytes:limits.unzip_bytes,zip_entries:limits.zip_entries},xlsxEnabled,xlsxLimits:XLSX_LIMITS},paths:{bundle:source.path,restore:restorePath}},prepareOutput:async result=>{
             const replayPath=path.join(restorePath,'replayed-run');
             if(result.run_path!==replayPath||![0,1,3].includes(result.exit_code)||!result.left_preview||!result.right_preview)throw failure('invalid_worker_output','Invalid restore candidate');
-            const leftAsset=await session.prepareAsset('csv','restored-left.csv',path.join(replayPath,'input/left.csv'));
-            const rightAsset=await session.prepareAsset('csv','restored-right.csv',path.join(replayPath,'input/right.csv'));
+            const restored=result.restored_imports;
+            if((result.sidecar.schema_version===2)!==Boolean(restored))throw failure('invalid_worker_output','Restore version metadata mismatch');
+            const newAssets=[],newImports=[];
+            for(const side of ['left','right']){
+              const item=restored?.[side];
+              if(item&&item.format==='xlsx'){
+                const sourceAsset=await session.prepareAsset('xlsx',`restored-${side}.xlsx`,item.source_path);
+                const canonical=await session.prepareAsset('csv',`restored-${side}.csv`,path.join(replayPath,'input',`${side}.csv`));
+                const profileBytes=await fs.readFile(item.profile_path),manifestBytes=await fs.readFile(item.adapter_manifest_path);
+                const adapterManifest=JSON.parse(manifestBytes.toString('utf8'));
+                await Promise.all([session.owned(item.profile_path),session.owned(item.adapter_manifest_path)]);
+                if(sourceAsset.sha256!==adapterManifest.source.sha256||canonical.sha256!==adapterManifest.canonical_csv.sha256||profileBytes.length!==adapterManifest.profile.bytes||createHash('sha256').update(profileBytes).digest('hex')!==adapterManifest.profile.sha256)throw failure('xlsx_conversion_mismatch','Restored XLSX material hashes changed');
+                newAssets.push(sourceAsset,canonical);
+                const adapter={adapter_id:'restricted-ooxml',adapter_version:'1.0.0',profile_schema_version:1,profile_sha256:adapterManifest.profile.sha256,import_manifest_sha256:createHash('sha256').update(manifestBytes).digest('hex'),source_sha256:sourceAsset.sha256,canonical_csv_sha256:canonical.sha256};
+                newImports.push({import_id:randomUUID(),asset_id:sourceAsset.asset_id,side,format:'xlsx',status:'ready',headers:item.preview.headers,row_count:item.preview.row_count,column_count:item.preview.column_count,sha256:canonical.sha256,adapter,canonical_asset_id:canonical.asset_id,path:canonical.path,source_path:sourceAsset.path,profile_path:item.profile_path,adapter_manifest_path:item.adapter_manifest_path});
+              }else{
+                const asset=await session.prepareAsset('csv',`restored-${side}.csv`,path.join(replayPath,'input',`${side}.csv`));newAssets.push(asset);newImports.push(importEntry(asset,side,side==='left'?result.left_preview:result.right_preview));
+              }
+            }
             const configAsset=await session.prepareAsset('config','restored-config.json',path.join(replayPath,'config.json'));
-            const left=importEntry(leftAsset,'left',result.left_preview),right=importEntry(rightAsset,'right',result.right_preview);
-            const newAssets=[leftAsset,rightAsset,configAsset],newImports=[left,right];
+            newAssets.push(configAsset);
+            const left=newImports.find(entry=>entry.side==='left'),right=newImports.find(entry=>entry.side==='right');
             const revision=await session.prepareRevision({runPath:replayPath,left_import_id:left.import_id,right_import_id:right.import_id,config_asset_id:configAsset.asset_id,prospectiveAssets:newAssets,prospectiveImports:newImports});
             if(revision.exit_code!==result.exit_code)throw failure('invalid_worker_output','Restored result exit code mismatch');
             session.checkRestoreCapacity({newAssets,newImports,revision});
