@@ -218,11 +218,16 @@ export function renderResultView({ root, store, api, summary, onPublished, onSuc
     const reservation = { job_id:null, phase:'读取来源格值', state:'running' };
     store.update({active_job:reservation});
     try {
-      const accepted = await api.request(`/api/runs/${revision.revision_id}/cell`, { method: 'POST', body: { side, record, column } });
+      const xlsx=imported[side]?.format==='xlsx';
+      const accepted = await api.request(`/api/runs/${revision.revision_id}/${xlsx?'source-cell':'cell'}`, { method: 'POST', body: { side, record, column } });
       reservation.job_id=accepted.job_id;
       const job = await api.waitJob(accepted.job_id);
       if (!selected() || generation !== store.generation()) return;
-      const dialog = element('dialog'); dialog.append(element('h3', { text: `${side} · 数据记录 ${record} · ${column}` }), element('pre', { text: job.output.cell.value }), button('关闭', () => dialog.close())); document.body.append(dialog); dialog.showModal();
+      const dialog = element('dialog');
+      dialog.append(element('h3', { text: `${side} · 数据记录 ${record} · ${column}` }));
+      if(xlsx){const cell=job.output.source_cell;dialog.append(element('p',{text:`原始工作簿：${cell.sheet_name} · ${cell.coordinate} · ${cell.cell_type} · ${cell.mode}`}),element('h4',{text:'存储的原值'}),element('pre',{text:cell.stored_value}),element('h4',{text:'导入后的原值'}),element('pre',{text:cell.imported_value}),element('p',{text:`数字格式：${cell.number_format}`}));}
+      else dialog.append(element('pre', { text: job.output.cell.value }));
+      dialog.append(button('关闭', () => dialog.close())); document.body.append(dialog); dialog.showModal();
     } catch (error) { notice = `单元格读取失败：${error.message}`; render(); }
     finally { if(store.get().active_job===reservation)store.update({active_job:null}); }
   }

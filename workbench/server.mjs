@@ -22,7 +22,7 @@ const EXAMPLES={orders:'合成 orders 示例',migration:'合成 migration 示例
 const STATIC_FILES=new Map([
   ['/','index.html'],['/index.html','index.html'],
   ['/public/app.mjs','app.mjs'],['/public/idle-reminder.mjs','idle-reminder.mjs'],['/public/api.mjs','api.mjs'],['/public/state.mjs','state.mjs'],
-  ['/public/dom.mjs','dom.mjs'],['/public/import-view.mjs','import-view.mjs'],
+  ['/public/dom.mjs','dom.mjs'],['/public/import-view.mjs','import-view.mjs'],['/public/xlsx-view.mjs','xlsx-view.mjs'],
   ['/public/config-view.mjs','config-view.mjs'],['/public/config-model.mjs','config-model.mjs'],
   ['/public/result-view.mjs','result-view.mjs'],['/public/review-view.mjs','review-view.mjs'],['/public/review-model.mjs','review-model.mjs'],
   ['/public/export-view.mjs','export-view.mjs'],

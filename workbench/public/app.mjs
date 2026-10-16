@@ -21,6 +21,12 @@ else {
   const stopIdle=watchIdle({target:document,onIdle:()=>{if(!idleNotice){idleNotice=element('p',{className:'notice warning idle-reminder',role:'status',text:'已空闲 30 分钟。工作仍保留，可以继续操作；需要留存时请导出配置或运行 ZIP。'});top.append(idleNotice);}},onActivity:()=>{idleNotice?.remove();idleNotice=null;}});
   window.addEventListener('pagehide',stopIdle,{once:true});
   const importView=renderImportView({root:importRoot,store,api});renderConfigView({root:configRoot,store,api});
+  void api.request('/api/capabilities').then(capabilities=>{
+    const enabled=Array.isArray(capabilities.formats)&&capabilities.formats.includes('xlsx');
+    importView.setXlsxEnabled(enabled);
+    top.querySelector('.eyebrow').textContent=enabled?'本机 CSV / XLSX 核对':'本机 CSV 核对';
+    stepText.textContent=enabled?'步骤 1：选择左右 CSV 或 XLSX':'步骤 1：选择左右 CSV';
+  }).catch(()=>{});
   let busy=false,jobId=null,summary=null,resultDispose=null,resultRefresh=null,resultRevisionId=null,latestRevisionId=null;
   const history=[];
   async function acceptRestoredRevision(revision,{startRevisionId,startGeneration}){
