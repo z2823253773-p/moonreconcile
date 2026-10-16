@@ -23,6 +23,15 @@ function warningName(code) {
   })[code] ?? code;
 }
 
+// ErrorDTO phase identifies the location domain; the upload extension does not.
+export function importErrorLocation(error) {
+  if (error.phase === 'xlsx') {
+    if (error.record == null && error.field == null) return '工作簿级别失败（服务未提供具体位置）。';
+    return `工作表物理位置：${error.record != null ? `第 ${error.record} 行` : ''}${error.field != null ? `${error.record != null ? '，' : ''}单元格 ${error.field}` : ''}。修正后重新导入。`;
+  }
+  return error.record != null ? `错误位置：含表头的逻辑记录 ${error.record}${error.field != null ? `，字段 ${error.field}` : ''}。修正后重新选择文件。预览数据行号不包含表头。` : '';
+}
+
 export function renderXlsxSelection({ root, api, asset, side, onConfirmed, onCancel, onTaskState = () => {} }) {
   let disposed = false, busy = false, workbook = null, converted = null, issue = '';
   const sideName = side === 'left' ? '左侧' : '右侧';
@@ -35,7 +44,7 @@ export function renderXlsxSelection({ root, api, asset, side, onConfirmed, onCan
     dialog.append(element('p', { className: 'notice', text: '先选择一张可见工作表、矩形范围和每列转换方式。每次转换都绑定到原始工作簿 SHA-256；公式策略固定为拒绝。' }));
     dialog.append(element('p', { className: 'source-meta', text: `原始文件：${asset.name} · ${asset.bytes.toLocaleString()} 字节` }));
     dialog.append(element('p', { className: 'source-meta', text: `原始文件 SHA-256：${asset.sha256}` }));
-    if (issue) dialog.append(element('p', { className: 'notice error', role: 'alert', text: issue }));
+    if (issue) dialog.append(element('p', { className: 'notice error', role: 'alert', text: `${issue.label}（${issue.error.code ?? '错误'}）：${issue.error.message} ${importErrorLocation(issue.error)}` }));
     if (!workbook) {
       dialog.append(element('p', { className: 'notice', role: 'status', text: '正在读取工作簿清单…' }));
     } else if (!converted) {
@@ -90,7 +99,7 @@ export function renderXlsxSelection({ root, api, asset, side, onConfirmed, onCan
         busy = true; render();
         Promise.resolve(onConfirmed({ ...converted, asset, profile: { import_spec: converted.importSpec }, label: asset.name }))
           .then(() => dispose())
-          .catch(error => { busy = false; issue = `来源未替换：${error.message}`; render(); });
+          .catch(error => { busy = false; issue = { label: '来源未替换', error }; render(); });
       }, { disabled: busy }));
       dialog.append(button('修改选择并重新转换', () => { converted = null; issue = ''; selection.modes = []; render(); }, { className: 'secondary', disabled: busy }));
     }
@@ -118,12 +127,12 @@ export function renderXlsxSelection({ root, api, asset, side, onConfirmed, onCan
       const manifest = JSON.parse(await manifestBlob.text());
       if (manifest.source.sha256 !== asset.sha256 || manifest.canonical_csv.sha256 !== result.import.sha256 || manifest.row_mapping.header_row !== header || manifest.row_mapping.column_start !== start || manifest.row_mapping.column_end !== end || manifest.row_mapping.row_count !== result.preview.row_count) throw new Error('转换清单与本次选择或导入结果不一致。');
       converted = { import: result.import, preview: result.preview, importSpec, manifest };
-    } catch (error) { issue = `XLSX 转换失败（${error.code ?? '错误'}）：${error.message}`; }
+    } catch (error) { issue = { label: 'XLSX 转换失败', error }; }
     finally { busy = false; render(); }
   }
   async function catalog() {
     try { const output = await waitFor('/api/xlsx/catalog', { asset_id: asset.asset_id }); workbook = output.workbook; }
-    catch (error) { issue = `工作簿清单读取失败（${error.code ?? '错误'}）：${error.message}`; }
+    catch (error) { issue = { label: '工作簿清单读取失败', error }; }
     finally { render(); }
   }
   function dispose() { if (disposed) return; disposed = true; dialog.close?.(); dialog.remove(); }

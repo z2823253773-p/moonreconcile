@@ -1,5 +1,5 @@
 import { button, element, label } from './dom.mjs';
-import { renderXlsxSelection } from './xlsx-view.mjs';
+import { importErrorLocation, renderXlsxSelection } from './xlsx-view.mjs';
 
 const LIMIT = 20;
 const EXAMPLES = [['orders','合成 orders 示例'],['migration','合成 migration 示例'],['catalog','合成 catalog 示例'],['ourairports','OurAirports 公开快照']];
@@ -75,7 +75,7 @@ export function renderImportView({ root, store, api, xlsxEnabled = false }) {
           render();
         },onCancel:()=>{notice='XLSX 候选已保留在本机会话；当前来源未更换。';render();},
       });
-    } catch(error) {error.inputFormat='xlsx';errors[side]=error;notice=`${side==='left'?'左侧':'右侧'}文件未导入：${error.message}`;store.update({error:error.message});}
+    } catch(error) {errors[side]=error;notice=`${side==='left'?'左侧':'右侧'}文件未导入：${error.message}`;store.update({error:error.message});}
     finally{busy=false;if(store.get().active_job?.job_id===null&&store.get().active_job?.phase==='正在上传 XLSX 来源')store.update({active_job:null});render();}
   }
   async function page(side,offset) {
@@ -117,9 +117,20 @@ export function renderImportView({ root, store, api, xlsxEnabled = false }) {
       const rightPage = await waitFor(`/api/imports/${revision.right_import_id}/preview`, { offset: 0, limit: LIMIT });
       const configBlob = await configBlobPromise;
       const config = JSON.parse(await configBlob.text());
+      const hydrateSource = async (meta, page) => {
+        const source = { ...meta.asset, label: '当前分支原始快照', preview: page.preview, import: meta.import };
+        if (meta.import.format !== 'xlsx') return source;
+        const [profileBlob, manifestBlob] = await Promise.all([
+          api.download(`/api/imports/${meta.import.import_id}/materials/export?kind=profile`),
+          api.download(`/api/imports/${meta.import.import_id}/materials/export?kind=manifest`),
+        ]);
+        const [profile, manifest] = await Promise.all([profileBlob.text().then(JSON.parse), manifestBlob.text().then(JSON.parse)]);
+        return { ...source, format: 'xlsx', profile, manifest };
+      };
+      const [leftSource, rightSource] = await Promise.all([hydrateSource(leftMeta, leftPage), hydrateSource(rightMeta, rightPage)]);
       if (!stillSelected()) throw new Error('选择的版本或当前来源已变化；没有替换工作台绑定。');
-      sources.left = { ...leftMeta.asset, label: '当前分支原始快照', preview: leftPage.preview, import: leftMeta.import };
-      sources.right = { ...rightMeta.asset, label: '当前分支原始快照', preview: rightPage.preview, import: rightMeta.import };
+      sources.left = leftSource;
+      sources.right = rightSource;
       exampleLabel = '当前分支原始快照';
       store.update({
         left_import_id: revision.left_import_id, right_import_id: revision.right_import_id,
@@ -152,7 +163,7 @@ export function renderImportView({ root, store, api, xlsxEnabled = false }) {
     }catch(error){notice=`交换未完成：${error.message}`;}
     finally{busy=false;render();}
   }
-  function errorCard(error){const children=[element('p',{text:`${error.code??'导入错误'}：${error.message}`})];if(error.record!=null)children.push(element('p',{text:error.inputFormat==='xlsx'?`工作表物理位置：第 ${error.record} 行${error.field?`，单元格 ${error.field}`:''}。修正后重新导入。`:`错误位置：含表头的逻辑记录 ${error.record}${error.field?`，字段 ${error.field}`:''}。修正后重新选择文件。预览数据行号不包含表头。`}));return element('div',{className:'notice error',role:'alert'},children);}
+  function errorCard(error){const children=[element('p',{text:`${error.code??'导入错误'}：${error.message}`})],location=importErrorLocation(error);if(location)children.push(element('p',{text:location}));return element('div',{className:'notice error',role:'alert'},children);}
   function renderRows(side,preview){const table=element('table',{className:'preview-table'}),thead=element('thead'),head=element('tr');head.append(element('th',{scope:'col',text:'数据记录'}));for(const column of preview.headers)head.append(element('th',{scope:'col',text:column}));thead.append(head);const body=element('tbody');for(const row of preview.rows){const tr=element('tr');tr.append(element('th',{scope:'row',text:row.record}));for(const cell of row.cells){const td=element('td'),text=element('span',{text:cell.value});td.append(text);if(cell.truncated){td.append(element('span',{className:'truncated-tag',text:`已截断 · ${cell.utf8_bytes} UTF-8 字节`}));td.append(button('查看完整值',()=>void fullCell(side,row.record,cell.column),{className:'secondary'}));}tr.append(td);}body.append(tr);}table.append(thead,body);return element('div',{className:'table-scroll'},table);}
   async function fullCell(side,record,column){if(busy||store.get().active_job)return;try{const out=await waitFor(`/api/imports/${sources[side].import.import_id}/cell`,{record,column});const dialog=element('dialog');dialog.append(element('h3',{text:`完整单元格：${column} · 数据记录 ${record}`}),element('pre',{text:out.cell.value}),button('关闭',()=>dialog.close()));document.body.append(dialog);dialog.showModal();}catch(error){notice=`读取完整单元格失败：${error.message}`;render();}}
   let lastJob=store.get().active_job;
