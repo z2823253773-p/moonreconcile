@@ -4,7 +4,7 @@ import {startWorkbench} from '../../workbench/server.mjs';
 import {loadBridgeInvoke} from '../../cli/bridge.mjs';
 
 let app;
-test.beforeEach(async()=>{app=await startWorkbench();});
+test.beforeEach(async()=>{app=await startWorkbench({xlsxEnabled:false});});
 test.afterEach(async()=>{await app?.close();app=null;});
 const escaped=s=>JSON.stringify(s).slice(1,-1);
 const lines=items=>items.map(s=>s===''?'\\e':escaped(s)).join('\n');

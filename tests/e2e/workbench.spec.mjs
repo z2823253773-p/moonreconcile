@@ -7,7 +7,7 @@ import { loadBridgeInvoke } from '../../cli/bridge.mjs';
 import { run } from '../../cli/main.mjs';
 
 let app;
-test.beforeEach(async()=>{app=await startWorkbench();});
+test.beforeEach(async()=>{app=await startWorkbench({xlsxEnabled:false});});
 test.afterEach(async()=>{await app?.close();app=null;});
 const panel=page=>page.locator('.export-panel');
 const result=page=>page.locator('.result-host');
@@ -186,7 +186,7 @@ test('real core compare cancellation preserves the last published report and rel
   const root=testInfo.outputPath('cancel');await fs.mkdir(root,{recursive:true});const bridge=path.join(root,'slow-bridge.mjs'),flag=path.join(root,'slow.flag');
   const core=pathToFileURL(path.resolve('_build/js/debug/build/cmd/bridge/bridge.js')).href;
   await fs.writeFile(bridge,`import fs from 'node:fs';import {invoke_bridge as core} from ${JSON.stringify(core)};export function invoke_bridge(s){if(fs.existsSync(${JSON.stringify(flag)}))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5000);return core(s);}`);
-  await app.close();app=await startWorkbench({bridgePath:bridge});await openWorkbench(page);await page.getByRole('button',{name:'载入合成 orders 示例',exact:true}).click();await expect(page.locator('#imports')).toContainText('完整校验 3 行');await compare(page);
+  await app.close();app=await startWorkbench({bridgePath:bridge,xlsxEnabled:false});await openWorkbench(page);await page.getByRole('button',{name:'载入合成 orders 示例',exact:true}).click();await expect(page.locator('#imports')).toContainText('完整校验 3 行');await compare(page);
   const saved=await downloadEvidence(page,root,'before');await fs.writeFile(flag,'delay');await page.getByRole('button',{name:'运行核心比较',exact:true}).click();await page.getByRole('button',{name:'取消当前任务',exact:true}).click();
   await expect(page.getByRole('button',{name:'运行核心比较',exact:true})).toBeEnabled();await expect(page.getByRole('button',{name:'取消当前任务',exact:true})).toHaveCount(0);
   await expect(page.locator('#run [role=alert]')).toContainText('取消');await expect(result(page).locator('.result-summary')).toBeVisible();const after=await saveDownload(page,panel(page).getByRole('button',{name:'下载 report.json',exact:true}),path.join(root,'after-report.json'));expect(await fs.readFile(after)).toEqual(await fs.readFile(saved.report));

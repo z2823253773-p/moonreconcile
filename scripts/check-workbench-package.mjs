@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import yauzl from 'yauzl';
 import { gitIdentity, verifySourceAtHead, verifyPackage, files, PACKAGE_PROVENANCE } from './workbench-package-provenance.mjs';
 import { spawnOwnedServer, stopAndVerify } from './workbench-package-lifecycle.mjs';
+import { assertXlsxCapabilities, checkPackagedXlsx } from './workbench-package-xlsx.mjs';
 import { externalControlEvidence, resolveExternalEndpoint, externalProbeScript, externalDenialEvidence } from './workbench-package-network.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -100,7 +101,7 @@ function waitForStartup(child, timeoutMs = 20000) {
   });
 }
 
-async function api(origin, token, route, { method = 'GET', body, bytes, kind, filename } = {}) {
+async function api(origin, token, route, { method = 'GET', body, bytes, kind, filename, raw = false } = {}) {
   const headers = { Authorization: `Bearer ${token}` };
   let payload;
   if (bytes !== undefined) {
@@ -118,18 +119,19 @@ async function api(origin, token, route, { method = 'GET', body, bytes, kind, fi
     const text = await response.text();
     throw new Error(`${method} ${url.pathname} failed (${response.status}): ${text.slice(0, 500)}`);
   }
-  if (['application/zip', 'application/octet-stream'].some((type) => response.headers.get('content-type')?.includes(type)) || url.pathname.endsWith('/export')) return Buffer.from(await response.arrayBuffer());
+  if (raw || ['application/zip', 'application/octet-stream'].some((type) => response.headers.get('content-type')?.includes(type)) || url.pathname.endsWith('/export')) return Buffer.from(await response.arrayBuffer());
   return response.json();
 }
 
-async function job(origin, token, result) {
+async function job(origin, token, result, { failureCode } = {}) {
   const jobId = result.job_id;
   assert.ok(jobId, 'job response must contain job_id');
   const deadline = Date.now() + 60000;
   while (Date.now() < deadline) {
     const response = await api(origin, token, `/api/jobs/${jobId}`);
     const current = response.job;
-    if (current.state === 'succeeded') return current.output;
+    if (current.state === 'succeeded') { assert.equal(failureCode, undefined, 'expected rejection but task succeeded'); return current.output; }
+    if (current.state === 'failed' && failureCode) { assert.equal(current.error.code, failureCode); return current.error; }
     if (current.state === 'failed' || current.state === 'cancelled') throw new Error(`workbench ${current.kind} job ${current.state}: ${JSON.stringify(current.error)}`);
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
@@ -219,7 +221,7 @@ async function main() {
     result.gates.push({ name: 'loopback-allowed', status: status(localLoopback) });
 
     const caps = await api(app.origin, app.token, '/api/capabilities');
-    assert.deepEqual(caps.formats, ['csv']);
+    assertXlsxCapabilities(caps);
     const leftFile = path.join(relocated, 'examples/orders/left.csv');
     const rightFile = path.join(relocated, 'examples/orders/right.csv');
     const rulesFile = path.join(relocated, 'examples/orders/rules.json');
@@ -263,6 +265,8 @@ async function main() {
     const restoredReport = await api(app.origin, app.token, `/api/runs/${restored.revision.revision_id}/export?kind=report`);
     assert.deepEqual(restoredReport, reviewedReport, 'restored ZIP replay must preserve report bytes');
     result.gates.push({ name: 'zip-save-reset-restore-replay', status: 0, restored_report_sha256: hash(restoredReport), zip_sha256: hash(zipBytes) });
+
+    await checkPackagedXlsx({ root: ROOT, temp, relocated, app, api, job, runOfflineNode, nodeOnly, homeEnv, extractZip, result });
 
     result.gates.push({ name: 'workbench-worker-process', status: 0, evidence: 'import/check/compare/review/bundle/restore jobs completed with only Node on PATH' });
   } catch (error) {

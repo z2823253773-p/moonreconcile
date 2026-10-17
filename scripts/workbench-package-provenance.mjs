@@ -98,6 +98,7 @@ export async function sourceInputs(root) {
     'docs/workbench.md', 'docs/limitations.md', 'docs/workbench-start-here.md',
     'scripts/package-workbench.mjs', 'scripts/check-workbench-package.mjs',
     'scripts/workbench-package-lifecycle.mjs', 'scripts/workbench-package-network.mjs',
+    'scripts/workbench-package-xlsx.mjs',
   ]) };
 }
 

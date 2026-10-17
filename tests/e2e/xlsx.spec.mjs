@@ -8,7 +8,7 @@ import yazl from 'yazl';
 import { startWorkbench } from '../../workbench/server.mjs';
 
 let app;
-test.beforeEach(async()=>{app=await startWorkbench({xlsxEnabled:true});});
+test.beforeEach(async()=>{app=await startWorkbench();});
 test.afterEach(async()=>{await app?.close();app=null;});
 async function open(page){try{await page.goto(`${app.origin}/#token=${app.token}`);}catch(error){error.message=error.message.replaceAll(app.token,'[redacted]');throw error;}await expect(page.getByRole('heading',{name:'MoonReconcile 工作台'})).toBeVisible();}
 const fixture=name=>fileURLToPath(new URL(`../../tests/fixtures/xlsx/${name}`,import.meta.url));
@@ -191,8 +191,8 @@ test('1904 date mode, stored date serial, blank row mapping, and outside-range w
   const right=page.locator('#imports .source-card').nth(1);await expect(right).toContainText('1904-01-01');await expect(right.locator('.preview-table tbody tr').last()).toContainText('3');
 });
 
-test('default host stays CSV-only until the explicit test capability is enabled',async({page})=>{
-  await app.close();app=await startWorkbench();await open(page);
+test('explicit constructor false keeps the CSV-only capability and picker',async({page})=>{
+  await app.close();app=await startWorkbench({xlsxEnabled:false});await open(page);
   await expect(page.locator('#imports h2')).toHaveText('选择左右 CSV');
   await expect(page.getByLabel('左侧来源 CSV 文件')).toBeEnabled();
   await expect(page.getByLabel('左侧来源 XLSX 文件')).toHaveCount(0);

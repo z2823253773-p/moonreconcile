@@ -46,7 +46,7 @@ function validWorkbook(workbook,asset) {
     return integer(sheet.min_row,1,1048576)&&integer(sheet.max_row,sheet.min_row,1048576)&&integer(sheet.min_column,1,16384)&&integer(sheet.max_column,sheet.min_column,16384);
   });
 }
-export async function startWorkbench({bridgePath,workerPath,rootParent,limits:overrides={},xlsxEnabled=false}={}) {
+export async function startWorkbench({bridgePath,workerPath,rootParent,limits:overrides={},xlsxEnabled=true}={}) {
   const limits=normalizeLimits(overrides),session=await createSession({rootParent,limits:overrides});
   const jobs=await createJobManager({session,bridgePath,workerPath,limits:overrides}),token=randomBytes(32).toString('hex');
   const uploads=new Set(),requests=new Set(),bundles=new Set();let origin,closing=false;

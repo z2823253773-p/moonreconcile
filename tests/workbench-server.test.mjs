@@ -10,7 +10,13 @@ test('server exposes capability and enforces token/origin/host', async (t) => {
   assert.equal(noToken.status, 401);
   const caps = await fetch(`${app.origin}/api/capabilities`, { headers: { authorization: `Bearer ${app.token}` } });
   assert.equal(caps.status, 200);
-  assert.deepEqual((await caps.json()).formats, ['csv']);
+  const capability = await caps.json();
+  assert.deepEqual(capability.formats, ['csv','xlsx']);
+  assert.equal(capability.app_version, '0.2.0');
+  assert.equal(capability.api_version, 1);
+  assert.equal(capability.engine_version, '0.1.0');
+  assert.equal(capability.xlsx_api_version, 1);
+  assert.equal(capability.import_profile_schema_version, 1);
   const cross = await fetch(`${app.origin}/api/capabilities`, { headers: { authorization: `Bearer ${app.token}`, origin: 'http://evil.example' } });
   assert.equal(cross.status, 403);
   const address = new URL(app.origin);
@@ -116,7 +122,7 @@ test('health stays responsive during synchronous child work; job busy and cancel
   const cancelled=await fetch(app.origin+'/api/jobs/'+started.body.job_id,{method:'DELETE',headers:c.headers});assert.equal((await cancelled.json()).job.state,'cancelled');assert.equal(app.session.imports.size,0);
 });
 test('private runtime permissions, strict schemas/queries and unsupported routes',async t=>{
-  const fs=await import('node:fs/promises'),path=await import('node:path');const app=await startWorkbench();t.after(()=>app.close());const c=await apiClient(app);
+  const fs=await import('node:fs/promises'),path=await import('node:path');const app=await startWorkbench({xlsxEnabled:false});t.after(()=>app.close());const c=await apiClient(app);
   for(const name of ['orders','migration','catalog','ourairports']){const j=await c.start('/api/examples/'+name,{});assert.equal(j.state,'succeeded',JSON.stringify(j.error));}
   const walk=async p=>{const stat=await fs.lstat(p);assert.equal(stat.mode&0o777,stat.isDirectory()?0o700:0o600,p);if(stat.isDirectory())for(const n of await fs.readdir(p))await walk(path.join(p,n));};await walk(app.session.root);
   assert.equal((await fetch(app.origin+'/')).status,200);assert.equal((await fetch(app.origin+'/../package.json')).status,404);
@@ -146,7 +152,7 @@ test('successful reset clears old jobs and replenishes metadata quota',async t=>
   const next=await c.start('/api/examples/orders',{});assert.equal(next.state,'succeeded');assert.notEqual(next.job_id,old.job_id);
 });
 test('failed owned reset preserves old job metadata',async t=>{
-  const fs=await import('node:fs/promises'),path=await import('node:path');const app=await startWorkbench();t.after(()=>app.close());const c=await apiClient(app),old=await c.start('/api/examples/orders',{}),marker=path.join(app.session.root,'.owner');
+  const fs=await import('node:fs/promises'),path=await import('node:path');const app=await startWorkbench({xlsxEnabled:false});t.after(()=>app.close());const c=await apiClient(app),old=await c.start('/api/examples/orders',{}),marker=path.join(app.session.root,'.owner');
   const owned=await fs.readFile(marker);await fs.writeFile(marker,'foreign');try{assert.notEqual((await c.request('/api/sessions/reset',{confirm:true})).status,200);assert.equal((await c.request('/api/jobs/'+old.job_id)).body.job.state,'succeeded');}finally{await fs.writeFile(marker,owned);}
 });
 test('close aborts unfinished JSON readers and prevents late job/reset work',async()=>{

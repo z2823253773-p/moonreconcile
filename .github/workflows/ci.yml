@@ -100,7 +100,7 @@ jobs:
       - name: Relocated package tests
         run: node --test tests/workbench-package.test.mjs
 
-      - name: Package identity, production lock, and shutdown regressions (macOS network sandbox)
+      - name: Package identity, production lock, genuine XLSX closure and shutdown regressions (macOS network sandbox)
         if: matrix.os == 'macos-15'
         run: node --test tests/workbench-package-validation.test.mjs
 
@@ -119,11 +119,11 @@ jobs:
       - name: README acceptance smoke from fresh checkout
         run: node scripts/readme-smoke.mjs
 
-      - name: Strict offline package workflow (macOS)
+      - name: Strict offline CSV + genuine XLSX package workflow (macOS)
         if: matrix.os == 'macos-15'
         run: npm run test:workbench:package
 
-      - name: Strict offline package workflow (Ubuntu network namespace)
+      - name: Strict offline CSV + genuine XLSX package workflow (Ubuntu network namespace)
         if: matrix.os == 'ubuntu-24.04'
         run: |
           set -euo pipefail

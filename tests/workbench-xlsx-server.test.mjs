@@ -23,8 +23,8 @@ async function client(app) {
   return {headers,request,job,terminal,upload};
 }
 
-test('csv_wire_shape_unchanged and xlsx_requires_exact_bound_profile',async t=>{
-  const app=await startWorkbench({xlsxEnabled:true});t.after(()=>app.close());const c=await client(app);
+test('default_host_preserves_csv_wire_shape and xlsx_requires_exact_bound_profile',async t=>{
+  const app=await startWorkbench();t.after(()=>app.close());const c=await client(app);
   const caps=(await c.request('/api/capabilities')).body;
   assert.deepEqual(caps.formats,['csv','xlsx']);
   assert.equal(caps.xlsx_api_version,1);
@@ -138,7 +138,7 @@ test('xlsx_source_cell_is_revision_bound and fixed materials export is owned',as
   assert.equal(coreError.state,'failed');assert.equal(coreError.error.code,'invalid_request');assert.equal(coreError.error.phase,'request');
 });
 
-test('mixed XLSX bundle restores its source identity after reset and keeps production restore off',async t=>{
+test('mixed XLSX bundle restores its source identity after reset and keeps explicit CSV-only restore off',async t=>{
   const app=await startWorkbench({xlsxEnabled:true});t.after(()=>app.close());const c=await client(app);
   const bytes=await fs.readFile(fixture('lo-conversion-1900.xlsx')),xlsx=await c.upload('xlsx',bytes);
   const workbook=(await c.job('/api/xlsx/catalog',{asset_id:xlsx.asset.asset_id})).output.workbook,sheet=workbook.sheets.find(item=>item.selectable);
@@ -202,7 +202,7 @@ test('mixed XLSX bundle restores its source identity after reset and keeps produ
   assert.equal(secondRestore.state,'succeeded',JSON.stringify(secondRestore.error));assert.notEqual(secondRestore.output.revision.revision_id,fresh.revision_id);
   assert.notEqual(secondRestore.output.revision.left_import_id,fresh.left_import_id);assert.equal(app.session.imports.size,4);
   await fs.writeFile(path.join(task6Evidence,'restore-cancel-duplicate-receipt.json'),JSON.stringify({cancel:{bridge_entered:entered,state:cancelledJob.state,published_assets:cancelApp.session.assets.size,published_imports:cancelApp.session.imports.size,published_revisions:cancelApp.session.revisions.size},cancel_after_asset_hash:{candidate_sha256:hashed.sha256,expected_sha256:sha(priorSource),candidate_not_registered:!app.session.assets.has(hashedCandidate.asset_id),state:afterHashJob.job.state,old_head_report_source_profile_preserved:true},concurrent_duplicate:{http_status:duplicate.status,first_restore_state:onlyRestore.state,published_assets:activeApp.session.assets.size,published_imports:activeApp.session.imports.size,published_revisions:activeApp.session.revisions.size},sequential_double_restore:{first_revision:fresh.revision_id,second_revision:secondRestore.output.revision.revision_id,first_left_import:fresh.left_import_id,second_left_import:secondRestore.output.revision.left_import_id,total_imports:app.session.imports.size}},null,2)+'\n');
-  const production=await startWorkbench();t.after(()=>production.close());const p=await client(production),foreign=await p.upload('run',bundle),rejected=await p.job('/api/restores',{asset_id:foreign.asset.asset_id});
+  const production=await startWorkbench({xlsxEnabled:false});t.after(()=>production.close());const p=await client(production),foreign=await p.upload('run',bundle),rejected=await p.job('/api/restores',{asset_id:foreign.asset.asset_id});
   assert.equal(rejected.state,'failed');assert.equal(rejected.error.code,'unsupported_format');assert.equal(production.session.imports.size,0);assert.equal(production.session.revisions.size,0);
 });
 
@@ -290,7 +290,7 @@ test('deeply altered v2 materials with refreshed outer hashes fail before restor
 
 test('xlsx_routes_keep_auth_origin_and_full_envelope_limits',async t=>{
   const app=await startWorkbench({xlsxEnabled:true,limits:{response_bytes:300}});t.after(()=>app.close());const c=await client(app);
-  const defaults=await startWorkbench();t.after(()=>defaults.close());
+  const defaults=await startWorkbench({xlsxEnabled:false});t.after(()=>defaults.close());
   assert.deepEqual((await (await fetch(defaults.origin+'/api/capabilities',{headers:{authorization:`Bearer ${defaults.token}`} })).json()).formats,['csv']);
   assert.equal((await fetch(defaults.origin+'/api/assets?kind=xlsx',{method:'POST',headers:{authorization:`Bearer ${defaults.token}`,'content-type':'application/octet-stream'},body:'x'})).status,422);
   const unauth=[

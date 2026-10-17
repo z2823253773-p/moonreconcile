@@ -146,6 +146,10 @@ test('package_contains_only_runtime_deps_and_licenses', async () => {
   assert.ok(await readFile(path.join(packageRoot, 'workbench/xlsx-bundle.mjs')));
   assert.ok(entries.includes('examples'));
   assert.ok(!entries.includes('tests'));
+  assert.ok(!entries.includes('scripts'));
+  const proof = JSON.parse(await readFile(path.join(packageRoot, 'PACKAGE-PROVENANCE.json'), 'utf8'));
+  assert.ok(proof.source_inputs['scripts/workbench-package-xlsx.mjs']);
+  assert.ok(proof.source_inputs['scripts/check-workbench-package.mjs']);
   assert.ok(!entries.includes('_build'));
   assert.ok(!entries.includes('playwright.config.mjs'));
   const inspectTree = async directory => {

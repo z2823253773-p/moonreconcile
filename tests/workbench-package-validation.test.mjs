@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test, { before, after } from 'node:test';
+import { assertXlsxCapabilities, genuineXlsxInputs } from '../scripts/workbench-package-xlsx.mjs';
 import { packageContract, thirdPartyNotices, verifyPackage } from '../scripts/workbench-package-provenance.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -39,7 +40,7 @@ async function fixture(label) {
   }
   // Include this round's new helper before it is committed. All fixture writes
   // remain under the root created by this test, never under a reviewer fixture.
-  for (const relative of ['scripts/workbench-package-provenance.mjs', 'scripts/workbench-package-lifecycle.mjs', 'scripts/workbench-package-network.mjs', 'docs/licenses/saxes-6.0.0-LICENSE.txt']) {
+  for (const relative of ['scripts/workbench-package-provenance.mjs', 'scripts/workbench-package-lifecycle.mjs', 'scripts/workbench-package-network.mjs', 'scripts/workbench-package-xlsx.mjs', 'docs/licenses/saxes-6.0.0-LICENSE.txt']) {
     try {
       await fs.mkdir(path.dirname(path.join(directory, relative)), { recursive: true });
       await fs.copyFile(path.join(root, relative), path.join(directory, relative));
@@ -86,7 +87,7 @@ async function check(directory) {
   });
   clearTimeout(timer);
   const record = JSON.parse(await fs.readFile(evidence, 'utf8'));
-  console.log(JSON.stringify({ fixture: path.basename(directory), checker_exit: exit, timed_out: timedOut, status: record.status, source_sha: record.source_sha, package_source_sha: record.package_source_sha, archive_sha256: record.archive_sha256, bridge_sha256: record.bridge_sha256, network_isolation: record.network_isolation, shutdown: record.shutdown }));
+  console.log(JSON.stringify({ fixture: path.basename(directory), checker_exit: exit, timed_out: timedOut, status: record.status, source_sha: record.source_sha, package_source_sha: record.package_source_sha, archive_sha256: record.archive_sha256, bridge_sha256: record.bridge_sha256, network_isolation: record.network_isolation, shutdown: record.shutdown, xlsx_gate: record.gates?.find(gate => gate.name === 'genuine-mixed-xlsx-regeneration-cli-formula-retention') }));
   return { ...exit, stdout, stderr, timedOut, record };
 }
 
@@ -99,10 +100,33 @@ test('strict checker accepts an evidence-only commit with unchanged package inpu
   assert.equal(result.record.status, 'passed');
   assert.equal(result.record.source_sha, run(directory, 'git', ['rev-parse', 'HEAD']).trim());
   assert.notEqual(result.record.source_sha, result.record.package_source_sha);
+  assert.ok(result.record.gates.some(gate => gate.name === 'genuine-mixed-xlsx-regeneration-cli-formula-retention' && gate.status === 0));
+  assert.equal(result.record.gates.find(gate => gate.name === 'genuine-mixed-xlsx-regeneration-cli-formula-retention').materials, 16);
   assert.equal(result.record.shutdown.graceful, true);
   assert.equal(result.record.shutdown.forced, false);
   assert.equal(result.record.shutdown.exit_code, 0);
   assert.deepEqual(result.record.shutdown.remaining_sessions, []);
+});
+
+test('strict XLSX capabilities reject partial formats, version and limit drift', () => {
+  const caps = { formats: ['csv','xlsx'], app_version: '0.2.0', api_version: 1, engine_version: '0.1.0', xlsx_api_version: 1, import_profile_schema_version: 1, xlsx_limits: { compressed_bytes: 67108864, entries: 2048, actual_unzip_bytes: 268435456, xml_bytes: 67108864, xml_depth: 64, cell_bytes: 65536, csv_bytes: 67108864, data_rows: 100000, columns: 256 } };
+  assertXlsxCapabilities(caps);
+  for (const field of ['app_version','api_version','engine_version','xlsx_api_version','import_profile_schema_version']) {
+    assert.throws(() => assertXlsxCapabilities({ ...caps, [field]: 99 }));
+  }
+  assert.throws(() => assertXlsxCapabilities({ ...caps, formats: ['csv'] }));
+  assert.throws(() => assertXlsxCapabilities({ ...caps, xlsx_limits: { ...caps.xlsx_limits, extra: 1 } }));
+  assert.throws(() => assertXlsxCapabilities({ ...caps, xlsx_limits: { ...caps.xlsx_limits, cell_bytes: 65537 } }));
+});
+
+test('strict genuine XLSX inputs require pinned bytes committed at HEAD', async () => {
+  const directory = await fixture('genuine-input-drift');
+  assert.equal((await genuineXlsxInputs(directory)).expected.stored.date_system, '1904');
+  const input = path.join(directory, 'tests/fixtures/xlsx/lo-conversion-1904.xlsx');
+  await fs.appendFile(input, 'changed');
+  await assert.rejects(genuineXlsxInputs(directory), /differs from claimed HEAD/);
+  commit(directory);
+  await assert.rejects(genuineXlsxInputs(directory), /pinned genuine fixture changed/);
 });
 
 test('builder refuses an old bridge after committed core source inputs change', async () => {
