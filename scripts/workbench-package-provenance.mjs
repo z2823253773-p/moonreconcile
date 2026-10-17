@@ -10,10 +10,15 @@ export const BUILD_PROVENANCE = '_build/js/debug/build/cmd/bridge/bridge.provena
 export const PACKAGE_PROVENANCE = 'PACKAGE-PROVENANCE.json';
 export const VERSION = '0.2.0';
 export const EXPECTED = { 'buffer-crc32': '1.0.0', saxes: '6.0.0', yauzl: '3.4.0', yazl: '3.3.1' };
-export const PINNED_TRANSITIVE = { xmlchars: '2.2.0' };
+export const PINNED_TRANSITIVE = { xmlchars: '2.2.0', pend: '1.2.0' };
+export const PINNED_OVERRIDES = { xmlchars: '2.2.0' };
 export const PINNED_ARTIFACTS = {
+  'buffer-crc32': { version: '1.0.0', integrity: 'sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w==' },
   saxes: { version: '6.0.0', integrity: 'sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==' },
+  yauzl: { version: '3.4.0', integrity: 'sha512-jIH9yLR9wqr0wOS0TpBvo/g/2UgZH5qePVbjgRliiF0BYvOZyaBknKsF+x9Iht0O6sqgnB93rCICdOZFecJuDw==' },
+  yazl: { version: '3.3.1', integrity: 'sha512-BbETDVWG+VcMUle37k5Fqp//7SDOK2/1+T7X8TD96M3D9G8jK5VLUdQVdVjGi8im7FGkazX7kk5hkU8X4L5Bng==' },
   xmlchars: { version: '2.2.0', integrity: 'sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==' },
+  pend: { version: '1.2.0', integrity: 'sha512-F3asv42UuXchdzt+xXqfW1OGlVBe+mxa2mqI0pg5yAHZPvFmY3Y6drSf/GQ1A86WgWEN9Kzh/WrgKa6iGcHXLg==' },
 };
 export const SAXES_LICENSE = {
   relativePath: 'docs/licenses/saxes-6.0.0-LICENSE.txt',
@@ -136,7 +141,7 @@ export async function packageContract(root) {
   const rootLock = await json(path.join(root, 'package-lock.json'));
   assert.equal(manifest.version, VERSION);
   assert.deepEqual(manifest.dependencies, EXPECTED, 'audit changed production dependency contract before packaging');
-  assert.deepEqual(manifest.overrides, PINNED_TRANSITIVE, 'audit changed the exact XML parser transitive pin');
+  assert.deepEqual(manifest.overrides, PINNED_OVERRIDES, 'audit changed the exact XML parser transitive pin');
   assert.deepEqual(rootLock.packages?.['']?.dependencies, EXPECTED, 'lockfile root dependencies differ from manifest');
   const dependencies = { ...EXPECTED };
   const packages = { '': { name: 'moonreconcile-workbench', version: VERSION, dependencies, engines: { node: '>=22' } } };

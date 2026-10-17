@@ -142,14 +142,20 @@ test('package_contains_only_runtime_deps_and_licenses', async () => {
   assert.ok(entries.includes('runtime'));
   assert.ok(entries.includes('cli'));
   assert.ok(entries.includes('workbench'));
+  assert.ok(await readFile(path.join(packageRoot, 'workbench/xlsx/package.mjs')));
+  assert.ok(await readFile(path.join(packageRoot, 'workbench/xlsx-bundle.mjs')));
   assert.ok(entries.includes('examples'));
   assert.ok(!entries.includes('tests'));
   assert.ok(!entries.includes('_build'));
   assert.ok(!entries.includes('playwright.config.mjs'));
-  for (const entry of entries) {
-    const stat = await lstat(path.join(packageRoot, entry));
-    assert.ok(!stat.isSymbolicLink(), `${entry} must not be a symlink`);
-  }
+  const inspectTree = async directory => {
+    for (const entry of await readdir(directory,{withFileTypes:true})) {
+      const absolute=path.join(directory,entry.name),stat=await lstat(absolute);
+      assert.ok(!stat.isSymbolicLink(),`${path.relative(packageRoot,absolute)} must not be a symlink`);
+      if(stat.isDirectory())await inspectTree(absolute);
+    }
+  };
+  await inspectTree(packageRoot);
   const lock = JSON.parse(await readFile(path.join(packageRoot, 'package-lock.json'), 'utf8'));
   assert.deepEqual(Object.keys(lock.packages).filter(name => name.startsWith('node_modules/')).sort(), [
     'node_modules/buffer-crc32', 'node_modules/pend', 'node_modules/saxes',

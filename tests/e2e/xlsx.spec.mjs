@@ -12,6 +12,21 @@ test.beforeEach(async()=>{app=await startWorkbench({xlsxEnabled:true});});
 test.afterEach(async()=>{await app?.close();app=null;});
 async function open(page){try{await page.goto(`${app.origin}/#token=${app.token}`);}catch(error){error.message=error.message.replaceAll(app.token,'[redacted]');throw error;}await expect(page.getByRole('heading',{name:'MoonReconcile 工作台'})).toBeVisible();}
 const fixture=name=>fileURLToPath(new URL(`../../tests/fixtures/xlsx/${name}`,import.meta.url));
+
+test('catalog failure clears its loading status after the error is shown',async({page})=>{
+  let release;const pending=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/xlsx/catalog',async route=>{
+    await pending;
+    await route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({ok:false,error:{code:'invalid_xlsx',message:'Invalid workbook.',phase:'xlsx',side:'left',record:null,field:null}})});
+  });
+  await open(page);
+  await page.getByLabel('左侧来源 XLSX 文件').setInputFiles(fixture('lo-native-filter.xlsx'));
+  const dialog=page.getByRole('dialog');
+  await expect(dialog.getByRole('status')).toContainText('正在读取工作簿清单');
+  release();
+  await expect(dialog.getByRole('alert')).toContainText('工作簿清单读取失败');
+  await expect(dialog.getByRole('status')).toHaveCount(0);
+});
 async function saveReport(page,file){const pending=page.waitForEvent('download');await page.locator('.export-panel').getByRole('button',{name:'下载 report.json',exact:true}).click();const download=await pending;await download.saveAs(file);return fs.readFile(file);}
 async function makeHtmlWorkbook(input,output){
   const zip=await yauzl.openPromise(input,{lazyEntries:true,autoClose:false,strictFileNames:true}),entries=[];

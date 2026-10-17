@@ -1,0 +1,16 @@
+Finished. moon: no work to do
+
+Running 1 test using 1 worker
+
+Finished. moon: no work to do
+  ✘  1 tests/e2e/xlsx.spec.mjs:16:1 › catalog failure clears its loading status after the error is shown (5ms)
+
+
+  1) tests/e2e/xlsx.spec.mjs:16:1 › catalog failure clears its loading status after the error is shown 
+
+    Error: listen EPERM: operation not permitted 127.0.0.1
+
+    Error Context: test-results/xlsx-catalog-failure-clear-20c11-us-after-the-error-is-shown/error-context.md
+
+  1 failed
+    tests/e2e/xlsx.spec.mjs:16:1 › catalog failure clears its loading status after the error is shown 

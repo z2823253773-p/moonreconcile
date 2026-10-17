@@ -1,6 +1,6 @@
 export const APP_VERSION = '0.2.0';
 export const API_VERSION = 1;
-export const XLSX_LIMITS = Object.freeze({compressed_bytes:67108864,entries:2048,actual_unzip_bytes:268435456,xml_bytes:67108864,xml_depth:64,cell_bytes:65536,csv_bytes:67108864,data_rows:100000,columns:256});
+export { XLSX_LIMITS } from './xlsx/contracts.mjs';
 export const HOST_LIMITS = Object.freeze({
   session_bytes: 1073741824, assets: 64, imports: 64, revisions: 32, jobs: 256,
   uploads: 1, children: 1, upload_ms: 60000, job_ms: 180000, kill_ms: 1000,

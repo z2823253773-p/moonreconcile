@@ -3,6 +3,8 @@ import test from 'node:test';
 import { createWorkbenchState } from '../workbench/public/state.mjs';
 import { renderImportView } from '../workbench/public/import-view.mjs';
 import { renderXlsxSelection } from '../workbench/public/xlsx-view.mjs';
+import { XLSX_LIMITS as hostXlsxLimits } from '../workbench/contracts.mjs';
+import { XLSX_LIMITS as parserXlsxLimits } from '../workbench/xlsx/contracts.mjs';
 
 class FakeNode {
   constructor(tag) { this.tag=tag;this.children=[];this.listeners={};this.attrs={};this.nodeType=1;this.value='';this.disabled=false;this._text=''; }
@@ -82,6 +84,26 @@ test('XLSX conversion preserves core including-header logical origin by phase',a
 test('null-coordinate XLSX package rejection is workbook-level without a guessed cell',async()=>{
   const alert=await conversionAlert(Object.assign(errorDto('xlsx',null,null),{code:'xlsx_formula_rejected'}),{catalogFailure:true});
   assert.match(alert,/工作簿级别/);assert.doesNotMatch(alert,/单元格|物理第|A[0-9]|xl\//);
+});
+
+test('host and XLSX parser share the same frozen limit contract',()=>{
+  assert.strictEqual(hostXlsxLimits,parserXlsxLimits);
+  assert.equal(Object.isFrozen(hostXlsxLimits),true);
+  assert.deepEqual(Object.keys(hostXlsxLimits),['compressed_bytes','entries','actual_unzip_bytes','xml_bytes','xml_depth','cell_bytes','csv_bytes','data_rows','columns']);
+});
+
+test('catalog failure removes the loading status while a pending catalog keeps it',async()=>{
+  const body=setupDocument();let rejectCatalog;
+  const catalogResult=new Promise((_,reject)=>{rejectCatalog=reject;});
+  const api={request:async()=>({job_id:'catalog'}),waitJob:()=>catalogResult};
+  const view=renderXlsxSelection({root:new FakeNode('main'),api,asset:{asset_id:'asset',name:'sample.xlsx',sha256:'a'.repeat(64),bytes:1},side:'left',onConfirmed(){},onCancel(){}});
+  await tick();const dialog=body.children[0];
+  assert.ok(walk(dialog).some(node=>node.attrs.role==='status'&&node.textContent.includes('正在读取工作簿清单')));
+  rejectCatalog(Object.assign(new Error('Invalid workbook.'),{code:'invalid_xlsx',phase:'xlsx'}));
+  await tick();
+  assert.equal(walk(dialog).some(node=>node.attrs.role==='status'&&node.textContent.includes('正在读取工作簿清单')),false);
+  assert.ok(walk(dialog).some(node=>node.attrs.role==='alert'&&node.textContent.includes('工作簿清单读取失败')));
+  view.dispose();
 });
 
 function revisionModel() {

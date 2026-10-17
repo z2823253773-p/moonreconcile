@@ -100,7 +100,7 @@ jobs:
       - name: Relocated package tests
         run: node --test tests/workbench-package.test.mjs
 
-      - name: Package identity and shutdown regressions (macOS network sandbox)
+      - name: Package identity, production lock, and shutdown regressions (macOS network sandbox)
         if: matrix.os == 'macos-15'
         run: node --test tests/workbench-package-validation.test.mjs
 

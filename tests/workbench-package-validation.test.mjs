@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test, { before, after } from 'node:test';
-import { packageContract, thirdPartyNotices } from '../scripts/workbench-package-provenance.mjs';
+import { packageContract, thirdPartyNotices, verifyPackage } from '../scripts/workbench-package-provenance.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const name = 'moonreconcile-workbench-0.2.0';
@@ -129,6 +129,42 @@ test('package contract rejects saxes and xmlchars lock drift', async () => {
   lock.packages['node_modules/xmlchars'].version = '2.3.0';
   await fs.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
   await assert.rejects(packageContract(directory), /locked transitive dependency drift: xmlchars/);
+});
+
+test('package contract pins every direct and transitive production artifact', async () => {
+  const directory = await fixture('all-production-artifact-lock-drift');
+  const lockPath = path.join(directory, 'package-lock.json');
+  const baseline = JSON.parse(await fs.readFile(lockPath, 'utf8'));
+  for (const name of ['buffer-crc32','saxes','yauzl','yazl','xmlchars','pend']) {
+    const lock = structuredClone(baseline);
+    lock.packages[`node_modules/${name}`].integrity = 'sha512-tampered';
+    await fs.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+    await assert.rejects(packageContract(directory), new RegExp(`locked candidate integrity drift: ${name}`));
+  }
+});
+
+test('package contract rejects manifest drift and provenance rejects changed XLSX source modules', async () => {
+  const directory = await fixture('manifest-and-xlsx-module-drift');
+  const manifestPath = path.join(directory, 'package.json');
+  const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+  manifest.dependencies.saxes = '6.0.1';
+  await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  await assert.rejects(packageContract(directory), /audit changed production dependency contract/);
+
+  const tampered = path.join(owned, 'tampered-package');
+  await fs.cp(originalPackage, tampered, { recursive: true });
+  const parser = path.join(tampered, 'workbench/xlsx/package.mjs');
+  await fs.appendFile(parser, '\n// altered package module\n');
+  await assert.rejects(verifyPackage(root, tampered), /package files differ from provenance/);
+});
+
+test('package contract rejects pend version drift', async () => {
+  const directory = await fixture('pend-version-drift');
+  const lockPath = path.join(directory, 'package-lock.json');
+  const lock = JSON.parse(await fs.readFile(lockPath, 'utf8'));
+  lock.packages['node_modules/pend'].version = '1.3.0';
+  await fs.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+  await assert.rejects(packageContract(directory), /locked transitive dependency drift: pend/);
 });
 
 test('offline saxes notice supplement rejects missing or altered license source', async () => {

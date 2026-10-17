@@ -1,0 +1,123 @@
+TAP version 13
+# {"fixture":"evidence-only","checker_exit":{"code":1,"signal":null},"timed_out":false,"status":"failed","source_sha":"3b519e3197d720edd16bfe521c61abecdc51f6bc","package_source_sha":"629241da9fcdcbb954a3813b283c3ad9c7276a2e","archive_sha256":"aa6cf03579cae75dcbb2c902a7f3aacf3323e62f3db77eca2e70cdedf1f88e72","bridge_sha256":"32781ffbb9508ba50768aa2e4e53762a3173987a371b19c69982a016325df081"}
+# Subtest: strict checker accepts an evidence-only commit with unchanged package inputs and verifies graceful cleanup
+not ok 1 - strict checker accepts an evidence-only commit with unchanged package inputs and verifies graceful cleanup
+  ---
+  duration_ms: 1545.50825
+  type: 'test'
+  location: '/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/workbench-package-validation.test.mjs:93:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"code":1,"signal":null,"stdout":"","stderr":"package validation failed: AssertionError [ERR_ASSERTION]: runtime cannot invoke npm, moon, or python: status=71\n\nsandbox-exec: sandbox_apply: Operation not permitted\n\n\n71 !== 0\n\n    at assertStatus (file:///private/var/folders/l0/z510jl1d0rxc2cpk2jkvmks80000gn/T/moonreconcile-validator-regression-hMjGFq/evidence-only/scripts/check-workbench-package.mjs:27:10)\n    at main (file:///private/var/folders/l0/z510jl1d0rxc2cpk2jkvmks80000gn/T/moonreconcile-validator-regression-hMjGFq/evidence-only/scripts/check-workbench-package.mjs:193:5)\n","timedOut":false,"record":{"created_at":"2026-10-17T08:58:01.715Z","source_sha":"3b519e3197d720edd16bfe521c61abecdc51f6bc","source_worktree_clean":true,"package_source_sha":"629241da9fcdcbb954a3813b283c3ad9c7276a2e","package_source_worktree_clean":false,"provenance_sha256":"7c65c99d923848c2bb66584a23a42892c13f230848964a23f0a4a206d8d060ba","package":"moonreconcile-workbench-0.2.0","package_version":"0.2.0","node_binary_sha256":"68f4d07ca49e0500cc135c7e0a445093e228e42e126ac22306d045f0a8c2636b","node_version":"v22.23.3","bridge_sha256":"32781ffbb9508ba50768aa2e4e53762a3173987a371b19c69982a016325df081","archive_sha256":"aa6cf03579cae75dcbb2c902a7f3aacf3323e62f3db77eca2e70cdedf1f88e72","package_dependencies":{"buffer-crc32":"1.0.0","saxes":"6.0.0","yauzl":"3.4.0","yazl":"3.3.1"},"environment":{"path_entries":["node"],"npm_available":false,"moon_available":false,"python_available":false},"network_isolation":{"mechanism":"macOS sandbox-exec; deny network-outbound; allow localhost only","profile":"(version 1) (allow default) (deny network-outbound) (allow network-outbound (remote ip \"localhost:*\"))","loopback":"pending","external_probe":"pending"},"gates":[{"name":"source-build-package-archive-identity","status":0,"packaged_source_sha":"629241da9fcdcbb954a3813b283c3ad9c7276a2e","validated_source_sha":"3b519e3197d720edd16bfe521c61abecdc51f6bc"}],"status":"failed","error":"runtime cannot invoke npm, moon, or python: status=71\n\nsandbox-exec: sandbox_apply: Operation not permitted\n\n\n71 !== 0\n"}}
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/henryz/Desktop/%E6%AF%94%E8%B5%9B/moonreconcile/.worktrees/quarter-workbench/tests/workbench-package-validation.test.mjs:98:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# {"fixture":"new-core-old-bridge","builder_exit":1,"rejected":"compiled bridge source/build inputs changed"}
+# Subtest: builder refuses an old bridge after committed core source inputs change
+ok 2 - builder refuses an old bridge after committed core source inputs change
+  ---
+  duration_ms: 405.135083
+  type: 'test'
+  ...
+# Subtest: package contract rejects saxes and xmlchars lock drift
+ok 3 - package contract rejects saxes and xmlchars lock drift
+  ---
+  duration_ms: 404.939458
+  type: 'test'
+  ...
+# Subtest: package contract pins every direct and transitive production artifact
+ok 4 - package contract pins every direct and transitive production artifact
+  ---
+  duration_ms: 444.205792
+  type: 'test'
+  ...
+# Subtest: offline saxes notice supplement rejects missing or altered license source
+ok 5 - offline saxes notice supplement rejects missing or altered license source
+  ---
+  duration_ms: 451.784292
+  type: 'test'
+  ...
+# {"fixture":"archive-mismatch","checker_exit":{"code":1,"signal":null},"timed_out":false,"status":"failed","source_sha":"21f155900087aa5189c0e735c1ea7d369200ea09","package_source_sha":"629241da9fcdcbb954a3813b283c3ad9c7276a2e","archive_sha256":"09d7427322f6b33cf71c54867a27edcd5f19805b17ed17523562bceca1fe675f","bridge_sha256":"32781ffbb9508ba50768aa2e4e53762a3173987a371b19c69982a016325df081"}
+# Subtest: strict checker rejects an archive that differs from the complete package directory
+ok 6 - strict checker rejects an archive that differs from the complete package directory
+  ---
+  duration_ms: 879.572584
+  type: 'test'
+  ...
+# {"fixture":"new-source-old-package","checker_exit":{"code":1,"signal":null},"timed_out":false,"status":"failed"}
+# Subtest: strict checker rejects an old package at a new clean runtime source commit
+ok 7 - strict checker rejects an old package at a new clean runtime source commit
+  ---
+  duration_ms: 594.84225
+  type: 'test'
+  ...
+# {"fixture":"ignore","checker_exit":{"code":1,"signal":null},"timed_out":false,"status":"failed","source_sha":"6e9d28b239b67c3ab6ddf5ee7af7ef63e5f087bc","package_source_sha":"6e9d28b239b67c3ab6ddf5ee7af7ef63e5f087bc","archive_sha256":"a96f21430b15b37b69f854f1ac5f2d8f4bf22e048c00a16f81aa483fe8285480","bridge_sha256":"32781ffbb9508ba50768aa2e4e53762a3173987a371b19c69982a016325df081"}
+# Subtest: strict checker fails and reaps its child on ignore
+not ok 8 - strict checker fails and reaps its child on ignore
+  ---
+  duration_ms: 1442.458125
+  type: 'test'
+  location: '/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/workbench-package-validation.test.mjs:188:3'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, open '/var/folders/l0/z510jl1d0rxc2cpk2jkvmks80000gn/T/moonreconcile-validator-regression-hMjGFq/ignore/dist/fixture-child.pid'"
+  code: 'ENOENT'
+  stack: |-
+    async open (node:internal/fs/promises:639:25)
+    async Object.readFile (node:internal/fs/promises:1252:14)
+    async TestContext.<anonymous> (file:///Users/henryz/Desktop/%E6%AF%94%E8%B5%9B/moonreconcile/.worktrees/quarter-workbench/tests/workbench-package-validation.test.mjs:210:24)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# {"fixture":"cleanup-refusal","checker_exit":{"code":1,"signal":null},"timed_out":false,"status":"failed","source_sha":"1a79c60c53eada5b1b1c174cca7931d3fd77e638","package_source_sha":"1a79c60c53eada5b1b1c174cca7931d3fd77e638","archive_sha256":"e3fd01bb5d8502db22d9a69f3dbef8a0fa10378801bb2605e9f515ca588508e6","bridge_sha256":"32781ffbb9508ba50768aa2e4e53762a3173987a371b19c69982a016325df081"}
+# Subtest: strict checker fails and reaps its child on cleanup-refusal
+not ok 9 - strict checker fails and reaps its child on cleanup-refusal
+  ---
+  duration_ms: 1524.616459
+  type: 'test'
+  location: '/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/workbench-package-validation.test.mjs:188:3'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, open '/var/folders/l0/z510jl1d0rxc2cpk2jkvmks80000gn/T/moonreconcile-validator-regression-hMjGFq/cleanup-refusal/dist/fixture-child.pid'"
+  code: 'ENOENT'
+  stack: |-
+    async open (node:internal/fs/promises:639:25)
+    async Object.readFile (node:internal/fs/promises:1252:14)
+    async TestContext.<anonymous> (file:///Users/henryz/Desktop/%E6%AF%94%E8%B5%9B/moonreconcile/.worktrees/quarter-workbench/tests/workbench-package-validation.test.mjs:210:24)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# {"fixture":"cleanup-residue","checker_exit":{"code":1,"signal":null},"timed_out":false,"status":"failed","source_sha":"4b7edc631dc7863d80509acae50b066e3d82efcf","package_source_sha":"4b7edc631dc7863d80509acae50b066e3d82efcf","archive_sha256":"b23305fd9234e6230ef7aeff147d7db8247b6cff82c6cdd83f0f830d961ae3e4","bridge_sha256":"32781ffbb9508ba50768aa2e4e53762a3173987a371b19c69982a016325df081"}
+# Subtest: strict checker fails and reaps its child on cleanup-residue
+not ok 10 - strict checker fails and reaps its child on cleanup-residue
+  ---
+  duration_ms: 167684.297292
+  type: 'test'
+  location: '/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/workbench-package-validation.test.mjs:188:3'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, open '/var/folders/l0/z510jl1d0rxc2cpk2jkvmks80000gn/T/moonreconcile-validator-regression-hMjGFq/cleanup-residue/dist/fixture-child.pid'"
+  code: 'ENOENT'
+  stack: |-
+    async open (node:internal/fs/promises:639:25)
+    async Object.readFile (node:internal/fs/promises:1252:14)
+    async TestContext.<anonymous> (file:///Users/henryz/Desktop/%E6%AF%94%E8%B5%9B/moonreconcile/.worktrees/quarter-workbench/tests/workbench-package-validation.test.mjs:210:24)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 6
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 176184.588959

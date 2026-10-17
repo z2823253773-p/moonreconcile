@@ -45,9 +45,9 @@ export function renderXlsxSelection({ root, api, asset, side, onConfirmed, onCan
     dialog.append(element('p', { className: 'source-meta', text: `原始文件：${asset.name} · ${asset.bytes.toLocaleString()} 字节` }));
     dialog.append(element('p', { className: 'source-meta', text: `原始文件 SHA-256：${asset.sha256}` }));
     if (issue) dialog.append(element('p', { className: 'notice error', role: 'alert', text: `${issue.label}（${issue.error.code ?? '错误'}）：${issue.error.message} ${importErrorLocation(issue.error)}` }));
-    if (!workbook) {
+    if (!workbook && !issue) {
       dialog.append(element('p', { className: 'notice', role: 'status', text: '正在读取工作簿清单…' }));
-    } else if (!converted) {
+    } else if (workbook && !converted) {
       const sheet = element('select', { disabled: busy }, [
         element('option', { value: '', text: '请选择工作表（无默认项）' }),
         ...workbook.sheets.map(item => element('option', { value: item.sheet_id, disabled: !item.selectable, text: `${item.name} · ${item.state} · ${item.kind}${item.selectable ? '' : '（不可选）'}` })),
@@ -82,7 +82,7 @@ export function renderXlsxSelection({ root, api, asset, side, onConfirmed, onCan
       const summary = valid ? `将导入 ${current.name}!${columnName(start)}${header}:${columnName(end)}${last}；${width} 列均已明确选择转换方式。空白数据行会保留在行映射中。` : '请完成工作表、标题行、列范围、最后一行和每列转换方式。数值范围受工作表格式上限约束。';
       dialog.append(element('p', { className: 'notice xlsx-spec-summary', role: 'note', text: summary }));
       dialog.append(button(busy ? '正在转换…' : '检查选择并转换', () => { if (valid) void convert({ current, header, start, end, last, width }); }, { disabled: busy || !valid }));
-    } else {
+    } else if (converted) {
       dialog.append(element('h3', { tabindex: '-1', text: '转换完成；请检查摘要后再绑定来源' }));
       dialog.append(element('p', { text: `工作表 ${converted.manifest.worksheet.name} · 日期系统 ${converted.manifest.worksheet.date_system} · ${converted.manifest.row_mapping.row_count} 条数据记录 × ${converted.preview.column_count} 列` }));
       dialog.append(element('p', { text: `原始文件 SHA-256：${asset.sha256}` }));
