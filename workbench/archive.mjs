@@ -15,6 +15,7 @@ const RUN_FILES = Object.freeze([
   'manifest.json','input/left.csv','input/right.csv','config.json','report.json',
   'pairs.csv','fields.csv','candidates.csv','decisions.csv','unresolved.csv','summary.md',
 ]);
+const MATERIAL_JSON_FILES = new Set(['import/manifest.json',...['left','right'].flatMap(side=>[`import/${side}.profile.json`,`import/${side}.adapter.json`])]);
 const ZIP_FILES = new Set(['workbench.json', ...RUN_FILES.map(name => `run/${name}`),'import/manifest.json',...['left','right'].flatMap(side=>[`import/${side}.xlsx`,`import/${side}.profile.json`,`import/${side}.adapter.json`])]);
 const DEFAULT_LIMITS = Object.freeze({zip_bytes:268435456,unzip_bytes:1073741824,zip_entries:32,sidecar_bytes:1048576,entry_bytes:134217728});
 const hashBytes = value => createHash('sha256').update(value).digest('hex');
@@ -30,7 +31,7 @@ function normalizeLimits(overrides={}) {
 }
 function validSha(value){return typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);}
 function entryLimit(name,limits) {
-  const role=name==='workbench.json'?limits.sidecar_bytes:name==='run/decisions.csv'?134217728:name==='run/input/left.csv'||name==='run/input/right.csv'?67108864:67108864;
+  const role=name==='workbench.json'?limits.sidecar_bytes:MATERIAL_JSON_FILES.has(name)?1048576:name==='run/decisions.csv'?134217728:name==='run/input/left.csv'||name==='run/input/right.csv'?67108864:67108864;
   return Math.min(limits.entry_bytes,role);
 }
 function validateSidecar(value) {
@@ -185,7 +186,7 @@ export async function readRunBundle({assetPath,stagingPath,limits:overrides={}}=
     if(count!==allowedNames.size||seen.size!==allowedNames.size||[...allowedNames].some(name=>!seen.has(name)))throw archiveError(sidecar.schema_version===1?'ZIP must contain exactly the twelve allowed files':'ZIP entries do not match the v2 manifest');
     if(sidecar.schema_version===2){
       try{const manifestBytes=await fs.readFile(path.join(stagingPath,'import/manifest.json'));importManifest=JSON.parse(manifestBytes.toString('utf8'));if(canonicalJsonStringify(importManifest)!==manifestBytes.toString('utf8'))throw archiveError('Import manifest is not canonical JSON');validateImportBundleManifest(importManifest,sidecar);}
-      catch(error){if(error.code)throw error;throw archiveError('Invalid import manifest');}
+      catch(error){if(error.code&&error.code!=='invalid_request')throw error;throw archiveError('Invalid import manifest');}
     }
     for(const item of sidecar.files) {
       const actual=actuals.get(item.path);

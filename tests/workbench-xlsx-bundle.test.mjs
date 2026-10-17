@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import yauzl from 'yauzl';
 import {writeRunBundle,readRunBundle} from '../workbench/archive.mjs';
 import {inspectXlsxPackage,disposeXlsxPackage,projectWorkbook} from '../workbench/xlsx/package.mjs';
 import {convertXlsx} from '../workbench/xlsx/adapter.mjs';
@@ -116,4 +117,120 @@ write('duplicate-entry',duplicate='run/report.json')
   for(const name of ['csv-only-v2-13-files','unknown-version','missing-v2-entry','count-mismatch','duplicate-entry']){
     await assert.rejects(readRunBundle({assetPath:path.join(generated,`${name}.zip`),stagingPath:path.join(f.root,`restore-${name}`)}),error=>error.code==='invalid_bundle',name);
   }
+});
+
+// These cases catch a missing material role cap before inflation/JSON parsing,
+// and request-schema errors escaping the archive's invalid_bundle boundary.
+const MATERIAL_JSON=['import/manifest.json','import/left.profile.json','import/right.profile.json','import/left.adapter.json','import/right.adapter.json'];
+const MATERIAL_EVIDENCE=path.join(ROOT,'.superpowers/sdd/2026-10-08-restricted-xlsx/evidence/task-6/metadata-bounds');
+function materialMutation(base,dest,target,{size,forgedSize,malformed}={}){
+  const script=String.raw`import hashlib,json,struct,sys,zipfile
+base,dest,target,options=sys.argv[1:];options=json.loads(options)
+canonical=lambda v:(json.dumps(v,separators=(',',':'),sort_keys=True)+'\n').encode()
+with zipfile.ZipFile(base) as z: members={n:z.read(n) for n in z.namelist()}
+value=json.loads(members[target])
+if 'size' in options:
+ value['padding']='';value['padding']='x'*(options['size']-len(canonical(value)))
+else:
+ kind=options['malformed']
+ if kind=='extra-root':value['unknown']=True
+ elif kind=='missing-root':del value['schema_version']
+ elif kind=='extra-side':value['sides'][0]['unknown']=True
+ elif kind=='extra-file':value['sides'][0]['profile']['unknown']=True
+members[target]=canonical(value)
+manifest=json.loads(members['import/manifest.json'])
+if target!='import/manifest.json':
+ for side in manifest['sides']:
+  for key in ('profile','adapter_manifest'):
+   item=side.get(key)
+   if item and item['path']==target:item.update(bytes=len(members[target]),sha256=hashlib.sha256(members[target]).hexdigest())
+ members['import/manifest.json']=canonical(manifest)
+sidecar=json.loads(members['workbench.json'])
+for item in sidecar['files']:item.update(bytes=len(members[item['path']]),sha256=hashlib.sha256(members[item['path']]).hexdigest())
+members['workbench.json']=canonical(sidecar)
+with zipfile.ZipFile(dest,'w',zipfile.ZIP_DEFLATED) as z:
+ for name,data in members.items():z.writestr(name,data)
+with zipfile.ZipFile(dest) as z:
+ info=z.getinfo(target);actual=len(z.read(target));compressed=info.compress_size;offset=info.header_offset
+ assert all(len(z.read(item['path']))==item['bytes'] and hashlib.sha256(z.read(item['path'])).hexdigest()==item['sha256'] for item in sidecar['files'])
+if 'forgedSize' in options:
+ data=bytearray(open(dest,'rb').read());struct.pack_into('<I',data,offset+22,options['forgedSize'])
+ pos=data.rfind(b'PK\x05\x06');central=struct.unpack_from('<I',data,pos+16)[0]
+ while data[central:central+4]==b'PK\x01\x02':
+  length,extra,comment=struct.unpack_from('<HHH',data,central+28);name=data[central+46:central+46+length].decode()
+  if name==target:struct.pack_into('<I',data,central+24,options['forgedSize']);break
+  central+=46+length+extra+comment
+ open(dest,'wb').write(data)
+print(json.dumps({'target':target,'actual_bytes':actual,'compressed_bytes':compressed,'declared_bytes':options.get('forgedSize',actual),'outer_hashes_match_actual_bytes':True}))`;
+  return JSON.parse(execFileSync('python3',['-c',script,base,dest,target,JSON.stringify({size,forgedSize,malformed})],{encoding:'utf8'}));
+}
+
+async function observeMaterialRead(t,options,target){
+  const observed={stream_bytes:0,stream_opened:false,json_read_bytes:0};
+  const originalStream=yauzl.ZipFile.prototype.openReadStreamPromise,originalRead=fs.readFile;
+  t.mock.method(yauzl.ZipFile.prototype,'openReadStreamPromise',async function(entry,...args){
+    const stream=await originalStream.call(this,entry,...args);
+    if(entry.fileName===target){
+      observed.stream_opened=true;const iterate=stream[Symbol.asyncIterator].bind(stream);
+      stream[Symbol.asyncIterator]=async function*(){for await(const chunk of iterate()){observed.stream_bytes+=chunk.length;yield chunk;}};
+    }
+    return stream;
+  });
+  t.mock.method(fs,'readFile',async function(file,...args){
+    const bytes=await originalRead.call(this,file,...args);
+    if(file===path.join(options.stagingPath,target))observed.json_read_bytes+=Buffer.byteLength(bytes);
+    return bytes;
+  });
+  try{await readRunBundle(options);return{...observed,code:null};}
+  catch(error){return{...observed,code:error.code,message:error.message};}
+  finally{t.mock.restoreAll();}
+}
+
+test('v2_material_json_is_bounded_before_inflation_and_read_with_owned_cleanup',async t=>{
+  const f=await writeV2(t,['xlsx','xlsx']),original=await fs.readFile(f.destPath);
+  const evidence=MATERIAL_EVIDENCE;await fs.mkdir(evidence,{recursive:true});
+  for(const target of MATERIAL_JSON)for(const mode of ['frozen','lower','forged'])await t.test(`${target} ${mode}`,async sub=>{
+    const cap=mode==='lower'?131072:1048576,label=`${target.replaceAll('/','-')}-${mode}`;
+    const assetPath=path.join(f.root,`${label}.zip`),stagingPath=path.join(f.root,`restore-${label}`);
+    const fixture=materialMutation(f.destPath,assetPath,target,{size:cap+1,...(mode==='forged'?{forgedSize:cap}:{})});
+    const outcome=await observeMaterialRead(sub,{assetPath,stagingPath,...(mode==='lower'?{limits:{entry_bytes:cap}}:{})},target);
+    const removed=await fs.access(stagingPath).then(()=>false,error=>error.code==='ENOENT');
+    const receipt={...fixture,...outcome,cap,owned_stage_removed:removed};
+    await fs.copyFile(assetPath,path.join(evidence,`${label}.zip`));await fs.writeFile(path.join(evidence,`${label}.json`),JSON.stringify(receipt,null,2)+'\n');
+    console.log(JSON.stringify(receipt));
+    assert.ok(fixture.compressed_bytes<fixture.actual_bytes/100,'fixture must exercise compressed expansion');
+    assert.equal(removed,true);assert.deepEqual(await fs.readFile(f.destPath),original,'cleanup preserves the caller-owned archive');
+    assert.equal(outcome.json_read_bytes,0,'oversized material must never reach a whole JSON read');
+    if(mode==='forged'){
+      assert.ok(['quota_exceeded','invalid_bundle'].includes(outcome.code),JSON.stringify(outcome));
+      assert.equal(outcome.stream_opened,true);assert.ok(outcome.stream_bytes>0,'retain the real bytes consumed before a forged-size guard fires');
+      assert.ok(outcome.stream_bytes<=cap,'the ZIP size guard must stop before yielding bytes past the declared cap');
+    }else{
+      assert.equal(outcome.code,'quota_exceeded',JSON.stringify(outcome));
+      assert.equal(outcome.stream_opened,false,'honest oversized declaration must fail before inflation');
+      assert.equal(outcome.stream_bytes,0);
+    }
+  });
+});
+
+test('v2_material_profile_and_adapter_exact_1MiB_archive_boundary_remains_allowed',async t=>{
+  const f=await writeV2(t,['xlsx','xlsx']);await fs.mkdir(MATERIAL_EVIDENCE,{recursive:true});
+  for(const target of MATERIAL_JSON.slice(1))await t.test(target,async()=>{
+    const assetPath=path.join(f.root,`${path.basename(target)}.zip`),stagingPath=path.join(f.root,`boundary-${path.basename(target)}`);
+    materialMutation(f.destPath,assetPath,target,{size:1048576});
+    const restored=await readRunBundle({assetPath,stagingPath});
+    assert.equal(restored.sidecar.schema_version,2);assert.equal((await fs.stat(path.join(stagingPath,target))).size,1048576);
+    await fs.copyFile(assetPath,path.join(MATERIAL_EVIDENCE,`${path.basename(target)}-exact-boundary.zip`));
+  });
+});
+
+test('v2_malformed_material_manifest_schema_is_invalid_bundle_with_owned_cleanup',async t=>{
+  const f=await writeV2(t,['xlsx','xlsx']);await fs.mkdir(MATERIAL_EVIDENCE,{recursive:true});
+  for(const malformed of ['extra-root','missing-root','extra-side','extra-file'])await t.test(malformed,async()=>{
+    const assetPath=path.join(f.root,`${malformed}.zip`),stagingPath=path.join(f.root,`restore-${malformed}`);
+    materialMutation(f.destPath,assetPath,'import/manifest.json',{malformed});
+    await assert.rejects(readRunBundle({assetPath,stagingPath}),error=>error.code==='invalid_bundle'&&error.error.phase==='restoring');
+    await assert.rejects(fs.access(stagingPath),{code:'ENOENT'});
+    await fs.copyFile(assetPath,path.join(MATERIAL_EVIDENCE,`malformed-${malformed}.zip`));
+  });
 });
