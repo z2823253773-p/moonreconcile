@@ -1,3 +1,0 @@
-npm warn audit request to https://registry.npmjs.org/-/npm/v1/security/audits/quick failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org
-npm error audit endpoint returned an error
-npm error A complete log of this run can be found in: /Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/.verify/task-7/phase-a/npm-cache/_logs/2026-10-17T06_56_27_888Z-debug-0.log

@@ -12,6 +12,10 @@ export const VERSION = '0.2.0';
 export const EXPECTED = { 'buffer-crc32': '1.0.0', saxes: '6.0.0', yauzl: '3.4.0', yazl: '3.3.1' };
 export const PINNED_TRANSITIVE = { xmlchars: '2.2.0', pend: '1.2.0' };
 export const PINNED_OVERRIDES = { xmlchars: '2.2.0' };
+const PRODUCTION_EDGES = {
+  'buffer-crc32': {}, saxes: { xmlchars: '^2.2.0' }, yauzl: { pend: '~1.2.0' },
+  yazl: { 'buffer-crc32': '^1.0.0' }, xmlchars: {}, pend: {},
+};
 export const PINNED_ARTIFACTS = {
   'buffer-crc32': { version: '1.0.0', integrity: 'sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w==' },
   saxes: { version: '6.0.0', integrity: 'sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==' },
@@ -143,13 +147,28 @@ export async function packageContract(root) {
   assert.deepEqual(manifest.dependencies, EXPECTED, 'audit changed production dependency contract before packaging');
   assert.deepEqual(manifest.overrides, PINNED_OVERRIDES, 'audit changed the exact XML parser transitive pin');
   assert.deepEqual(rootLock.packages?.['']?.dependencies, EXPECTED, 'lockfile root dependencies differ from manifest');
+  const rejectAlternateEdges = (entry, name) => {
+    for (const key of ['optionalDependencies', 'peerDependencies', 'peerDependenciesMeta', 'bundleDependencies', 'bundledDependencies']) {
+      assert.ok(!Object.hasOwn(entry, key), `unreviewed production dependency declaration: ${name}.${key}`);
+    }
+  };
+  rejectAlternateEdges(manifest, 'manifest');
+  rejectAlternateEdges(rootLock.packages[''], 'lock root');
+  for (const name of Object.keys(PRODUCTION_EDGES)) {
+    assert.ok(!Object.keys(rootLock.packages).some((key) => key.startsWith(`node_modules/${name}/node_modules/`)), `nested production dependency shadows frozen closure: ${name}`);
+  }
   const dependencies = { ...EXPECTED };
   const packages = { '': { name: 'moonreconcile-workbench', version: VERSION, dependencies, engines: { node: '>=22' } } };
   const visit = (name) => {
+    assert.ok(Object.hasOwn(PRODUCTION_EDGES, name), `unreviewed production dependency: ${name}`);
     const key = `node_modules/${name}`;
     if (packages[key]) return;
     const entry = rootLock.packages?.[key];
     assert.ok(entry, `missing locked dependency: ${name}`);
+    rejectAlternateEdges(entry, name);
+    assert.deepEqual(entry.dependencies ?? {}, PRODUCTION_EDGES[name], `production dependency edges drift: ${name}`);
+    assert.ok(!entry.link && !entry.dev && !entry.optional && !entry.inBundle, `non-production locked dependency: ${name}`);
+    assert.ok(!Object.hasOwn(entry, 'name') || entry.name === name, `aliased production dependency: ${name}`);
     if (dependencies[name]) assert.equal(entry.version, dependencies[name]);
     if (PINNED_TRANSITIVE[name]) assert.equal(entry.version, PINNED_TRANSITIVE[name], `locked transitive dependency drift: ${name}`);
     if (PINNED_ARTIFACTS[name]) {
@@ -160,6 +179,7 @@ export async function packageContract(root) {
     Object.keys(entry.dependencies ?? {}).forEach(visit);
   };
   Object.keys(dependencies).forEach(visit);
+  assert.deepEqual(Object.keys(packages).filter(Boolean).sort(), Object.keys(PRODUCTION_EDGES).map((name) => `node_modules/${name}`).sort(), 'production dependency closure differs from frozen six packages');
   return {
     manifest: { name: 'moonreconcile-workbench', version: VERSION, private: true, type: 'module', engines: { node: '>=22' }, scripts: { start: 'node workbench/start.mjs' }, bin: { reconcile: './cli/main.mjs' }, dependencies },
     lock: { name: 'moonreconcile-workbench', version: VERSION, lockfileVersion: 3, requires: true, packages },

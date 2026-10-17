@@ -86,7 +86,7 @@ async function check(directory) {
   });
   clearTimeout(timer);
   const record = JSON.parse(await fs.readFile(evidence, 'utf8'));
-  console.log(JSON.stringify({ fixture: path.basename(directory), checker_exit: exit, timed_out: timedOut, status: record.status, source_sha: record.source_sha, package_source_sha: record.package_source_sha, archive_sha256: record.archive_sha256, bridge_sha256: record.bridge_sha256, shutdown: record.shutdown }));
+  console.log(JSON.stringify({ fixture: path.basename(directory), checker_exit: exit, timed_out: timedOut, status: record.status, source_sha: record.source_sha, package_source_sha: record.package_source_sha, archive_sha256: record.archive_sha256, bridge_sha256: record.bridge_sha256, network_isolation: record.network_isolation, shutdown: record.shutdown }));
   return { ...exit, stdout, stderr, timedOut, record };
 }
 
@@ -141,6 +141,38 @@ test('package contract pins every direct and transitive production artifact', as
     await fs.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
     await assert.rejects(packageContract(directory), new RegExp(`locked candidate integrity drift: ${name}`));
   }
+});
+
+test('package contract freezes the exact production graph and edge declarations', async () => {
+  const directory = await fixture('production-graph-drift');
+  const lockPath = path.join(directory, 'package-lock.json');
+  const baseline = JSON.parse(await fs.readFile(lockPath, 'utf8'));
+  const approved = ['buffer-crc32', 'pend', 'saxes', 'xmlchars', 'yauzl', 'yazl'];
+  const contract = await packageContract(directory);
+  assert.deepEqual(Object.keys(contract.lock.packages).filter(Boolean).map((key) => key.slice(13)).sort(), approved);
+  const mutations = {
+    'extra transitive': (lock) => { lock.packages['node_modules/yauzl'].dependencies.extra = '1.0.0'; lock.packages['node_modules/extra'] = { version: '1.0.0' }; },
+    'removed edge and entry': (lock) => { delete lock.packages['node_modules/saxes'].dependencies.xmlchars; delete lock.packages['node_modules/xmlchars']; },
+    'missing transitive': (lock) => { delete lock.packages['node_modules/pend']; },
+    'changed edge': (lock) => { lock.packages['node_modules/saxes'].dependencies = { pend: '^2.2.0' }; },
+    'changed range': (lock) => { lock.packages['node_modules/saxes'].dependencies.xmlchars = '~2.2.0'; },
+    'optional edge': (lock) => { lock.packages['node_modules/saxes'].optionalDependencies = { extra: '1.0.0' }; },
+    'peer edge': (lock) => { lock.packages['node_modules/saxes'].peerDependencies = { extra: '1.0.0' }; },
+    'nested shadow': (lock) => { lock.packages['node_modules/saxes/node_modules/xmlchars'] = { ...lock.packages['node_modules/xmlchars'] }; },
+    'alias range': (lock) => { lock.packages['node_modules/saxes'].dependencies.xmlchars = 'npm:xmlchars@2.2.0'; },
+    'root optional': (lock) => { lock.packages[''].optionalDependencies = { extra: '1.0.0' }; },
+  };
+  for (const [label, mutate] of Object.entries(mutations)) {
+    const lock = structuredClone(baseline);
+    mutate(lock);
+    await fs.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+    await assert.rejects(packageContract(directory), /production|locked dependency/, label);
+    console.log(JSON.stringify({ graph_mutation: label, rejected: true }));
+  }
+  // The checkout's separate development closure remains permitted.
+  baseline.packages['node_modules/development-only-extra'] = { version: '1.0.0', dev: true };
+  await fs.writeFile(lockPath, `${JSON.stringify(baseline, null, 2)}\n`);
+  assert.deepEqual((await packageContract(directory)).lock, contract.lock);
 });
 
 test('package contract rejects manifest drift and provenance rejects changed XLSX source modules', async () => {

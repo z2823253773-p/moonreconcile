@@ -1,6 +1,6 @@
 # Restricted XLSX B interface preflight
 
-Status: **Task1 ACCEPTED LOCAL at d63c2d9; Task2 initial candidate bb0481b7 NOT ACCEPTED, repair round1/2 in progress; Tasks3–7 PLANNED / NOT IMPLEMENTED; production CSV-only**. Historical failed/candidate evidence is retained; current acceptance is task-1-controller-acceptance-2026-10-11.md.
+Status checkpoint 2026-10-17: **Tasks1–6 ACCEPTED LOCAL through `629241da9fcdcbb954a3813b283c3ad9c7276a2e`; Task7 Phase A `64b0602` under repair round1/2; production CSV-only**. Historical failed/candidate evidence and frozen interfaces below are retained. Current Phase A status and pending activation/final acceptance are recorded in `.superpowers/sdd/2026-10-08-restricted-xlsx/task-7-phase-a-report.md`.
 
 ## Verified starting point
 

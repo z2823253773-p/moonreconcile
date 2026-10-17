@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import yauzl from 'yauzl';
 import { gitIdentity, verifySourceAtHead, verifyPackage, files, PACKAGE_PROVENANCE } from './workbench-package-provenance.mjs';
 import { spawnOwnedServer, stopAndVerify } from './workbench-package-lifecycle.mjs';
-import { externalControlEvidence } from './workbench-package-network.mjs';
+import { externalControlEvidence, resolveExternalEndpoint, externalProbeScript, externalDenialEvidence } from './workbench-package-network.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const NAME = 'moonreconcile-workbench-0.2.0';
@@ -193,17 +193,21 @@ async function main() {
     assertStatus(dependencyToolProbe, 0, 'runtime cannot invoke npm, moon, or python');
     result.gates.push({ name: 'only-node-on-PATH', status: status(dependencyToolProbe) });
 
-    const external = runOfflineNode(nodeOnly, ['-e', `import net from 'node:net';const socket=net.createConnection({host:'1.1.1.1',port:443});const timer=setTimeout(()=>{socket.destroy();process.exit(4)},3000);socket.once('connect',()=>{clearTimeout(timer);socket.destroy();process.exit(5)});socket.once('error',(error)=>{clearTimeout(timer);process.stdout.write(error.code??'unknown');process.exit(['EPERM','EACCES','ENETUNREACH','EHOSTUNREACH'].includes(error.code)?0:6)})`], { cwd: relocated, env: homeEnv, encoding: 'utf8', timeout: 7000 });
-    assertStatus(external, 0, 'external TCP probe must be denied by network sandbox');
-    result.network_isolation.external_probe = `denied (${external.stdout.trim() || external.stderr.trim() || 'socket error'})`;
-    result.gates.push({ name: 'external-network-denied', status: status(external), observed: external.stdout.trim() });
+    const endpoint = await resolveExternalEndpoint(process.platform);
+    result.network_isolation.endpoint = endpoint;
     if (process.platform === 'darwin') {
-      const externalControl = spawnSync(nodeOnly, ['-e', `import net from 'node:net';const socket=net.createConnection({host:'1.1.1.1',port:443});const timer=setTimeout(()=>{socket.destroy();process.stdout.write('timeout');process.exit(4)},3000);socket.once('connect',()=>{clearTimeout(timer);socket.destroy();process.stdout.write('connected');process.exit(0)});socket.once('error',(error)=>{clearTimeout(timer);process.stdout.write(error.code??'unknown');process.exit(1)})`], { cwd: relocated, env: homeEnv, encoding: 'utf8', timeout: 7000 });
-      result.network_isolation.external_control = externalControlEvidence(process.platform, externalControl);
-      result.gates.push({ name: 'fresh-external-network-positive-control', status: status(externalControl) });
+      const externalControl = spawnSync(nodeOnly, ['-e', externalProbeScript(endpoint, 'positive')], { cwd: relocated, env: homeEnv, encoding: 'utf8', timeout: 7000 });
+      result.network_isolation.positive_result = { status: externalControl.status, signal: externalControl.signal, stdout: externalControl.stdout, stderr: externalControl.stderr, error: externalControl.error?.message ?? null };
+      result.network_isolation.external_control = externalControlEvidence(process.platform, externalControl, endpoint);
+      result.gates.push({ name: 'fresh-external-network-positive-control', status: status(externalControl), endpoint, observed: JSON.parse(externalControl.stdout) });
     } else {
       result.network_isolation.external_control = externalControlEvidence(process.platform);
     }
+    const external = runOfflineNode(nodeOnly, ['-e', externalProbeScript(endpoint, 'denial')], { cwd: relocated, env: homeEnv, encoding: 'utf8', timeout: 7000 });
+    result.network_isolation.denial_result = { status: external.status, signal: external.signal, stdout: external.stdout, stderr: external.stderr, error: external.error?.message ?? null };
+    const denial = externalDenialEvidence(external, endpoint);
+    result.network_isolation.external_probe = `denied (${denial.error})`;
+    result.gates.push({ name: 'external-network-denied', status: status(external), endpoint, observed: denial });
 
     child = process.platform === 'darwin'
       ? spawnOwnedServer('/usr/bin/sandbox-exec', ['-p', SANDBOX_PROFILE, nodeOnly, 'workbench/start.mjs'], { cwd: relocated, env: homeEnv, stdio: ['ignore', 'pipe', 'pipe'] })
