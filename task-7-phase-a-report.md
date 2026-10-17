@@ -1,6 +1,6 @@
 # Task 7 Phase A report
 
-Phase A has a reviewable preactivation candidate for offline packaging and provenance. The public workbench still starts CSV-only. No XLSX activation or Task 7 acceptance is claimed.
+Phase A has a reviewable preactivation candidate for offline packaging and provenance. The implementation and Phase A evidence are committed as `3e7c67c51e486dd97bfd8b98cf4967d97a9e24bb` (`build: verify restricted XLSX offline package inputs`). The public workbench still starts CSV-only. No XLSX activation or Task 7 acceptance is claimed.
 
 The package builder already recursively copied all of `workbench/`, so the parser, converter and bundle modules were present. I kept that behavior and did not invent a copy defect or add a redundant whitelist. The package contract now pins version and registry integrity for the full six-package production closure: direct `buffer-crc32@1.0.0`, `saxes@6.0.0`, `yauzl@3.4.0`, `yazl@3.3.1`, plus transitive `xmlchars@2.2.0` and `pend@1.2.0`. `pend` stays a lock-validated transitive rather than a manifest override. The existing saxes license supplement and complete dependency notice generation remain in force. Package tests now reject tampered artifact integrities, manifest drift, changed XLSX module bytes and the wrong `pend` version. The relocated package test also checks nested package entries for symlinks.
 

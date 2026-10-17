@@ -4,6 +4,7 @@
   "status": "candidate_phase_a_only",
   "date": "2026-10-17",
   "base_sha": "629241da9fcdcbb954a3813b283c3ad9c7276a2e",
+  "phase_a_implementation_commit": "3e7c67c51e486dd97bfd8b98cf4967d97a9e24bb",
   "candidate_source_sha_at_build": "629241da9fcdcbb954a3813b283c3ad9c7276a2e",
   "source_worktree_clean_at_build": false,
   "production_xlsx_default": false,
