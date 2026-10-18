@@ -211,7 +211,7 @@ test('independent_python_zipfile_mutations_cover_zip_structure_and_counts', asyn
     const manifest = JSON.parse(await readFile(fixture('malicious-manifest.json'), 'utf8'));
     for (const id of manifest.zip_mutations) {
       const target = path.join(directory, `${id}.xlsx`);
-      const before = (await import('node:fs/promises')).readdir(directory);
+      const before = await (await import('node:fs/promises')).readdir(directory);
       if (['bit3_descriptor_valid','bit3_descriptor_unsigned','safe_inert_directory','entry_count_2048'].includes(id)) {
         const inventory = await inspectXlsxPackage({ assetPath: target, stagingPath: directory, limits: XLSX_LIMITS });
         assert.equal(inventory.date_system, '1904');
