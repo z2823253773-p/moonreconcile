@@ -39,6 +39,12 @@ jobs:
           # of the exact HEAD revision.
           fetch-depth: 0
 
+      - name: Ignore generated XLSX test evidence in CI metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '/.superpowers/sdd/2026-10-08-restricted-xlsx/evidence/task-6/' >> "$(git rev-parse --git-path info/exclude)"
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -119,6 +125,13 @@ jobs:
 
       - name: README acceptance smoke from fresh checkout
         run: node scripts/readme-smoke.mjs
+
+      - name: Verify source is clean before strict package validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --porcelain=v1 --untracked-files=all
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
       - name: Strict offline CSV + genuine XLSX package workflow (macOS)
         if: matrix.os == 'macos-15'
