@@ -192,7 +192,7 @@ test('mixed XLSX bundle restores its source identity after reset and keeps expli
   assert.equal(app.jobs.get(afterHashStart.body.job_id).state,'cancelling');releaseCandidate();
   const afterHashResponse=await afterHashCancel;assert.equal(afterHashResponse.status,200);const afterHashJob=await afterHashResponse.json();
   app.session.prepareAsset=originalPrepareAsset;
-  assert.equal(afterHashJob.job.state,'cancelled');assert.equal(hashed.sha256,sha(priorSource));
+  assert.equal(afterHashJob.job.state,'cancelled',JSON.stringify(afterHashJob.job.error));assert.equal(hashed.sha256,sha(priorSource));
   assert.deepEqual([...app.session.assets.keys()].sort(),beforeAfterHash.assets);assert.deepEqual([...app.session.imports.keys()].sort(),beforeAfterHash.imports);
   assert.deepEqual([...app.session.revisions.keys()].sort(),beforeAfterHash.revisions);assert.deepEqual([...app.session.heads],beforeAfterHash.heads);
   assert.equal(app.session.assets.has(hashedCandidate.asset_id),false);

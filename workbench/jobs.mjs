@@ -29,7 +29,7 @@ export async function createJobManager({session,workerPath=DEFAULT_WORKER,bridge
     let finish;record.done=new Promise(resolve=>finish=resolve);
     const valid=()=>!record.blocked&&!closed&&active===record&&job.state==='running'&&session.generation===record.generation;
     function stop(cause=null) {
-      if(!['running','cancelling'].includes(job.state))return;
+      if(job.state!=='running')return;
       record.blocked=true;record.cause??=cause;job.state='cancelling';record.candidate=null;
       if(record.child&&!record.exited) {
         record.child.kill('SIGTERM');

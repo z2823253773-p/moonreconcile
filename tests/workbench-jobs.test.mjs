@@ -19,7 +19,7 @@ async function setup(t, script, limits={}) {
 test('cancel_ignores_late_worker_result and cleans only after SIGKILL exit', async t=>{
   const {session,jobs}=await setup(t,`import fs from 'node:fs';process.on('SIGTERM',()=>{});process.on('message',m=>{fs.writeFileSync(m.task.paths.staging+'/alive','x');process.send({job_id:m.job_id,type:'result',output:{value:1}});setInterval(()=>{},20);});`,{kill_ms:70});
   let commits=0;const job=jobs.start('compare',{prepare:async({staging})=>({task:{kind:'compare',paths:{staging}},prepareOutput:async o=>({output:o,commit:()=>{commits++;}})})});
-  await wait(()=>job.phase==='publishing');const pending=jobs.cancel(job.job_id);assert.equal(job.state,'cancelling');await pending;
+  await wait(()=>job.phase==='publishing');const pending=jobs.cancel(job.job_id);assert.equal(job.state,'cancelling');const repeated=jobs.cancel(job.job_id);await Promise.all([pending,repeated]);
   assert.equal(job.state,'cancelled');assert.equal(commits,0);assert.equal(job.output,null);assert.equal(jobs.active,null);
   assert.equal((await fs.readdir(session.root)).some(x=>x.startsWith('job-')),false);
 });
@@ -28,6 +28,56 @@ test('cancellation during async publication cannot register a late candidate',as
   let release, entered=false, commits=0;const gate=new Promise(r=>release=r);
   const j=jobs.start('check',{prepare:async()=>({task:{},prepareOutput:async()=>{entered=true;await gate;return {output:{config_asset_id:'x'},commit:()=>commits++};}})});
   await wait(()=>entered);const cancelled=jobs.cancel(j.job_id);release();await cancelled;assert.equal(j.state,'cancelled');assert.equal(commits,0);
+});
+test('cancelled publication is not reclassified by an in-flight quota error during cleanup',async t=>{
+  const {session,jobs}=await setup(t,`process.on('message',m=>process.send({job_id:m.job_id,type:'result',output:{}},()=>process.disconnect()));`,{quota_poll_ms:10});
+  let releasePublication,releaseQuota,publicationEntered=false,quotaEntered=false,armed=false,commits=0,removed=false;
+  const publicationGate=new Promise(r=>releasePublication=r),quotaGate=new Promise(r=>releaseQuota=r);
+  const check=session.checkQuota.bind(session),remove=session.remove.bind(session);
+  session.checkQuota=async()=>{
+    if(armed&&!quotaEntered){quotaEntered=true;await quotaGate;throw Object.assign(new Error('staging disappeared during quota traversal'),{code:'ENOENT'});}
+    return check();
+  };
+  session.remove=async target=>{await remove(target);removed=true;releaseQuota();await new Promise(r=>setImmediate(r));};
+  try{
+    const j=jobs.start('restore',{prepare:async()=>({task:{},prepareOutput:async()=>{armed=true;publicationEntered=true;await publicationGate;return {output:{},commit:()=>commits++};}})});
+    await wait(()=>publicationEntered&&quotaEntered);
+    const cancelled=jobs.cancel(j.job_id);assert.equal(j.state,'cancelling');releasePublication();await cancelled;
+    assert.equal(j.state,'cancelled',JSON.stringify(j.error));assert.equal(j.error,null);assert.equal(j.output,null);assert.equal(commits,0);assert.equal(removed,true);
+    assert.equal(session.assets.size,0);assert.equal(session.imports.size,0);assert.equal(session.revisions.size,0);assert.equal(session.heads.size,0);assert.equal(jobs.active,null);
+    assert.equal((await fs.readdir(session.root)).some(name=>name.startsWith('job-')),false);
+  }finally{releasePublication();releaseQuota();}
+});
+test('first failure reason survives a subsequent user cancellation',async t=>{
+  for(const code of ['quota_exceeded','job_timeout'])await t.test(code,async t=>{
+    const {session,jobs}=await setup(t,`process.on('SIGTERM',()=>{});process.on('message',m=>{process.send({job_id:m.job_id,type:'phase',phase:'validating'});setInterval(()=>{},20);});`,{quota_poll_ms:10,kill_ms:200});
+    const check=session.checkQuota.bind(session);let rejectNext=false;
+    session.checkQuota=async()=>{if(rejectNext){rejectNext=false;throw Object.assign(new Error('first failure'),{code});}return check();};
+    const j=jobs.start('compare',{task:{paths:{}}});await wait(()=>j.phase==='validating');rejectNext=true;
+    await wait(()=>j.state==='cancelling');await jobs.cancel(j.job_id);
+    assert.equal(j.state,'failed');assert.equal(j.error.code,code);assert.equal(j.output,null);assert.equal(jobs.active,null);
+    assert.equal((await fs.readdir(session.root)).some(name=>name.startsWith('job-')),false);
+  });
+});
+test('user cancellation remains cancelled when its deadline expires during publication',async t=>{
+  const {jobs}=await setup(t,`process.on('message',m=>process.send({job_id:m.job_id,type:'result',output:{}},()=>process.disconnect()));`,{job_ms:5000});
+  let release,entered=false,commits=0;const gate=new Promise(r=>release=r);
+  try{
+    const j=jobs.start('check',{prepare:async()=>({task:{},prepareOutput:async()=>{entered=true;await gate;return {output:{},commit:()=>commits++};}})});
+    await wait(()=>entered);const cancelled=jobs.cancel(j.job_id);assert.equal(j.state,'cancelling');
+    await new Promise(r=>setTimeout(r,5100));release();await cancelled;
+    assert.equal(j.state,'cancelled',JSON.stringify(j.error));assert.equal(j.error,null);assert.equal(commits,0);
+  }finally{release();}
+});
+test('a real staging cleanup failure is still reported after user cancellation',async t=>{
+  const {session,jobs}=await setup(t,`process.on('message',m=>process.send({job_id:m.job_id,type:'result',output:{}},()=>process.disconnect()));`);
+  let release,entered=false,commits=0;const gate=new Promise(r=>release=r),marker=path.join(session.root,'.owner'),owner=await fs.readFile(marker);
+  try{
+    const j=jobs.start('check',{prepare:async()=>({task:{},prepareOutput:async()=>{entered=true;await gate;return {output:{},commit:()=>commits++};}})});
+    await wait(()=>entered);const cancelled=jobs.cancel(j.job_id);await fs.writeFile(marker,'foreign');release();await cancelled;
+    assert.equal(j.state,'failed');assert.equal(j.error.code,'ownership_failed');assert.equal(commits,0);assert.equal(j.output,null);assert.equal(jobs.active,null);
+    assert.equal((await fs.readdir(session.root)).some(name=>name.startsWith('job-')),true);
+  }finally{release();await fs.writeFile(marker,owner);}
 });
 test('timeout_and_quota_preserve_previous_revision',async t=>{
   for(const mode of ['timeout','quota']){
