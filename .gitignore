@@ -1,4 +1,11 @@
 .DS_Store
+.verify/
+__pycache__/
+*.py[cod]
+node_modules/
+dist/
+playwright-report/
+test-results/
 _build/
 target/
 .mooncakes/

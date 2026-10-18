@@ -1,0 +1,66 @@
+
+> moonreconcile@0.1.0 test:workbench:e2e
+> playwright test
+
+Finished. moon: no work to do
+
+Running 5 tests using 1 worker
+
+(node:30009) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✘  1 tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes (4ms)
+(node:30012) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✘  2 tests/e2e/workbench.spec.mjs:148:1 › catalog form threshold, core manual reason rejection, competing reject/accept/unmatched, conflict preservation and CSV replay (4ms)
+(node:30015) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✘  3 tests/e2e/workbench.spec.mjs:172:1 › HTML and long Chinese are text; malformed CSV and invalid config preserve precise locations (4ms)
+(node:30018) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✘  4 tests/e2e/workbench.spec.mjs:185:1 › real core compare cancellation preserves the last published report and releases all controls (4ms)
+(node:30021) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✘  5 tests/e2e/workbench.spec.mjs:196:1 › resource-limited comparison stays incomplete and exit 3 after UI review (4ms)
+
+
+  1) tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes
+
+    Error: listen EPERM: operation not permitted 127.0.0.1
+
+    Error Context: test-results/workbench-orders-blank-for-fa9f6-file-replay-match-CLI-bytes/error-context.md
+
+  2) tests/e2e/workbench.spec.mjs:148:1 › catalog form threshold, core manual reason rejection, competing reject/accept/unmatched, conflict preservation and CSV replay
+
+    Error: listen EPERM: operation not permitted 127.0.0.1
+
+    Error Context: test-results/workbench-catalog-form-thr-85001-preservation-and-CSV-replay/error-context.md
+
+  3) tests/e2e/workbench.spec.mjs:172:1 › HTML and long Chinese are text; malformed CSV and invalid config preserve precise locations
+
+    Error: listen EPERM: operation not permitted 127.0.0.1
+
+    Error Context: test-results/workbench-HTML-and-long-Ch-658a6--preserve-precise-locations/error-context.md
+
+  4) tests/e2e/workbench.spec.mjs:185:1 › real core compare cancellation preserves the last published report and releases all controls
+
+    Error: listen EPERM: operation not permitted 127.0.0.1
+
+    Error Context: test-results/workbench-real-core-compar-f3a29-t-and-releases-all-controls/error-context.md
+
+  5) tests/e2e/workbench.spec.mjs:196:1 › resource-limited comparison stays incomplete and exit 3 after UI review
+
+    Error: listen EPERM: operation not permitted 127.0.0.1
+
+    Error Context: test-results/workbench-resource-limited-971fc--and-exit-3-after-UI-review/error-context.md
+
+  5 failed
+    tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes
+    tests/e2e/workbench.spec.mjs:148:1 › catalog form threshold, core manual reason rejection, competing reject/accept/unmatched, conflict preservation and CSV replay
+    tests/e2e/workbench.spec.mjs:172:1 › HTML and long Chinese are text; malformed CSV and invalid config preserve precise locations
+    tests/e2e/workbench.spec.mjs:185:1 › real core compare cancellation preserves the last published report and releases all controls
+    tests/e2e/workbench.spec.mjs:196:1 › resource-limited comparison stays incomplete and exit 3 after UI review

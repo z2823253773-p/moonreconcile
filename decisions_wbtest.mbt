@@ -716,7 +716,10 @@ test "indexed_review_preserves_first_conflicting_record_and_reason_precedence" {
       "conflicting_decisions", 2,
     ),
   ]
-  for (csv, code, record) in cases {
+  for case in cases {
+    let csv = case.0
+    let code = case.1
+    let record = case.2
     match
       apply_decisions(
         base,

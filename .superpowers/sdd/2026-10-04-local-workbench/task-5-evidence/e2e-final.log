@@ -1,0 +1,18 @@
+
+> moonreconcile@0.1.0 test:workbench:e2e
+> playwright test
+
+Finished. moon: no work to do
+
+Running 5 tests using 1 worker
+
+(node:34714) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✓  1 tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes (6.7s)
+  ✓  2 tests/e2e/workbench.spec.mjs:148:1 › catalog form threshold, core manual reason rejection, competing reject/accept/unmatched, conflict preservation and CSV replay (5.6s)
+  ✓  3 tests/e2e/workbench.spec.mjs:172:1 › HTML and long Chinese are text; malformed CSV and invalid config preserve precise locations (2.3s)
+  ✓  4 tests/e2e/workbench.spec.mjs:185:1 › real core compare cancellation preserves the last published report and releases all controls (1.8s)
+  ✓  5 tests/e2e/workbench.spec.mjs:196:1 › resource-limited comparison stays incomplete and exit 3 after UI review (3.9s)
+
+  5 passed (21.0s)

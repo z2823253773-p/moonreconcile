@@ -1,0 +1,52 @@
+{
+  "version": "0.1.0",
+  "name": "moonreconcile",
+  "dependencies": {
+    "@playwright/test": {
+      "version": "1.63.0",
+      "resolved": "https://registry.npmjs.org/@playwright/test/-/test-1.63.0.tgz",
+      "overridden": false,
+      "dependencies": {
+        "playwright": {
+          "version": "1.63.0",
+          "resolved": "https://registry.npmjs.org/playwright/-/playwright-1.63.0.tgz",
+          "overridden": false,
+          "dependencies": {
+            "playwright-core": {
+              "version": "1.63.0",
+              "resolved": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.63.0.tgz",
+              "overridden": false
+            }
+          }
+        }
+      }
+    },
+    "buffer-crc32": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/buffer-crc32/-/buffer-crc32-1.0.0.tgz",
+      "overridden": false
+    },
+    "yauzl": {
+      "version": "3.4.0",
+      "resolved": "https://registry.npmjs.org/yauzl/-/yauzl-3.4.0.tgz",
+      "overridden": false,
+      "dependencies": {
+        "pend": {
+          "version": "1.2.0",
+          "resolved": "https://registry.npmjs.org/pend/-/pend-1.2.0.tgz",
+          "overridden": false
+        }
+      }
+    },
+    "yazl": {
+      "version": "3.3.1",
+      "resolved": "https://registry.npmjs.org/yazl/-/yazl-3.3.1.tgz",
+      "overridden": false,
+      "dependencies": {
+        "buffer-crc32": {
+          "version": "1.0.0"
+        }
+      }
+    }
+  }
+}

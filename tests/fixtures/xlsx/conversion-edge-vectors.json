@@ -1,0 +1,826 @@
+{
+  "schema_version": 1,
+  "label": "synthetic edge domain; original native fixtures remain unchanged",
+  "cases": [
+    {
+      "id": "fraction-0.5",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>0.5</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "error": {
+        "code": "xlsx_date_rejected",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "fraction-61.999",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>61.999</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "error": {
+        "code": "xlsx_date_rejected",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "invalid-stored-nan",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>NaN</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "error": {
+        "code": "xlsx_numeric_limit",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "invalid-stored-sign",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>-</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "error": {
+        "code": "xlsx_numeric_limit",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "leading-point",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>.5</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "decimal_lexeme"
+      ],
+      "csv": "id\n.5\n"
+    },
+    {
+      "id": "leading-exponent",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>1e00000000</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "decimal_lexeme"
+      ],
+      "csv": "id\n1\n"
+    },
+    {
+      "id": "exact53",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>9007199254740993</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "decimal_lexeme"
+      ],
+      "csv": "id\n9007199254740993\n"
+    },
+    {
+      "id": "exact30",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>123456789012345678901234567890</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "decimal_lexeme"
+      ],
+      "csv": "id\n123456789012345678901234567890\n"
+    },
+    {
+      "id": "date-integral",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>61.000</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "csv": "id\n1904-03-02\n"
+    },
+    {
+      "id": "date-exponent",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>6.1e1</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "csv": "id\n1904-03-02\n"
+    },
+    {
+      "id": "zero-long",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>123456</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "csv": "id\n123456\n"
+    },
+    {
+      "id": "zero-leading",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>00123</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "csv": "id\n00123\n"
+    },
+    {
+      "id": "zero-fraction-integral",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>123.0</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "csv": "id\n00123\n"
+    },
+    {
+      "id": "zero-exponent",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>1.23e2</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "csv": "id\n00123\n"
+    },
+    {
+      "id": "zero-plus",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>+123</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "csv": "id\n00123\n"
+    },
+    {
+      "id": "zero-format-257",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>1</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "error": {
+        "code": "xlsx_value_mode_mismatch",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      },
+      "format": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "builtin-zero-1",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>1</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "csv": "id\n1\n",
+      "builtin_zero": true
+    },
+    {
+      "id": "builtin-zero-123",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>123</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "csv": "id\n123\n",
+      "builtin_zero": true
+    },
+    {
+      "id": "absent-styles",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c></row><row r=\"7\"><c r=\"A7\"><v>1</v></c></row><row r=\"8\"></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 8,
+      "modes": [
+        "stored_text"
+      ],
+      "csv": "id\nx\n1\n\n",
+      "no_styles": true
+    },
+    {
+      "id": "header-inlineStr",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>_x0069_d</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "csv": "id\nx\n"
+    },
+    {
+      "id": "header-str",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"str\"><v>_x0069_d</v></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "csv": "id\nx\n"
+    },
+    {
+      "id": "header-s",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"s\"><v>0</v></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "csv": "id\nx\n",
+      "shared_xml": "<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><si><r><t>_x0069_</t></r><r><t>d</t></r><rPh sb=\"0\" eb=\"1\"><t>PHONETIC</t></rPh></si></sst>"
+    },
+    {
+      "id": "header-rich",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><r><t>_x0069_</t></r><r><t>d</t></r><rPh sb=\"0\" eb=\"1\"><t>PHONETIC</t></rPh></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "csv": "id\nx\n"
+    },
+    {
+      "id": "header-literal-once",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>_x005F_x0061_</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "csv": "_x0061_\nx\n"
+    },
+    {
+      "id": "header-surrogate",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>_xD800_</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "error": {
+        "code": "xlsx_value_mode_mismatch",
+        "phase": "xlsx",
+        "record": 5,
+        "field": "A5"
+      }
+    },
+    {
+      "id": "header-whitespace",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>_x0020_</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "error": {
+        "code": "invalid_header",
+        "phase": "input",
+        "record": 1,
+        "field": "column_1"
+      }
+    },
+    {
+      "id": "header-duplicate",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c><c r=\"B5\" t=\"inlineStr\"><is><t>_x0069_d</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c><c r=\"B6\" t=\"inlineStr\"><is><t>y</t></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 2,
+      "last_row": 6,
+      "modes": [
+        "stored_text",
+        "stored_text"
+      ],
+      "error": {
+        "code": "invalid_import_spec",
+        "phase": "xlsx",
+        "record": 5,
+        "field": null
+      }
+    },
+    {
+      "id": "origin-mode",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>text</t></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "decimal_lexeme"
+      ],
+      "error": {
+        "code": "xlsx_value_mode_mismatch",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "origin-numeric",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>1e65537</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "decimal_lexeme"
+      ],
+      "error": {
+        "code": "xlsx_numeric_limit",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "origin-text",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>_xD800_</t></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "error": {
+        "code": "xlsx_value_mode_mismatch",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "single-empty-column",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"></row><row r=\"7\"></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 7,
+      "modes": [
+        "stored_text"
+      ],
+      "csv": "id\n\n\n"
+    },
+    {
+      "id": "warnings",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\" hidden=\"true\"><c r=\"A5\" t=\"inlineStr\"><is><r><t>i</t></r><r><t>d</t></r><rPh sb=\"0\" eb=\"1\"><t>NO</t></rPh></is></c></row><row r=\"6\" hidden=\"true\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c><c r=\"B6\" t=\"inlineStr\"><is><t>outside</t></is></c></row><row r=\"7\"></row></sheetData><autoFilter ref=\"A5:A7\"/><mergeCells count=\"1\"><mergeCell ref=\"B8:C8\"/></mergeCells></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 7,
+      "modes": [
+        "stored_text"
+      ],
+      "csv": "id\nx\n\n",
+      "warnings": [
+        {
+          "code": "hidden_rows_included",
+          "count": 1
+        },
+        {
+          "code": "filtered_rows_included",
+          "count": 2
+        },
+        {
+          "code": "outside_range_value_cells",
+          "count": 1
+        },
+        {
+          "code": "outside_range_merges",
+          "count": 1
+        },
+        {
+          "code": "rich_text_formatting_ignored",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "lower-rows",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c><c r=\"B5\" t=\"inlineStr\"><is><t>second</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c><c r=\"B6\" t=\"inlineStr\"><is><t>y</t></is></c></row><row r=\"7\"></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 2,
+      "last_row": 7,
+      "modes": [
+        "stored_text",
+        "stored_text"
+      ],
+      "error": {
+        "code": "xlsx_limit_exceeded",
+        "phase": "xlsx",
+        "record": null,
+        "field": null
+      },
+      "limits": {
+        "data_rows": 1
+      },
+      "no_csv": true
+    },
+    {
+      "id": "lower-columns",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c><c r=\"B5\" t=\"inlineStr\"><is><t>second</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><t>x</t></is></c><c r=\"B6\" t=\"inlineStr\"><is><t>y</t></is></c></row><row r=\"7\"></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 2,
+      "last_row": 7,
+      "modes": [
+        "stored_text",
+        "stored_text"
+      ],
+      "error": {
+        "code": "xlsx_limit_exceeded",
+        "phase": "xlsx",
+        "record": null,
+        "field": null
+      },
+      "limits": {
+        "columns": 1
+      },
+      "no_csv": true
+    },
+    {
+      "id": "date-1900-0",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>0</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "csv": "id\n1899-12-31\n",
+      "date_system": "1900"
+    },
+    {
+      "id": "date-1900-59",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>59</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "csv": "id\n1900-02-28\n",
+      "date_system": "1900"
+    },
+    {
+      "id": "date-1900-60",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>60</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "date_system": "1900",
+      "error": {
+        "code": "xlsx_date_rejected",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "date-1900-61",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>61</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "csv": "id\n1900-03-01\n",
+      "date_system": "1900"
+    },
+    {
+      "id": "date-1900-2958465",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>2958465</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "csv": "id\n9999-12-31\n",
+      "date_system": "1900"
+    },
+    {
+      "id": "date-1900-2958466",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>2958466</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "date_system": "1900",
+      "error": {
+        "code": "xlsx_date_rejected",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "date-1904-2957003",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>2957003</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "csv": "id\n9999-12-31\n",
+      "date_system": "1904"
+    },
+    {
+      "id": "date-1904-2957004",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>2957004</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "date_system": "1904",
+      "error": {
+        "code": "xlsx_date_rejected",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "date-1904--1",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>-1</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "excel_date"
+      ],
+      "date_system": "1904",
+      "error": {
+        "code": "xlsx_date_rejected",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "zero-negative",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>-1</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "error": {
+        "code": "xlsx_value_mode_mismatch",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "zero-time",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>123.5</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "error": {
+        "code": "xlsx_value_mode_mismatch",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      }
+    },
+    {
+      "id": "zero-complex-format",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>123</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "error": {
+        "code": "xlsx_value_mode_mismatch",
+        "phase": "xlsx",
+        "record": 6,
+        "field": "A6"
+      },
+      "format": "000-00"
+    },
+    {
+      "id": "zero-width-256",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" s=\"2\"><v>+123</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "csv": "id\n0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000123\n",
+      "format": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "builtin-column-style",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><cols><col min=\"1\" max=\"1\" style=\"2\"/></cols><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>123</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "csv": "id\n123\n",
+      "builtin_zero": true
+    },
+    {
+      "id": "builtin-row-style",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\" s=\"2\"><c r=\"A6\"><v>123</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "zero_padded_identifier"
+      ],
+      "csv": "id\n123\n",
+      "builtin_zero": true
+    },
+    {
+      "id": "rich-data-csv",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\" t=\"inlineStr\"><is><r><t>雪,🙂&quot;_x000D_</t></r><r><t><![CDATA[\n&amp;]]></t></r><rPh sb=\"0\" eb=\"1\"><t>NO</t></rPh></is></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "csv": "id\n\"雪,🙂\"\"\r\n&amp;\"\n",
+      "warnings": [
+        {
+          "code": "rich_text_formatting_ignored",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "stored-exact-lexeme",
+      "label": "synthetic",
+      "sheet_xml": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"5\"><c r=\"A5\" t=\"inlineStr\"><is><t>id</t></is></c></row><row r=\"6\"><c r=\"A6\"><v>+001.2300e+2</v></c></row></sheetData></worksheet>",
+      "header_row": 5,
+      "column_start": 1,
+      "column_end": 1,
+      "last_row": 6,
+      "modes": [
+        "stored_text"
+      ],
+      "csv": "id\n+001.2300e+2\n"
+    }
+  ]
+}

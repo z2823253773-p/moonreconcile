@@ -1,0 +1,550 @@
+
+> moonreconcile@0.1.0 test:workbench
+> node --test tests/workbench-*.test.mjs
+
+✖ bundle export, reset, upload, CLI replay restore, and fresh local registration are atomic (11.276875ms)
+✖ restore asset quota precheck preserves every old registry entry and report (5.06075ms)
+✖ restore import quota precheck preserves every old registry entry and report (2.578541ms)
+✖ restore revision quota precheck preserves every old registry entry and report (2.849958ms)
+✖ final no-await restore latch rechecks asset capacity after a concurrent upload (9.144125ms)
+✖ self-consistent forged report fails HTTP restore without publishing any partial registry entries (13.532042ms)
+✖ reviewed ZIP restore creates a self-baseline retaining applied actions, and branch really re-compares (6.433791ms)
+✖ cancel actual bundle waits for child exit before owned cleanup and preserves old reports (12.683541ms)
+✖ cancel actual restore waits for child exit before owned cleanup and preserves old reports (8.916333ms)
+✔ writes the exact twelve-file whitelist and restores verified bytes (73.835916ms)
+✔ rejects duplicate, unsafe, aliased, unknown, directory, and non-file ZIP entries (349.175417ms)
+✔ rejects missing entries, schema/hash/size mismatch, encryption, corruption, and truncation (199.06725ms)
+✔ counts real decompressed bytes and enforces raw archive and per-entry caps (6.4485ms)
+✔ writer enforces compressed and decompressed caps and removes a partial archive (3.921166ms)
+✔ yauzl size validation does not replace the required streamed CRC comparison (21.922167ms)
+✔ bundle_roundtrip_cli_report_equal: CLI replay is byte-identical and self-consistent forged reports fail replay (169.331833ms)
+✔ all_config_v1_properties_round_trip (5.541542ms)
+✔ duplicate mapping keys are rejected without losing special keys (0.170459ms)
+✔ unknown core config keys remain core errors (0.146417ms)
+✔ changing a field type or deleting a field preserves tolerance text and references (0.190333ms)
+✔ strict integer controls do not reinterpret decimal notation (0.131792ms)
+✖ static app is fixed-whitelist and imports expose safe asset metadata (10.117208ms)
+✔ session token is removed from fragment and client rejects cross-origin destinations (1.605709ms)
+✔ edits stale old revisions, recheck keeps stale, and only compare clears it (0.121666ms)
+✔ strict DTO validation rejects field types, paths and malformed identifiers (0.885541ms)
+✔ orders_api_report_equals_cli; draft remains explicit and non-runnable (125.193833ms)
+✔ exit2 preserves six-field machine error and sanitizes paths and stacks (1.501625ms)
+✔ unknown task kinds cannot invoke engine (0.075459ms)
+✔ config asset matches CLI with leading document BOM (2.102084ms)
+✔ config asset matches CLI with interior mapping U+FEFF (1.699125ms)
+✔ malformed config asset retains invalid_json ErrorDTO code (0.881375ms)
+✔ cancel_ignores_late_worker_result and cleans only after SIGKILL exit (127.408209ms)
+✔ cancellation during async publication cannot register a late candidate (25.486ms)
+✔ timeout_and_quota_preserve_previous_revision (246.447625ms)
+✔ cleanup_refuses_foreign_or_symlink_root (1.728125ms)
+✔ shared reservations reject upload/job overcommit and reset active writes (1.762292ms)
+✔ worker preview output cannot leak internal paths or omit the DTO (33.207125ms)
+✔ ownership marker symlink is never followed for cleanup (0.980541ms)
+✔ manager reset refuses active jobs and clears metadata only after owned reset (2.859ms)
+✔ cumulative decision CSV preserves four columns, reason text and exact tuple order (0.310167ms)
+✔ decision subset identity is collision free for delimiter-containing tuple values (0.275042ms)
+✖ orders_review_preserves_differences and revision_id differs while run_id stays (11.850917ms)
+✖ catalog_can_reject_top_and_accept_competitor without accepting highest score by default (5.802125ms)
+✖ imported_decisions_are_append_only uses complete tuples and detects noncumulative input (5.03175ms)
+✖ whole conflict batch publishes no revision and stale base is rejected (8.175125ms)
+✖ branch recomputes original baseline into a distinct revision and clears decisions (9.674625ms)
+✖ exact key pairs stay locked by the core and manual outside-candidate accept needs a reason (6.909875ms)
+✖ 101 by 101 incomplete review stays exit 3 (8.137791ms)
+✖ cumulative decisions export reimports to byte-identical report (7.975667ms)
+✖ cancelling a real resolve preserves the old revision hash and registry (6.144209ms)
+✖ server exposes capability and enforces token/origin/host (19.559208ms)
+✖ asset upload enforces raw byte limit before publishing (7.204667ms)
+✖ real examples, draft/check binding, exports, summary, collections, cells and reset (7.710584ms)
+✖ rejects_stream_over_limit_without_length and disconnect_leaves_no_asset (7.862083ms)
+✖ 0/1/3 have Result revisions; exit2 never publishes and previous hash remains (7.916042ms)
+✖ wide preview shrinks whole rows before Job publication; no half import fits (1.965333ms)
+✖ oversize evidence item exposes full same-origin export and summary points to report (3.521917ms)
+✖ large config asset bypasses orchestration cap and exports canonical bytes (3.9225ms)
+✖ upload timeout and close abort writers before owned cleanup (6.117667ms)
+✖ health stays responsive during synchronous child work; job busy and cancellation are real (15.970875ms)
+✖ private runtime permissions, strict schemas/queries and unsupported routes (7.975667ms)
+✖ anonymous fixed static navigation accepts none but API and cross-site checks stay strict (6.748ms)
+✖ successful reset clears old jobs and replenishes metadata quota (1.633042ms)
+✖ failed owned reset preserves old job metadata (1.462583ms)
+✖ close aborts unfinished JSON readers and prevents late job/reset work (6.343625ms)
+✔ candidate scoring and the 49-to-50 mapping boundary remain reachable (31.666416ms)
+✔ validated rules list unmapped columns and transformations, then hide binding on edit (1.043334ms)
+✔ late compare and summary responses cannot clear stale edits (29.639875ms)
+✔ replacing an example side displays the uploaded filename and clears the blanket example label (2.027958ms)
+✔ a delayed canonical-config download cannot validate a rule edited while waiting (3.245583ms)
+✔ drag and drop cannot replace a source during a global job (0.162083ms)
+✔ blank missing markers remain editable and clearing ignore lists creates empty arrays (1.055708ms)
+✔ draft download stores canonical Config while the form keeps editable mapping rows locally (1.005ms)
+✔ successful check stores canonical mappings and unrelated edits recheck to the same core result (8.414833ms)
+✔ successful raw Config JSON import keeps canonical special mappings and blank missing marker (1.55675ms)
+✔ invalid duplicate mapping stays local and can be fixed before lossless recheck (3.643041ms)
+✔ result evidence reads source cells for paired records and keeps exact-pair locks across collection pages (1.58375ms)
+✔ short API pages advance by next_offset and previous returns to the recorded offset (1.114917ms)
+✔ source generation clears only unapplied review drafts and a stale current head can branch back to its bound inputs (1.218708ms)
+✔ successful review registers its head even if history selection changes while waiting (4.375375ms)
+✔ successful branch registers its head even if history selection changes while waiting (2.544833ms)
+✔ uploaded invalid decision CSV displays structured location and keeps the pending draft and parent revision (4.15375ms)
+✔ uploaded invalid_row_width preserves core record numbering without assuming decision data rows (2.831209ms)
+✔ uploaded invalid_header preserves core record numbering without assuming decision data rows (2.428125ms)
+✔ uploaded input_limit_exceeded preserves core record numbering without assuming decision data rows (5.534958ms)
+✔ uploaded future_decision_failure preserves core record numbering without assuming decision data rows (2.137792ms)
+✔ cancelled review and failed branch display their safe structured job details (1.887583ms)
+✔ result rerenders preserve active-job disabling for unlocked review actions (2.137083ms)
+✔ exact-pair accept/reject remain locked through unrelated updates and a failed review cleanup (3.788708ms)
+✔ exact-pair review actions stay disabled while lock loading fails (2.301834ms)
+✔ removing a pending action immediately updates the immutable-export notice state (2.252917ms)
+✔ revision input binding normalizes empty selection and keeps the outer lock through visible binding (1.923792ms)
+✔ revision input binding normalizes empty selection and preserves a late history choice (1.749541ms)
+✔ ZIP export owns the shared lock through download and reports pending drafts without bundling them (3.061959ms)
+ℹ tests 94
+ℹ suites 0
+ℹ pass 60
+ℹ fail 34
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 870.938958
+
+✖ failing tests:
+
+test at tests/workbench-archive-host.test.mjs:27:1
+✖ bundle export, reset, upload, CLI replay restore, and fresh local registration are atomic (11.276875ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-archive-host.test.mjs:52:1
+✖ restore asset quota precheck preserves every old registry entry and report (5.06075ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-archive-host.test.mjs:53:1
+✖ restore import quota precheck preserves every old registry entry and report (2.578541ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-archive-host.test.mjs:54:1
+✖ restore revision quota precheck preserves every old registry entry and report (2.849958ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-archive-host.test.mjs:56:1
+✖ final no-await restore latch rechecks asset capacity after a concurrent upload (9.144125ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-archive-host.test.mjs:68:1
+✖ self-consistent forged report fails HTTP restore without publishing any partial registry entries (13.532042ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-archive-host.test.mjs:92:1
+✖ reviewed ZIP restore creates a self-baseline retaining applied actions, and branch really re-compares (6.433791ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-archive-host.test.mjs:107:40
+✖ cancel actual bundle waits for child exit before owned cleanup and preserves old reports (12.683541ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-archive-host.test.mjs:107:40
+✖ cancel actual restore waits for child exit before owned cleanup and preserves old reports (8.916333ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-config.test.mjs:78:1
+✖ static app is fixed-whitelist and imports expose safe asset metadata (10.117208ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-review.test.mjs:37:1
+✖ orders_review_preserves_differences and revision_id differs while run_id stays (11.850917ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-review.test.mjs:56:1
+✖ catalog_can_reject_top_and_accept_competitor without accepting highest score by default (5.802125ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-review.test.mjs:72:1
+✖ imported_decisions_are_append_only uses complete tuples and detects noncumulative input (5.03175ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-review.test.mjs:85:1
+✖ whole conflict batch publishes no revision and stale base is rejected (8.175125ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-review.test.mjs:103:1
+✖ branch recomputes original baseline into a distinct revision and clears decisions (9.674625ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-review.test.mjs:116:1
+✖ exact key pairs stay locked by the core and manual outside-candidate accept needs a reason (6.909875ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-review.test.mjs:137:1
+✖ 101 by 101 incomplete review stays exit 3 (8.137791ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-review.test.mjs:151:1
+✖ cumulative decisions export reimports to byte-identical report (7.975667ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-review.test.mjs:166:1
+✖ cancelling a real resolve preserves the old revision hash and registry (6.144209ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:6:1
+✖ server exposes capability and enforces token/origin/host (19.559208ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:23:1
+✖ asset upload enforces raw byte limit before publishing (7.204667ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:31:1
+✖ real examples, draft/check binding, exports, summary, collections, cells and reset (7.710584ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:48:1
+✖ rejects_stream_over_limit_without_length and disconnect_leaves_no_asset (7.862083ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:67:1
+✖ 0/1/3 have Result revisions; exit2 never publishes and previous hash remains (7.916042ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:80:1
+✖ wide preview shrinks whole rows before Job publication; no half import fits (1.965333ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:87:1
+✖ oversize evidence item exposes full same-origin export and summary points to report (3.521917ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:95:1
+✖ large config asset bypasses orchestration cap and exports canonical bytes (3.9225ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:102:1
+✖ upload timeout and close abort writers before owned cleanup (6.117667ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:107:1
+✖ health stays responsive during synchronous child work; job busy and cancellation are real (15.970875ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:118:1
+✖ private runtime permissions, strict schemas/queries and unsupported routes (7.975667ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:130:1
+✖ anonymous fixed static navigation accepts none but API and cross-site checks stay strict (6.748ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:142:1
+✖ successful reset clears old jobs and replenishes metadata quota (1.633042ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:148:1
+✖ failed owned reset preserves old job metadata (1.462583ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+test at tests/workbench-server.test.mjs:152:1
+✖ close aborts unfinished JSON readers and prevents late job/reset work (6.343625ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1986:21)
+      at listenInCluster (node:net:2065:12)
+      at node:net:2274:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }

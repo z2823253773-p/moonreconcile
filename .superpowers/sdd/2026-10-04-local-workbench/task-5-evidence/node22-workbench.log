@@ -1,0 +1,604 @@
+TAP version 13
+# Subtest: bundle export, reset, upload, CLI replay restore, and fresh local registration are atomic
+ok 1 - bundle export, reset, upload, CLI replay restore, and fresh local registration are atomic
+  ---
+  duration_ms: 780.701583
+  type: 'test'
+  ...
+# Subtest: restore asset quota precheck preserves every old registry entry and report
+ok 2 - restore asset quota precheck preserves every old registry entry and report
+  ---
+  duration_ms: 686.9405
+  type: 'test'
+  ...
+# Subtest: restore import quota precheck preserves every old registry entry and report
+ok 3 - restore import quota precheck preserves every old registry entry and report
+  ---
+  duration_ms: 618.931292
+  type: 'test'
+  ...
+# Subtest: restore revision quota precheck preserves every old registry entry and report
+ok 4 - restore revision quota precheck preserves every old registry entry and report
+  ---
+  duration_ms: 465.617417
+  type: 'test'
+  ...
+# Subtest: final no-await restore latch rechecks asset capacity after a concurrent upload
+ok 5 - final no-await restore latch rechecks asset capacity after a concurrent upload
+  ---
+  duration_ms: 5354.136083
+  type: 'test'
+  ...
+# Subtest: self-consistent forged report fails HTTP restore without publishing any partial registry entries
+ok 6 - self-consistent forged report fails HTTP restore without publishing any partial registry entries
+  ---
+  duration_ms: 549.765458
+  type: 'test'
+  ...
+# Subtest: reviewed ZIP restore creates a self-baseline retaining applied actions, and branch really re-compares
+ok 7 - reviewed ZIP restore creates a self-baseline retaining applied actions, and branch really re-compares
+  ---
+  duration_ms: 868.415041
+  type: 'test'
+  ...
+# Subtest: cancel actual bundle waits for child exit before owned cleanup and preserves old reports
+ok 8 - cancel actual bundle waits for child exit before owned cleanup and preserves old reports
+  ---
+  duration_ms: 297.383125
+  type: 'test'
+  ...
+# Subtest: cancel actual restore waits for child exit before owned cleanup and preserves old reports
+ok 9 - cancel actual restore waits for child exit before owned cleanup and preserves old reports
+  ---
+  duration_ms: 337.508917
+  type: 'test'
+  ...
+# Subtest: bundle worker honors the configured zip_bytes cap and preserves the published run
+ok 10 - bundle worker honors the configured zip_bytes cap and preserves the published run
+  ---
+  duration_ms: 232.524833
+  type: 'test'
+  ...
+# Subtest: bundle worker honors the configured unzip_bytes cap and preserves the published run
+ok 11 - bundle worker honors the configured unzip_bytes cap and preserves the published run
+  ---
+  duration_ms: 198.901333
+  type: 'test'
+  ...
+# Subtest: writes the exact twelve-file whitelist and restores verified bytes
+ok 12 - writes the exact twelve-file whitelist and restores verified bytes
+  ---
+  duration_ms: 152.780792
+  type: 'test'
+  ...
+# Subtest: rejects duplicate, unsafe, aliased, unknown, directory, and non-file ZIP entries
+ok 13 - rejects duplicate, unsafe, aliased, unknown, directory, and non-file ZIP entries
+  ---
+  duration_ms: 1156.930958
+  type: 'test'
+  ...
+# Subtest: rejects missing entries, schema/hash/size mismatch, encryption, corruption, and truncation
+ok 14 - rejects missing entries, schema/hash/size mismatch, encryption, corruption, and truncation
+  ---
+  duration_ms: 647.108292
+  type: 'test'
+  ...
+# Subtest: counts real decompressed bytes and enforces raw archive and per-entry caps
+ok 15 - counts real decompressed bytes and enforces raw archive and per-entry caps
+  ---
+  duration_ms: 26.11925
+  type: 'test'
+  ...
+# Subtest: writer enforces compressed and decompressed caps and removes a partial archive
+ok 16 - writer enforces compressed and decompressed caps and removes a partial archive
+  ---
+  duration_ms: 17.148458
+  type: 'test'
+  ...
+# Subtest: yauzl size validation does not replace the required streamed CRC comparison
+ok 17 - yauzl size validation does not replace the required streamed CRC comparison
+  ---
+  duration_ms: 126.445
+  type: 'test'
+  ...
+# Subtest: bundle_roundtrip_cli_report_equal: CLI replay is byte-identical and self-consistent forged reports fail replay
+ok 18 - bundle_roundtrip_cli_report_equal: CLI replay is byte-identical and self-consistent forged reports fail replay
+  ---
+  duration_ms: 414.014084
+  type: 'test'
+  ...
+# Subtest: all_config_v1_properties_round_trip
+ok 19 - all_config_v1_properties_round_trip
+  ---
+  duration_ms: 5.050458
+  type: 'test'
+  ...
+# Subtest: duplicate mapping keys are rejected without losing special keys
+ok 20 - duplicate mapping keys are rejected without losing special keys
+  ---
+  duration_ms: 0.473
+  type: 'test'
+  ...
+# Subtest: unknown core config keys remain core errors
+ok 21 - unknown core config keys remain core errors
+  ---
+  duration_ms: 0.390791
+  type: 'test'
+  ...
+# Subtest: changing a field type or deleting a field preserves tolerance text and references
+ok 22 - changing a field type or deleting a field preserves tolerance text and references
+  ---
+  duration_ms: 16.638166
+  type: 'test'
+  ...
+# Subtest: strict integer controls do not reinterpret decimal notation
+ok 23 - strict integer controls do not reinterpret decimal notation
+  ---
+  duration_ms: 0.446458
+  type: 'test'
+  ...
+# Subtest: static app is fixed-whitelist and imports expose safe asset metadata
+ok 24 - static app is fixed-whitelist and imports expose safe asset metadata
+  ---
+  duration_ms: 180.102833
+  type: 'test'
+  ...
+# Subtest: session token is removed from fragment and client rejects cross-origin destinations
+ok 25 - session token is removed from fragment and client rejects cross-origin destinations
+  ---
+  duration_ms: 0.985208
+  type: 'test'
+  ...
+# Subtest: edits stale old revisions, recheck keeps stale, and only compare clears it
+ok 26 - edits stale old revisions, recheck keeps stale, and only compare clears it
+  ---
+  duration_ms: 0.35375
+  type: 'test'
+  ...
+# Subtest: strict DTO validation rejects field types, paths and malformed identifiers
+ok 27 - strict DTO validation rejects field types, paths and malformed identifiers
+  ---
+  duration_ms: 0.493583
+  type: 'test'
+  ...
+# Subtest: orders_api_report_equals_cli; draft remains explicit and non-runnable
+ok 28 - orders_api_report_equals_cli; draft remains explicit and non-runnable
+  ---
+  duration_ms: 211.570208
+  type: 'test'
+  ...
+# Subtest: exit2 preserves six-field machine error and sanitizes paths and stacks
+ok 29 - exit2 preserves six-field machine error and sanitizes paths and stacks
+  ---
+  duration_ms: 6.895209
+  type: 'test'
+  ...
+# Subtest: unknown task kinds cannot invoke engine
+ok 30 - unknown task kinds cannot invoke engine
+  ---
+  duration_ms: 0.137458
+  type: 'test'
+  ...
+# Subtest: config asset matches CLI with leading document BOM
+ok 31 - config asset matches CLI with leading document BOM
+  ---
+  duration_ms: 35.477875
+  type: 'test'
+  ...
+# Subtest: config asset matches CLI with interior mapping U+FEFF
+ok 32 - config asset matches CLI with interior mapping U+FEFF
+  ---
+  duration_ms: 41.45375
+  type: 'test'
+  ...
+# Subtest: malformed config asset retains invalid_json ErrorDTO code
+ok 33 - malformed config asset retains invalid_json ErrorDTO code
+  ---
+  duration_ms: 30.547375
+  type: 'test'
+  ...
+# Subtest: cancel_ignores_late_worker_result and cleans only after SIGKILL exit
+ok 34 - cancel_ignores_late_worker_result and cleans only after SIGKILL exit
+  ---
+  duration_ms: 129.082875
+  type: 'test'
+  ...
+# Subtest: cancellation during async publication cannot register a late candidate
+ok 35 - cancellation during async publication cannot register a late candidate
+  ---
+  duration_ms: 67.004
+  type: 'test'
+  ...
+# Subtest: timeout_and_quota_preserve_previous_revision
+ok 36 - timeout_and_quota_preserve_previous_revision
+  ---
+  duration_ms: 527.923667
+  type: 'test'
+  ...
+# Subtest: cleanup_refuses_foreign_or_symlink_root
+ok 37 - cleanup_refuses_foreign_or_symlink_root
+  ---
+  duration_ms: 46.798083
+  type: 'test'
+  ...
+# Subtest: shared reservations reject upload/job overcommit and reset active writes
+ok 38 - shared reservations reject upload/job overcommit and reset active writes
+  ---
+  duration_ms: 22.961667
+  type: 'test'
+  ...
+# Subtest: worker preview output cannot leak internal paths or omit the DTO
+ok 39 - worker preview output cannot leak internal paths or omit the DTO
+  ---
+  duration_ms: 58.813541
+  type: 'test'
+  ...
+# Subtest: ownership marker symlink is never followed for cleanup
+ok 40 - ownership marker symlink is never followed for cleanup
+  ---
+  duration_ms: 17.779417
+  type: 'test'
+  ...
+# Subtest: manager reset refuses active jobs and clears metadata only after owned reset
+ok 41 - manager reset refuses active jobs and clears metadata only after owned reset
+  ---
+  duration_ms: 19.105666
+  type: 'test'
+  ...
+# Subtest: cumulative decision CSV preserves four columns, reason text and exact tuple order
+ok 42 - cumulative decision CSV preserves four columns, reason text and exact tuple order
+  ---
+  duration_ms: 0.571958
+  type: 'test'
+  ...
+# Subtest: decision subset identity is collision free for delimiter-containing tuple values
+ok 43 - decision subset identity is collision free for delimiter-containing tuple values
+  ---
+  duration_ms: 0.482458
+  type: 'test'
+  ...
+# Subtest: orders_review_preserves_differences and revision_id differs while run_id stays
+ok 44 - orders_review_preserves_differences and revision_id differs while run_id stays
+  ---
+  duration_ms: 579.902375
+  type: 'test'
+  ...
+# Subtest: catalog_can_reject_top_and_accept_competitor without accepting highest score by default
+ok 45 - catalog_can_reject_top_and_accept_competitor without accepting highest score by default
+  ---
+  duration_ms: 489.657208
+  type: 'test'
+  ...
+# Subtest: imported_decisions_are_append_only uses complete tuples and detects noncumulative input
+ok 46 - imported_decisions_are_append_only uses complete tuples and detects noncumulative input
+  ---
+  duration_ms: 685.705458
+  type: 'test'
+  ...
+# Subtest: whole conflict batch publishes no revision and stale base is rejected
+ok 47 - whole conflict batch publishes no revision and stale base is rejected
+  ---
+  duration_ms: 463.499416
+  type: 'test'
+  ...
+# Subtest: branch recomputes original baseline into a distinct revision and clears decisions
+ok 48 - branch recomputes original baseline into a distinct revision and clears decisions
+  ---
+  duration_ms: 475.959375
+  type: 'test'
+  ...
+# Subtest: exact key pairs stay locked by the core and manual outside-candidate accept needs a reason
+ok 49 - exact key pairs stay locked by the core and manual outside-candidate accept needs a reason
+  ---
+  duration_ms: 585.612791
+  type: 'test'
+  ...
+# Subtest: 101 by 101 incomplete review stays exit 3
+ok 50 - 101 by 101 incomplete review stays exit 3
+  ---
+  duration_ms: 695.309459
+  type: 'test'
+  ...
+# Subtest: cumulative decisions export reimports to byte-identical report
+ok 51 - cumulative decisions export reimports to byte-identical report
+  ---
+  duration_ms: 462.383042
+  type: 'test'
+  ...
+# Subtest: cancelling a real resolve preserves the old revision hash and registry
+ok 52 - cancelling a real resolve preserves the old revision hash and registry
+  ---
+  duration_ms: 3197.591625
+  type: 'test'
+  ...
+# Subtest: server exposes capability and enforces token/origin/host
+ok 53 - server exposes capability and enforces token/origin/host
+  ---
+  duration_ms: 30.953541
+  type: 'test'
+  ...
+# Subtest: asset upload enforces raw byte limit before publishing
+ok 54 - asset upload enforces raw byte limit before publishing
+  ---
+  duration_ms: 37.304
+  type: 'test'
+  ...
+# Subtest: real examples, draft/check binding, exports, summary, collections, cells and reset
+ok 55 - real examples, draft/check binding, exports, summary, collections, cells and reset
+  ---
+  duration_ms: 536.469667
+  type: 'test'
+  ...
+# Subtest: rejects_stream_over_limit_without_length and disconnect_leaves_no_asset
+ok 56 - rejects_stream_over_limit_without_length and disconnect_leaves_no_asset
+  ---
+  duration_ms: 160.957542
+  type: 'test'
+  ...
+# Subtest: 0/1/3 have Result revisions; exit2 never publishes and previous hash remains
+ok 57 - 0/1/3 have Result revisions; exit2 never publishes and previous hash remains
+  ---
+  duration_ms: 1049.951625
+  type: 'test'
+  ...
+# Subtest: wide preview shrinks whole rows before Job publication; no half import fits
+ok 58 - wide preview shrinks whole rows before Job publication; no half import fits
+  ---
+  duration_ms: 215.086583
+  type: 'test'
+  ...
+# Subtest: oversize evidence item exposes full same-origin export and summary points to report
+ok 59 - oversize evidence item exposes full same-origin export and summary points to report
+  ---
+  duration_ms: 406.370625
+  type: 'test'
+  ...
+# Subtest: large config asset bypasses orchestration cap and exports canonical bytes
+ok 60 - large config asset bypasses orchestration cap and exports canonical bytes
+  ---
+  duration_ms: 221.757042
+  type: 'test'
+  ...
+# Subtest: upload timeout and close abort writers before owned cleanup
+ok 61 - upload timeout and close abort writers before owned cleanup
+  ---
+  duration_ms: 146.752833
+  type: 'test'
+  ...
+# Subtest: health stays responsive during synchronous child work; job busy and cancellation are real
+ok 62 - health stays responsive during synchronous child work; job busy and cancellation are real
+  ---
+  duration_ms: 88.827666
+  type: 'test'
+  ...
+# Subtest: private runtime permissions, strict schemas/queries and unsupported routes
+ok 63 - private runtime permissions, strict schemas/queries and unsupported routes
+  ---
+  duration_ms: 334.083459
+  type: 'test'
+  ...
+# Subtest: anonymous fixed static navigation accepts none but API and cross-site checks stay strict
+ok 64 - anonymous fixed static navigation accepts none but API and cross-site checks stay strict
+  ---
+  duration_ms: 6.172958
+  type: 'test'
+  ...
+# Subtest: successful reset clears old jobs and replenishes metadata quota
+ok 65 - successful reset clears old jobs and replenishes metadata quota
+  ---
+  duration_ms: 118.282833
+  type: 'test'
+  ...
+# Subtest: failed owned reset preserves old job metadata
+ok 66 - failed owned reset preserves old job metadata
+  ---
+  duration_ms: 64.523333
+  type: 'test'
+  ...
+# Subtest: close aborts unfinished JSON readers and prevents late job/reset work
+ok 67 - close aborts unfinished JSON readers and prevents late job/reset work
+  ---
+  duration_ms: 46.32075
+  type: 'test'
+  ...
+# Subtest: chunked oversized JSON returns its 413 DTO and leaves the next request usable
+ok 68 - chunked oversized JSON returns its 413 DTO and leaves the next request usable
+  ---
+  duration_ms: 3.26825
+  type: 'test'
+  ...
+# Subtest: candidate scoring and the 49-to-50 mapping boundary remain reachable
+ok 69 - candidate scoring and the 49-to-50 mapping boundary remain reachable
+  ---
+  duration_ms: 96.330542
+  type: 'test'
+  ...
+# Subtest: validated rules list unmapped columns and transformations, then hide binding on edit
+ok 70 - validated rules list unmapped columns and transformations, then hide binding on edit
+  ---
+  duration_ms: 0.732209
+  type: 'test'
+  ...
+# Subtest: late compare and summary responses cannot clear stale edits
+ok 71 - late compare and summary responses cannot clear stale edits
+  ---
+  duration_ms: 69.624584
+  type: 'test'
+  ...
+# Subtest: replacing an example side displays the uploaded filename and clears the blanket example label
+ok 72 - replacing an example side displays the uploaded filename and clears the blanket example label
+  ---
+  duration_ms: 2.528125
+  type: 'test'
+  ...
+# Subtest: a delayed canonical-config download cannot validate a rule edited while waiting
+ok 73 - a delayed canonical-config download cannot validate a rule edited while waiting
+  ---
+  duration_ms: 3.866458
+  type: 'test'
+  ...
+# Subtest: drag and drop cannot replace a source during a global job
+ok 74 - drag and drop cannot replace a source during a global job
+  ---
+  duration_ms: 0.315208
+  type: 'test'
+  ...
+# Subtest: blank missing markers remain editable and clearing ignore lists creates empty arrays
+ok 75 - blank missing markers remain editable and clearing ignore lists creates empty arrays
+  ---
+  duration_ms: 1.643417
+  type: 'test'
+  ...
+# Subtest: draft download stores canonical Config while the form keeps editable mapping rows locally
+ok 76 - draft download stores canonical Config while the form keeps editable mapping rows locally
+  ---
+  duration_ms: 0.985875
+  type: 'test'
+  ...
+# Subtest: successful check stores canonical mappings and unrelated edits recheck to the same core result
+ok 77 - successful check stores canonical mappings and unrelated edits recheck to the same core result
+  ---
+  duration_ms: 11.464541
+  type: 'test'
+  ...
+# Subtest: successful raw Config JSON import keeps canonical special mappings and blank missing marker
+ok 78 - successful raw Config JSON import keeps canonical special mappings and blank missing marker
+  ---
+  duration_ms: 5.542917
+  type: 'test'
+  ...
+# Subtest: invalid duplicate mapping stays local and can be fixed before lossless recheck
+ok 79 - invalid duplicate mapping stays local and can be fixed before lossless recheck
+  ---
+  duration_ms: 5.402166
+  type: 'test'
+  ...
+# Subtest: result evidence reads source cells for paired records and keeps exact-pair locks across collection pages
+ok 80 - result evidence reads source cells for paired records and keeps exact-pair locks across collection pages
+  ---
+  duration_ms: 3.907125
+  type: 'test'
+  ...
+# Subtest: short API pages advance by next_offset and previous returns to the recorded offset
+ok 81 - short API pages advance by next_offset and previous returns to the recorded offset
+  ---
+  duration_ms: 2.406
+  type: 'test'
+  ...
+# Subtest: source generation clears only unapplied review drafts and a stale current head can branch back to its bound inputs
+ok 82 - source generation clears only unapplied review drafts and a stale current head can branch back to its bound inputs
+  ---
+  duration_ms: 1.55825
+  type: 'test'
+  ...
+# Subtest: successful review registers its head even if history selection changes while waiting
+ok 83 - successful review registers its head even if history selection changes while waiting
+  ---
+  duration_ms: 4.8705
+  type: 'test'
+  ...
+# Subtest: successful branch registers its head even if history selection changes while waiting
+ok 84 - successful branch registers its head even if history selection changes while waiting
+  ---
+  duration_ms: 1.776791
+  type: 'test'
+  ...
+# Subtest: uploaded invalid decision CSV displays structured location and keeps the pending draft and parent revision
+ok 85 - uploaded invalid decision CSV displays structured location and keeps the pending draft and parent revision
+  ---
+  duration_ms: 6.981958
+  type: 'test'
+  ...
+# Subtest: uploaded invalid_row_width preserves core record numbering without assuming decision data rows
+ok 86 - uploaded invalid_row_width preserves core record numbering without assuming decision data rows
+  ---
+  duration_ms: 3.524541
+  type: 'test'
+  ...
+# Subtest: uploaded invalid_header preserves core record numbering without assuming decision data rows
+ok 87 - uploaded invalid_header preserves core record numbering without assuming decision data rows
+  ---
+  duration_ms: 1.359209
+  type: 'test'
+  ...
+# Subtest: uploaded input_limit_exceeded preserves core record numbering without assuming decision data rows
+ok 88 - uploaded input_limit_exceeded preserves core record numbering without assuming decision data rows
+  ---
+  duration_ms: 10.701458
+  type: 'test'
+  ...
+# Subtest: uploaded future_decision_failure preserves core record numbering without assuming decision data rows
+ok 89 - uploaded future_decision_failure preserves core record numbering without assuming decision data rows
+  ---
+  duration_ms: 3.008333
+  type: 'test'
+  ...
+# Subtest: cancelled review and failed branch display their safe structured job details
+ok 90 - cancelled review and failed branch display their safe structured job details
+  ---
+  duration_ms: 5.17775
+  type: 'test'
+  ...
+# Subtest: result rerenders preserve active-job disabling for unlocked review actions
+ok 91 - result rerenders preserve active-job disabling for unlocked review actions
+  ---
+  duration_ms: 4.339167
+  type: 'test'
+  ...
+# Subtest: exact-pair accept/reject remain locked through unrelated updates and a failed review cleanup
+ok 92 - exact-pair accept/reject remain locked through unrelated updates and a failed review cleanup
+  ---
+  duration_ms: 3.714125
+  type: 'test'
+  ...
+# Subtest: exact-pair review actions stay disabled while lock loading fails
+ok 93 - exact-pair review actions stay disabled while lock loading fails
+  ---
+  duration_ms: 3.152
+  type: 'test'
+  ...
+# Subtest: removing a pending action immediately updates the immutable-export notice state
+ok 94 - removing a pending action immediately updates the immutable-export notice state
+  ---
+  duration_ms: 1.548541
+  type: 'test'
+  ...
+# Subtest: revision input binding normalizes empty selection and keeps the outer lock through visible binding
+ok 95 - revision input binding normalizes empty selection and keeps the outer lock through visible binding
+  ---
+  duration_ms: 2.205833
+  type: 'test'
+  ...
+# Subtest: revision input binding normalizes empty selection and preserves a late history choice
+ok 96 - revision input binding normalizes empty selection and preserves a late history choice
+  ---
+  duration_ms: 2.035583
+  type: 'test'
+  ...
+# Subtest: ZIP export owns the shared lock through download and reports pending drafts without bundling them
+ok 97 - ZIP export owns the shared lock through download and reports pending drafts without bundling them
+  ---
+  duration_ms: 3.262625
+  type: 'test'
+  ...
+# Subtest: cancelled compare restores the previous visible summary and keeps its download revision
+ok 98 - cancelled compare restores the previous visible summary and keeps its download revision
+  ---
+  duration_ms: 8.77625
+  type: 'test'
+  ...
+# Subtest: source transition clears the task label when the global job finishes while review stays stale
+ok 99 - source transition clears the task label when the global job finishes while review stays stale
+  ---
+  duration_ms: 2.279834
+  type: 'test'
+  ...
+1..99
+# tests 99
+# suites 0
+# pass 99
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10515.305417

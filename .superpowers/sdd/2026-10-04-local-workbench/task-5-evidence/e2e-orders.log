@@ -1,0 +1,14 @@
+
+> moonreconcile@0.1.0 test:workbench:e2e
+> playwright test --grep orders blank
+
+Finished. moon: no work to do
+
+Running 1 test using 1 worker
+
+(node:32104) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✓  1 tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes (6.7s)
+
+  1 passed (7.5s)

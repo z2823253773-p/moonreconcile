@@ -1,0 +1,49 @@
+
+> moonreconcile@0.1.0 test:workbench:e2e
+> playwright test
+
+Finished. moon: no work to do
+
+Running 5 tests using 1 worker
+
+(node:31560) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✘  1 tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes (18.6s)
+(node:31590) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✓  2 tests/e2e/workbench.spec.mjs:148:1 › catalog form threshold, core manual reason rejection, competing reject/accept/unmatched, conflict preservation and CSV replay (5.9s)
+  ✓  3 tests/e2e/workbench.spec.mjs:172:1 › HTML and long Chinese are text; malformed CSV and invalid config preserve precise locations (2.4s)
+  ✓  4 tests/e2e/workbench.spec.mjs:185:1 › real core compare cancellation preserves the last published report and releases all controls (1.8s)
+  ✓  5 tests/e2e/workbench.spec.mjs:196:1 › resource-limited comparison stays incomplete and exit 3 after UI review (3.8s)
+
+
+  1) tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes
+
+    Error: expect(locator).toBeDisabled() failed
+
+    Locator: getByRole('button', { name: '应用待处理决定', exact: true })
+    Expected: disabled
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeDisabled" getByRole('button', { name: '应用待处理决定', exact: true }) with timeout 15000ms
+      - waiting for getByRole('button', { name: '应用待处理决定', exact: true })
+
+
+      131 |   const changedRight=path.join(root,'changed.csv');await fs.writeFile(changedRight,'external_ref,state,total,settled_on\nA,settled,100.00,2026-09-01\n');
+      132 |   await page.getByLabel('右侧来源 CSV 文件').setInputFiles(changedRight);await expect(result(page)).toContainText('旧版本（只读）');
+    > 133 |   await expect(page.getByRole('button',{name:'应用待处理决定',exact:true})).toBeDisabled();
+          |                                                                      ^
+      134 |   page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'重置本机工作台',exact:true}).click();
+      135 |   await expect(panel(page)).toContainText('本机工作台已重置');await expect(page.locator('#imports')).not.toContainText('完整校验');
+      136 |   await page.getByLabel('ZIP 工作包',{exact:true}).setInputFiles(bundle);await page.getByRole('button',{name:'恢复 ZIP 工作包',exact:true}).click();
+        at /Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/e2e/workbench.spec.mjs:133:70
+
+    Error Context: test-results/workbench-orders-blank-for-fa9f6-file-replay-match-CLI-bytes/error-context.md
+
+  1 failed
+    tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes
+  4 passed (33.8s)

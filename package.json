@@ -1,6 +1,6 @@
 {
   "name": "moonreconcile",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -8,12 +8,28 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "test": "npm run build && node scripts/run-unit-tests.mjs",
+    "test:workbench": "node scripts/run-unit-tests.mjs --workbench",
+    "package:workbench": "node scripts/package-workbench.mjs",
+    "test:workbench:package": "node scripts/check-workbench-package.mjs",
+    "test:workbench:e2e": "playwright test",
     "test:workflows": "node scripts/workflows.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "test:public-data": "node scripts/check-ourairports.mjs"
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "buffer-crc32": "1.0.0",
+    "saxes": "6.0.0",
+    "yauzl": "3.4.0",
+    "yazl": "3.3.1"
+  },
+  "overrides": {
+    "xmlchars": "2.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
   }
 }

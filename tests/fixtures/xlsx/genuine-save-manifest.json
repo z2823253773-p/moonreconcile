@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "samples": [
+    {
+      "path": "lo-1900-values.xlsx",
+      "sha256": "0a4c6ed7fac37d7a6762e7f5bd14d20f7a6644881560d220420f624cdf340347",
+      "bytes": 6697,
+      "application": "LibreOffice",
+      "application_version": "26.2.4.2",
+      "save_method": "LibreOffice headless Calc XLSX export using a private isolated UserInstallation profile per sample",
+      "expected_cells_path": "genuine-save-expected.json"
+    },
+    {
+      "path": "lo-1904-values.xlsx",
+      "sha256": "03de0d3fce4cb78e97eb37a8d1f469e694b045e4e17f9e47e287b61d967a4954",
+      "bytes": 5670,
+      "application": "LibreOffice",
+      "application_version": "26.2.4.2",
+      "save_method": "LibreOffice headless Calc XLSX export using a private isolated UserInstallation profile per sample",
+      "expected_cells_path": "genuine-save-expected.json"
+    },
+    {
+      "path": "lo-formula-reject.xlsx",
+      "sha256": "7c2951091b4ff66bdd0edb7ab1cd1ceb0e92f53ee372227ad8c90a3eb787e806",
+      "bytes": 5620,
+      "application": "LibreOffice",
+      "application_version": "26.2.4.2",
+      "save_method": "LibreOffice headless Calc XLSX export using a private isolated UserInstallation profile per sample",
+      "expected_cells_path": "genuine-save-expected.json"
+    },
+    {
+      "path": "lo-merge-reject.xlsx",
+      "sha256": "67655c51abf1b38bbf8a80bde8a94a9f30025094f5dd5541aaf369ec6e72dc7b",
+      "bytes": 5612,
+      "application": "LibreOffice",
+      "application_version": "26.2.4.2",
+      "save_method": "LibreOffice headless Calc XLSX export using a private isolated UserInstallation profile per sample",
+      "expected_cells_path": "genuine-save-expected.json"
+    },
+    {
+      "path": "excel-cr-values.xlsx",
+      "sha256": "4acec821d7c5c0a506a314e635432d0ef847c2238600cb624d582ca6a63b8752",
+      "bytes": 8995,
+      "application": "Microsoft Excel",
+      "application_version": "16.113.4 (build 16.113.26100421)",
+      "save_method": "Synthetic workbook saved through Microsoft Excel UI after AppleScript Save As timed out; CUA observed the Save dialog completion and the resulting file was independently read back from disk",
+      "expected_cells_path": "genuine-save-expected.json"
+    },
+    {
+      "path": "lo-native-filter.xlsx",
+      "sha256": "74dbde7450c6e56de05a54891e8c9b9f6240a8212c783c129473c1c5cb706d4e",
+      "bytes": 6691,
+      "application": "LibreOffice",
+      "application_version": "26.2.4.2",
+      "save_method": "LibreOffice isolated profile headless FODS to XLSX export; original controller receipt and input preserved under evidence/controller-native-filter",
+      "expected_cells_path": "native-filter-expected.json"
+    },
+    {
+      "path": "lo-conversion-1900.xlsx",
+      "sha256": "4c3c8f2f19105df8702d52f0a16d092caa092959a54e2c3ff4bf37b94e755526",
+      "bytes": 5861,
+      "application": "LibreOffice",
+      "application_version": "26.2.4.2",
+      "save_method": "LibreOffice headless Calc XLSX export using an isolated UserInstallation profile per sample",
+      "expected_cells_path": "genuine-save-expected.json"
+    },
+    {
+      "path": "lo-conversion-1904.xlsx",
+      "sha256": "98dded72b9412239d51993b314ce49281a4735d61a3633399a069d12736d1b62",
+      "bytes": 5860,
+      "application": "LibreOffice",
+      "application_version": "26.2.4.2",
+      "save_method": "LibreOffice headless Calc XLSX export using an isolated UserInstallation profile per sample",
+      "expected_cells_path": "genuine-save-expected.json"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "numeric_refs_stay_text",
+      "xml": "<t>&#60;b&#62;x&#60;/b&#62;</t>",
+      "root": "t",
+      "text": "<b>x</b>",
+      "children": 0
+    },
+    {
+      "id": "ampersand_ref_decodes_once",
+      "xml": "<t>&#38;lt;</t>",
+      "root": "t",
+      "text": "&lt;",
+      "children": 0
+    },
+    {
+      "id": "quoted_attribute_remains_syntax_safe",
+      "xml": "<t a=\"&#34;\">x</t>",
+      "root": "t",
+      "text": "x",
+      "attributes": {
+        "a": "\""
+      },
+      "children": 0
+    },
+    {
+      "id": "decimal_hex_predefined",
+      "xml": "<t>&#65;&#x42;&amp;&lt;&gt;&quot;&apos;</t>",
+      "root": "t",
+      "text": "AB&<>\"'",
+      "children": 0
+    },
+    {
+      "id": "unicode_numeric_reference",
+      "xml": "<t>&#x1F642;</t>",
+      "root": "t",
+      "text": "🙂",
+      "children": 0
+    },
+    {
+      "id": "cdata_is_literal",
+      "xml": "<t>a<![CDATA[&lt;b>]]>c</t>",
+      "root": "t",
+      "text": "a&lt;b>c",
+      "children": 0
+    },
+    {
+      "id": "malformed_nesting",
+      "xml": "<a><b></a>",
+      "reject": "invalid_xlsx"
+    },
+    {
+      "id": "malformed_attribute",
+      "xml": "<a x=\"1></a>",
+      "reject": "invalid_xlsx"
+    },
+    {
+      "id": "doctype_custom_entity",
+      "xml": "<!DOCTYPE t [<!ENTITY x \"y\">]><t>&x;</t>",
+      "reject": "unsupported_xlsx_feature"
+    },
+    {
+      "id": "doctype_external_entity",
+      "xml": "<!DOCTYPE t SYSTEM \"file:///etc/passwd\"><t/>",
+      "reject": "unsupported_xlsx_feature"
+    },
+    {
+      "id": "xml_11",
+      "xml": "<?xml version=\"1.1\"?><t/>",
+      "reject": "invalid_xlsx"
+    },
+    {
+      "id": "non_utf8_declaration",
+      "xml": "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><t/>",
+      "reject": "invalid_xlsx"
+    }
+  ]
+}

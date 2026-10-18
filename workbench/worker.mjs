@@ -1,0 +1,19 @@
+import process from 'node:process';
+import { executeTask } from './engine-host.mjs';
+import { loadBridgeInvoke } from '../cli/bridge.mjs';
+import { sanitizeError } from './contracts.mjs';
+process.umask(0o077);
+let started=false;
+const controller=new AbortController();
+process.once('disconnect',()=>controller.abort(new Error('Worker transport closed')));
+process.once('SIGTERM',()=>controller.abort(new Error('Worker cancelled')));
+process.on('message',async message=>{
+  if(started||!message?.task||!message.job_id)return;started=true;
+  const {job_id,task}=message;
+  const send=(value)=>process.send?.({job_id,...value},()=>process.disconnect());
+  try {
+    process.send?.({job_id,type:'phase',phase:task.kind==='compare'||task.kind==='branch'?'comparing':task.kind==='review'?'resolving':task.kind==='bundle'?'packing':task.kind==='restore'?'restoring':'validating'});
+    const invoke=await loadBridgeInvoke(task.bridge_path);
+    const output=await executeTask(task,{invoke,signal:controller.signal});send({type:'result',output});
+  }catch(e){send({type:'error',error:sanitizeError(e,Object.values(task.paths??{}))});}
+});

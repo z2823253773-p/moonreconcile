@@ -1,0 +1,315 @@
+{
+  "schema_version": 1,
+  "samples": [
+    {
+      "id": "lo-1900-values.xlsx",
+      "design_cells": {
+        "F2": "line\r\nbreak"
+      },
+      "stored": {
+        "date_system": "1900",
+        "cells": {
+          "A1": "id",
+          "B1": "text",
+          "C1": "unicode",
+          "D1": "whitespace",
+          "E1": "literal",
+          "F1": "cr",
+          "A2": "00123",
+          "B2": "hello",
+          "C2": "雪🙂",
+          "D2": "  keep  ",
+          "E2": "_x0061_",
+          "F2": "line\nbreak"
+        },
+        "hidden_rows": [
+          3
+        ],
+        "auto_filter": true,
+        "formula": false,
+        "merge": false
+      }
+    },
+    {
+      "id": "lo-1904-values.xlsx",
+      "design_cells": {
+        "B2": "9007199254740993",
+        "C2": "1.2300E+2"
+      },
+      "stored": {
+        "date_system": "1904",
+        "cells": {
+          "A1": "value",
+          "B1": "numeric_long",
+          "C1": "numeric_exponent",
+          "A2": "0",
+          "B2": "9007199254740990",
+          "C2": "123"
+        },
+        "hidden_rows": [],
+        "auto_filter": false,
+        "formula": false,
+        "merge": false
+      }
+    },
+    {
+      "id": "lo-formula-reject.xlsx",
+      "design_cells": {
+        "A2": "=1+1"
+      },
+      "stored": {
+        "date_system": "1900",
+        "cells": {
+          "A1": "input",
+          "A2": "2"
+        },
+        "hidden_rows": [],
+        "auto_filter": false,
+        "formula": true,
+        "merge": false
+      }
+    },
+    {
+      "id": "lo-merge-reject.xlsx",
+      "design_cells": {
+        "A1": "left",
+        "B1": null
+      },
+      "stored": {
+        "date_system": "1900",
+        "cells": {
+          "A1": "left",
+          "B1": ""
+        },
+        "hidden_rows": [],
+        "auto_filter": false,
+        "formula": false,
+        "merge": true
+      }
+    },
+    {
+      "id": "excel-cr-values.xlsx",
+      "design_cells": {
+        "A1": "id",
+        "B1": "text",
+        "A2": "00123",
+        "B2": "synthetic\rline"
+      },
+      "stored": {
+        "date_system": "1900",
+        "cells": {
+          "A1": "id",
+          "B1": "text",
+          "A2": "00123",
+          "B2": "synthetic\rline"
+        },
+        "hidden_rows": [],
+        "auto_filter": false,
+        "formula": false,
+        "merge": false
+      }
+    },
+    {
+      "id": "lo-conversion-1900.xlsx",
+      "design_cells": {
+        "B2": "9007199254740993",
+        "C2": "1.2300E+2"
+      },
+      "stored": {
+        "date_system": "1900",
+        "cells": {
+          "A1": "text_id",
+          "B1": "numeric_long",
+          "C1": "decimal",
+          "D1": "date_serial",
+          "E1": "padded",
+          "F1": "boolean",
+          "A2": "00123",
+          "B2": "9007199254740990",
+          "C2": "123",
+          "D2": "0",
+          "E2": "123",
+          "F2": "1",
+          "A3": "end",
+          "B3": "1.23456789012346E+029",
+          "C3": "0.000123",
+          "D3": "59",
+          "E3": "0",
+          "F3": "0",
+          "A5": "last",
+          "B5": "1",
+          "C5": "100",
+          "D5": "61",
+          "E5": "99999",
+          "F5": ""
+        },
+        "hidden_rows": [],
+        "formula": false,
+        "merge": false,
+        "auto_filter": false
+      },
+      "modes": [
+        "stored_text",
+        "decimal_lexeme",
+        "stored_text",
+        "excel_date",
+        "zero_padded_identifier",
+        "stored_text"
+      ],
+      "range": {
+        "header_row": 1,
+        "column_start": 1,
+        "column_end": 6,
+        "last_row": 5
+      },
+      "expected_csv": "lo-conversion-1900-reference.csv",
+      "csv_bytes": 200,
+      "csv_sha256": "393b7834578406b26ebf62321e62ef9bc11020bd5ec53daa11c4ff06d030e89e",
+      "headers": [
+        "text_id",
+        "numeric_long",
+        "decimal",
+        "date_serial",
+        "padded",
+        "boolean"
+      ],
+      "rows": [
+        [
+          "00123",
+          "9007199254740990",
+          "123",
+          "1899-12-31",
+          "00123",
+          "1"
+        ],
+        [
+          "end",
+          "123456789012346000000000000000",
+          "0.000123",
+          "1900-02-28",
+          "00000",
+          "0"
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "last",
+          "1",
+          "100",
+          "1900-03-01",
+          "99999",
+          ""
+        ]
+      ],
+      "row_count": 4,
+      "note": "LibreOffice stored intended boolean cells as numeric 1/0; synthetic t=b remains separate necessary coverage. Large designed numeric values rounded before XLSX storage; compare actual stored bytes."
+    },
+    {
+      "id": "lo-conversion-1904.xlsx",
+      "design_cells": {
+        "B2": "9007199254740993",
+        "C2": "1.2300E+2"
+      },
+      "stored": {
+        "date_system": "1904",
+        "cells": {
+          "A1": "text_id",
+          "B1": "numeric_long",
+          "C1": "decimal",
+          "D1": "date_serial",
+          "E1": "padded",
+          "F1": "boolean",
+          "A2": "00123",
+          "B2": "9007199254740990",
+          "C2": "123",
+          "D2": "0",
+          "E2": "123",
+          "F2": "1",
+          "A3": "end",
+          "B3": "1.23456789012346E+029",
+          "C3": "0.000123",
+          "D3": "59",
+          "E3": "0",
+          "F3": "0",
+          "A5": "last",
+          "B5": "1",
+          "C5": "100",
+          "D5": "61",
+          "E5": "99999",
+          "F5": ""
+        },
+        "hidden_rows": [],
+        "formula": false,
+        "merge": false,
+        "auto_filter": false
+      },
+      "modes": [
+        "stored_text",
+        "decimal_lexeme",
+        "stored_text",
+        "excel_date",
+        "zero_padded_identifier",
+        "stored_text"
+      ],
+      "range": {
+        "header_row": 1,
+        "column_start": 1,
+        "column_end": 6,
+        "last_row": 5
+      },
+      "expected_csv": "lo-conversion-1904-reference.csv",
+      "csv_bytes": 200,
+      "csv_sha256": "11209dcaf415406fef9bf8f9f69a7269eb76e8136395ee3dd635dd82412ed783",
+      "headers": [
+        "text_id",
+        "numeric_long",
+        "decimal",
+        "date_serial",
+        "padded",
+        "boolean"
+      ],
+      "rows": [
+        [
+          "00123",
+          "9007199254740990",
+          "123",
+          "1904-01-01",
+          "00123",
+          "1"
+        ],
+        [
+          "end",
+          "123456789012346000000000000000",
+          "0.000123",
+          "1904-02-29",
+          "00000",
+          "0"
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "last",
+          "1",
+          "100",
+          "1904-03-02",
+          "99999",
+          ""
+        ]
+      ],
+      "row_count": 4,
+      "note": "LibreOffice stored intended boolean cells as numeric 1/0; synthetic t=b remains separate necessary coverage. Large designed numeric values rounded before XLSX storage; compare actual stored bytes."
+    }
+  ]
+}

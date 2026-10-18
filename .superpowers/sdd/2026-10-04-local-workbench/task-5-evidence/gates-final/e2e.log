@@ -1,0 +1,90 @@
+
+> moonreconcile@0.1.0 test:workbench:e2e
+> playwright test
+
+Finished. moon: no work to do
+
+Running 5 tests using 1 worker
+
+(node:31017) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✘  1 tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes (2.0m)
+(node:31206) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✘  2 tests/e2e/workbench.spec.mjs:148:1 › catalog form threshold, core manual reason rejection, competing reject/accept/unmatched, conflict preservation and CSV replay (2.0m)
+(node:31306) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Finished. moon: no work to do
+  ✓  3 tests/e2e/workbench.spec.mjs:172:1 › HTML and long Chinese are text; malformed CSV and invalid config preserve precise locations (2.4s)
+  ✓  4 tests/e2e/workbench.spec.mjs:185:1 › real core compare cancellation preserves the last published report and releases all controls (1.7s)
+  ✘  5 tests/e2e/workbench.spec.mjs:196:1 › resource-limited comparison stays incomplete and exit 3 after UI review (2.0m)
+
+
+  1) tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes
+
+    Test timeout of 120000ms exceeded.
+
+    Error: locator.selectOption: Test timeout of 120000ms exceeded.
+    Call log:
+      - waiting for locator('.field-card').first().getByLabel('右侧来源列', { exact: true })
+
+
+       97 |   while(await fields.count()>4)await fields.last().getByRole('button',{name:'删除字段',exact:true}).click();
+       98 |   for(const [index,rightColumn,type] of [[0,'external_ref','text'],[1,'state','text'],[2,'total','decimal'],[3,'settled_on','date']]){
+    >  99 |     await fields.nth(index).getByLabel('右侧来源列',{exact:true}).selectOption(rightColumn);
+          |                                                              ^
+      100 |     await fields.nth(index).getByLabel('类型（必选）').selectOption(type);
+      101 |   }
+      102 |   await fields.nth(0).getByLabel('参与逐行比较',{exact:true}).uncheck();
+        at /Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/e2e/workbench.spec.mjs:99:62
+
+    Error Context: test-results/workbench-orders-blank-for-fa9f6-file-replay-match-CLI-bytes/error-context.md
+
+  2) tests/e2e/workbench.spec.mjs:148:1 › catalog form threshold, core manual reason rejection, competing reject/accept/unmatched, conflict preservation and CSV replay
+
+    Test timeout of 120000ms exceeded.
+
+    Error: locator.selectOption: Test timeout of 120000ms exceeded.
+    Call log:
+      - waiting for getByLabel('动作', { exact: true })
+
+
+      56 | }
+      57 | async function manual(page,action,left,right='',reason='') {
+    > 58 |   await page.getByLabel('动作',{exact:true}).selectOption(action);
+         |                                            ^
+      59 |   await page.getByLabel('手工 left_id').fill(left);await page.getByLabel('手工 right_id').fill(right);
+      60 |   await page.getByLabel('手工决定理由').fill(reason);await page.getByRole('button',{name:'添加手工决定',exact:true}).click();
+      61 | }
+        at manual (/Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/e2e/workbench.spec.mjs:58:44)
+        at /Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/e2e/workbench.spec.mjs:154:9
+
+    Error Context: test-results/workbench-catalog-form-thr-85001-preservation-and-CSV-replay/error-context.md
+
+  3) tests/e2e/workbench.spec.mjs:196:1 › resource-limited comparison stays incomplete and exit 3 after UI review
+
+    Test timeout of 120000ms exceeded.
+
+    Error: locator.selectOption: Test timeout of 120000ms exceeded.
+    Call log:
+      - waiting for getByLabel('指标', { exact: true })
+
+
+      203 |   // Adding the row re-renders the form; reopen its native details before edits.
+      204 |   await candidates.locator('summary').click();const rows=candidates.locator('.editor-block').filter({has:page.getByRole('heading',{name:/^候选评分字段/})});await rows.getByRole('button',{name:'添加',exact:true}).click();await candidates.locator('summary').click();
+    > 205 |   await page.getByLabel('评分逻辑字段',{exact:true}).fill('label');await page.getByRole('combobox',{name:'指标',exact:true}).selectOption('exact');await page.getByLabel('权重（1–10000 严格整数）').fill('10000');await page.getByLabel('候选阈值（1–10000 严格整数）').fill('10000');await checkRules(page);await compare(page);
+          |                                                                                                       ^
+      206 |   await expect(result(page).locator('.result-summary')).toContainText('incomplete');await manual(page,'left_unmatched','L101','','明确核对');await applyPending(page);
+      207 |   const evidence=await downloadEvidence(page,root);const report=JSON.parse(await fs.readFile(evidence.report));expect(report.exit_code).toBe(3);expect(report.computation.status).toBe('incomplete');expect(report.decisions).toHaveLength(1);
+      208 |   expect(await fs.readFile(evidence.report)).toEqual(await cliOracle({left,right,...evidence,root:path.join(root,'cli')}));
+        at /Users/henryz/Desktop/比赛/moonreconcile/.worktrees/quarter-workbench/tests/e2e/workbench.spec.mjs:205:103
+
+    Error Context: test-results/workbench-resource-limited-971fc--and-exit-3-after-UI-review/error-context.md
+
+  3 failed
+    tests/e2e/workbench.spec.mjs:85:1 › orders blank form → L3 apply → downloads → ZIP/reset/restore → branch and cumulative file replay match CLI bytes
+    tests/e2e/workbench.spec.mjs:148:1 › catalog form threshold, core manual reason rejection, competing reject/accept/unmatched, conflict preservation and CSV replay
+    tests/e2e/workbench.spec.mjs:196:1 › resource-limited comparison stays incomplete and exit 3 after UI review
+  2 passed (6.1m)

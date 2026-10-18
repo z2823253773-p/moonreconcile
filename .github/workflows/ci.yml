@@ -3,9 +3,9 @@ name: CI
 # Task 8 requires CI on supported Ubuntu and arm64 macOS runners with a
 # recorded MoonBit toolchain, Node 22, Python 3.12, and the full local gates.
 #
-# The official `latest` selector is mutable. Each run records the installer
-# digest, installed version strings, and executable hashes so its toolchain is
-# identifiable. CI runs on disposable hosted runners only.
+# Use the same MoonBit release and exact Node version as local acceptance.
+# Each run still records installer/executable digests and actual versions.
+# CI runs on disposable hosted runners only.
 
 on:
   push:
@@ -17,7 +17,8 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: "22"
+  NODE_VERSION: "22.23.3"
+  MOONBIT_VERSION: "0.10.14+7d59c7ec9"
   PYTHON_VERSION: "3.12"
 
 jobs:
@@ -38,6 +39,12 @@ jobs:
           # of the exact HEAD revision.
           fetch-depth: 0
 
+      - name: Ignore generated XLSX test evidence in CI metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '/.superpowers/sdd/2026-10-08-restricted-xlsx/evidence/task-6/' >> "$(git rev-parse --git-path info/exclude)"
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -56,8 +63,10 @@ jobs:
             https://cli.moonbitlang.com/install/unix.sh \
             -o "$RUNNER_TEMP/moon-install.sh"
           shasum -a 256 "$RUNNER_TEMP/moon-install.sh"
-          bash "$RUNNER_TEMP/moon-install.sh" latest
+          bash "$RUNNER_TEMP/moon-install.sh" "$MOONBIT_VERSION"
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+          echo "MOON_HOME=$HOME/.moon" >> "$GITHUB_ENV"
+          echo "MOONBIT_HOME=$HOME/.moon" >> "$GITHUB_ENV"
 
       - name: Record actual toolchain versions
         run: |
@@ -67,6 +76,12 @@ jobs:
           git rev-parse HEAD
           uname -a
           shasum -a 256 "$HOME/.moon/bin/moon" "$HOME/.moon/bin/moonc"
+
+      - name: Install locked host and browser test dependencies
+        run: npm ci
+
+      - name: Install the pinned Playwright Chromium runtime
+        run: npx playwright install --with-deps chromium
 
       - name: Build and check core
         run: |
@@ -79,6 +94,22 @@ jobs:
 
       - name: Build bridge and run host integration tests
         run: npm test
+
+      - name: Local workbench host tests
+        run: npm run test:workbench
+
+      - name: Local workbench browser workflows
+        run: npm run test:workbench:e2e
+
+      - name: Build the precompiled Node 22 workbench package
+        run: npm run package:workbench
+
+      - name: Relocated package tests
+        run: node --test tests/workbench-package.test.mjs
+
+      - name: Package identity, production lock, genuine XLSX closure and shutdown regressions (macOS network sandbox)
+        if: matrix.os == 'macos-15'
+        run: node --test tests/workbench-package-validation.test.mjs
 
       - name: Synthetic workflow end-to-end chains
         run: npm run test:workflows
@@ -94,3 +125,29 @@ jobs:
 
       - name: README acceptance smoke from fresh checkout
         run: node scripts/readme-smoke.mjs
+
+      - name: Verify source is clean before strict package validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --porcelain=v1 --untracked-files=all
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Strict offline CSV + genuine XLSX package workflow (macOS)
+        if: matrix.os == 'macos-15'
+        run: npm run test:workbench:package
+
+      - name: Strict offline CSV + genuine XLSX package workflow (Ubuntu network namespace)
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          set -euo pipefail
+          node_binary="$(command -v node)"
+          sudo --preserve-env=PATH,MOON_HOME,MOONBIT_HOME unshare --net -- /usr/bin/bash -c '
+            set -euo pipefail
+            ip link set lo up
+            export MOONRECONCILE_NETWORK_ISOLATED=1
+            export MOONRECONCILE_NODE_BINARY="$1"
+            export PATH="$(dirname "$1"):/usr/bin:/bin:/usr/sbin:/sbin"
+            cd "$2"
+            exec "$1" scripts/check-workbench-package.mjs
+          ' _ "$node_binary" "$GITHUB_WORKSPACE"

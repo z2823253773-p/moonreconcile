@@ -1,0 +1,19 @@
+✔ bundle export, reset, upload, CLI replay restore, and fresh local registration are atomic (334.390959ms)
+✔ restore asset quota precheck preserves every old registry entry and report (306.349625ms)
+✔ restore import quota precheck preserves every old registry entry and report (317.056667ms)
+✔ restore revision quota precheck preserves every old registry entry and report (306.14725ms)
+✔ final no-await restore latch rechecks asset capacity after a concurrent upload (5380.83925ms)
+✔ self-consistent forged report fails HTTP restore without publishing any partial registry entries (359.141ms)
+✔ reviewed ZIP restore creates a self-baseline retaining applied actions, and branch really re-compares (664.014625ms)
+✔ cancel actual bundle waits for child exit before owned cleanup and preserves old reports (263.145083ms)
+✔ cancel actual restore waits for child exit before owned cleanup and preserves old reports (299.557833ms)
+✔ bundle worker honors the configured zip_bytes cap and preserves the published run (190.695916ms)
+✔ bundle worker honors the configured unzip_bytes cap and preserves the published run (190.080209ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8657.952833

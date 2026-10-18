@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "engine_version": "0.1.0",
+  "computation": {
+    "status": "complete",
+    "issues": []
+  },
+  "records": [
+    {
+      "id": "L1",
+      "side": "left",
+      "record": 1,
+      "status": "paired",
+      "reason": "exact_key"
+    },
+    {
+      "id": "L2",
+      "side": "left",
+      "record": 2,
+      "status": "paired",
+      "reason": "exact_key"
+    },
+    {
+      "id": "L3",
+      "side": "left",
+      "record": 3,
+      "status": "pending_review",
+      "reason": "review_required"
+    },
+    {
+      "id": "R1",
+      "side": "right",
+      "record": 1,
+      "status": "paired",
+      "reason": "exact_key"
+    },
+    {
+      "id": "R2",
+      "side": "right",
+      "record": 2,
+      "status": "paired",
+      "reason": "exact_key"
+    }
+  ],
+  "pairs": [
+    {
+      "left_id": "L1",
+      "right_id": "R1",
+      "source": "exact_key",
+      "reason": "unique_canonical_key",
+      "override": false
+    },
+    {
+      "left_id": "L2",
+      "right_id": "R2",
+      "source": "exact_key",
+      "reason": "unique_canonical_key",
+      "override": false
+    }
+  ],
+  "fields": [
+    {
+      "left_id": "L1",
+      "right_id": "R1",
+      "field": "status",
+      "type": "text",
+      "left_raw": "已支付",
+      "right_raw": "settled",
+      "left_transformed": "paid",
+      "right_transformed": "paid",
+      "left_canonical": "paid",
+      "right_canonical": "paid",
+      "status": "equivalent_by_rule",
+      "rules": [
+        "value_map",
+        "value_map"
+      ],
+      "difference": null,
+      "tolerance": null,
+      "explanation": "values_equal_after_configured_transforms"
+    },
+    {
+      "left_id": "L1",
+      "right_id": "R1",
+      "field": "amount",
+      "type": "decimal",
+      "left_raw": "100.00",
+      "right_raw": "100.01",
+      "left_transformed": "100.00",
+      "right_transformed": "100.01",
+      "left_canonical": "100",
+      "right_canonical": "100.01",
+      "status": "equivalent_by_rule",
+      "rules": [
+        "decimal_canonicalization",
+        "decimal_canonicalization",
+        "decimal_tolerance"
+      ],
+      "difference": "-0.01",
+      "tolerance": "0.02",
+      "explanation": "decimal_difference_within_tolerance"
+    },
+    {
+      "left_id": "L1",
+      "right_id": "R1",
+      "field": "day",
+      "type": "date",
+      "left_raw": "2026-09-01",
+      "right_raw": "2026-09-01",
+      "left_transformed": "2026-09-01",
+      "right_transformed": "2026-09-01",
+      "left_canonical": "2026-09-01",
+      "right_canonical": "2026-09-01",
+      "status": "equal",
+      "rules": [
+        "date_canonicalization",
+        "date_canonicalization"
+      ],
+      "difference": "0",
+      "tolerance": "0",
+      "explanation": "raw_values_equal"
+    },
+    {
+      "left_id": "L2",
+      "right_id": "R2",
+      "field": "status",
+      "type": "text",
+      "left_raw": "pending",
+      "right_raw": "paid",
+      "left_transformed": "pending",
+      "right_transformed": "paid",
+      "left_canonical": "pending",
+      "right_canonical": "paid",
+      "status": "different",
+      "rules": [],
+      "difference": null,
+      "tolerance": null,
+      "explanation": "canonical_values_differ"
+    },
+    {
+      "left_id": "L2",
+      "right_id": "R2",
+      "field": "amount",
+      "type": "decimal",
+      "left_raw": "10",
+      "right_raw": "11",
+      "left_transformed": "10",
+      "right_transformed": "11",
+      "left_canonical": "10",
+      "right_canonical": "11",
+      "status": "different",
+      "rules": [
+        "decimal_canonicalization",
+        "decimal_canonicalization",
+        "decimal_tolerance"
+      ],
+      "difference": "-1",
+      "tolerance": "0.02",
+      "explanation": "decimal_difference_exceeds_tolerance"
+    },
+    {
+      "left_id": "L2",
+      "right_id": "R2",
+      "field": "day",
+      "type": "date",
+      "left_raw": "2026-09-02",
+      "right_raw": "2026-09-03",
+      "left_transformed": "2026-09-02",
+      "right_transformed": "2026-09-03",
+      "left_canonical": "2026-09-02",
+      "right_canonical": "2026-09-03",
+      "status": "different",
+      "rules": [
+        "date_canonicalization",
+        "date_canonicalization",
+        "date_days_tolerance"
+      ],
+      "difference": "-1",
+      "tolerance": "0",
+      "explanation": "date_difference_exceeds_day_tolerance"
+    }
+  ],
+  "candidates": [],
+  "decisions": [],
+  "structure": {
+    "unmapped_left": [],
+    "unmapped_right": [],
+    "ignored_left": [],
+    "ignored_right": []
+  },
+  "key_issues": [
+    {
+      "code": "key_not_found",
+      "side": "left",
+      "record": 3,
+      "field": null,
+      "message": "no right record has this key; record remains pending"
+    }
+  ],
+  "summary": {
+    "per_side": {
+      "left": {
+        "total": 3,
+        "paired": 2,
+        "unmatched": 0,
+        "pending_review": 1,
+        "unprocessed": 0
+      },
+      "right": {
+        "total": 2,
+        "paired": 2,
+        "unmatched": 0,
+        "pending_review": 0,
+        "unprocessed": 0
+      }
+    },
+    "fields": {
+      "equal": 1,
+      "equivalent_by_rule": 2,
+      "different": 3,
+      "invalid_value": 0
+    },
+    "structural_issue_count": 0,
+    "key_issue_count": 1,
+    "candidate_count": 0,
+    "unresolved_count": 1
+  },
+  "exit_code": 1
+}

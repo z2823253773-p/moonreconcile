@@ -1,4 +1,4 @@
-# Project Agents.md Guide
+# MoonReconcile agent guide
 
 This is a [MoonBit](https://docs.moonbitlang.com) project.
 
@@ -51,3 +51,28 @@ You can browse and install extra skills here:
   scientific computations), prefer assertion tests. You can use
   `moon coverage analyze > uncovered.log` to see which parts of your code are
   not covered by tests.
+
+## Verification and implementation governance
+
+- Product implementation belongs to `.worktrees/quarter-workbench` on
+  `feature/quarter-workbench`. Preserve the main `feature/initial-product`
+  checkout and previously accepted evidence. Work is local by default; do not
+  push, merge, release, or submit competition materials without authorization.
+
+- `make verify` is the local one-command acceptance entrypoint. It requires a
+  clean tracked and untracked source tree, checks every tracked file against
+  the current HEAD blob, bootstraps only hard-pinned archives into `.verify/`,
+  and records stage logs plus a JSON summary under `.verify/runs/`.
+- Do not run the strict package validator on dirty source or report a green
+  status when any stage fails, times out, is skipped, or lacks required
+  isolation. Keep local acceptance, remote CI, and user/competition outcomes
+  as separate evidence claims. See `docs/verify.md` for prerequisites and
+  platform limits.
+- Keep all pre-existing A+C business assertions and the frozen P0 scope intact.
+  Do not alter matching, scoring, parsing, DTO/security contracts, or accepted
+  package evidence as part of verifier work.
+- One implementation writer owns a change. GPT-6.1-sol performs the independent
+  scoped review at high reasoning effort. Allow at most two repair-and-review
+  cycles; after the second unresolved cycle, stop implementation and present
+  the concrete findings and decision options. Record the exact base/head,
+  finding, cycle count, and final state in the ignored governance ledger.
